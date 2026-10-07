@@ -93,6 +93,20 @@
     background: var(--accent-soft); color: var(--ink); }
   .recon.bad { background: var(--bad-soft); color: var(--bad); font-weight: 600; }
   .recon.good { background: var(--good-soft); color: var(--good); }
+  .seg { display: inline-flex; border: 1px solid var(--line); border-radius: 999px; overflow: hidden; background: var(--panel); }
+  .seg button { font: inherit; font-size: 13.5px; border: none; background: none; color: var(--ink); padding: 6px 16px; cursor: pointer; }
+  .seg button + button { border-left: 1px solid var(--line); }
+  .seg button.on { background: var(--accent); color: #fff; font-weight: 600; }
+  .hbar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 4px; }
+  .hbar .label { font-size: 17px; font-weight: 700; min-width: 190px; text-align: center; }
+  .trend { display: flex; align-items: flex-end; gap: 8px; height: 150px; margin-top: 12px; }
+  .trend .col { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; height: 100%; cursor: pointer; min-width: 0; }
+  .trend .bar { width: 100%; background: var(--line); border-radius: 4px 4px 0 0; min-height: 2px; }
+  .trend .col:hover .bar { background: var(--accent-soft); }
+  .trend .col.sel .bar { background: var(--accent); }
+  .trend .n { font-size: 12px; font-variant-numeric: tabular-nums; color: var(--muted); margin-bottom: 3px; }
+  .trend .col.sel .n { color: var(--ink); font-weight: 700; }
+  .trend .l { font-size: 11px; color: var(--muted); margin-top: 5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
   .pctu { display: block; font-size: 11.5px; color: var(--muted); font-weight: 400; line-height: 1.3; }
 </style>
 </head>
@@ -301,6 +315,7 @@
       el.appendChild(b);
     }
     mk('summary', 'Team Summary');
+    mk('history', 'History');
     state.settings.forEach(function (s) { mk(s.rep, s.rep); });
   }
 
@@ -384,6 +399,152 @@
       + '<li><strong>Other</strong> &mdash; connects minus booked and the nine codes. It holds the two outcomes we deliberately do not track (Do Not Contact, Wrong Number) plus anything not yet filled in. A negative number means the outcomes entered exceed the connects entered &mdash; a logging error worth chasing.</li>'
       + '</ul>'
       + "<p class='hint'>Refresh the page to pull the latest entries.</p></div>";
+  }
+
+  // ---- History: any week, month or quarter, with a trend of the periods leading up to it ----
+  var hist = { kind: 'week', offset: 0, metric: 'booked' };
+  var MON = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  var HIST_METRICS = [
+    { k: 'booked', label: 'Meetings booked' }, { k: 'dials', label: 'Dials' },
+    { k: 'connects', label: 'Connects' }, { k: 'completions', label: 'Conversations' }
+  ];
+
+  function periodFor(kind, offset) {
+    var now = new Date(); now.setHours(0, 0, 0, 0);
+    var s, e, label, short;
+    if (kind === 'week') {
+      s = new Date(now); s.setDate(s.getDate() - ((s.getDay() + 6) % 7) + offset * 7);
+      e = new Date(s); e.setDate(e.getDate() + 6);
+      label = MON[s.getMonth()] + ' ' + s.getDate() + ' – ' + MON[e.getMonth()] + ' ' + e.getDate() + ', ' + e.getFullYear();
+      short = MON[s.getMonth()] + ' ' + s.getDate();
+    } else if (kind === 'month') {
+      s = new Date(now.getFullYear(), now.getMonth() + offset, 1);
+      e = new Date(s.getFullYear(), s.getMonth() + 1, 0);
+      label = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'][s.getMonth()] + ' ' + s.getFullYear();
+      short = MON[s.getMonth()] + " '" + String(s.getFullYear()).slice(2);
+    } else {
+      var q = Math.floor(now.getMonth() / 3);
+      s = new Date(now.getFullYear(), q * 3 + offset * 3, 1);
+      e = new Date(s.getFullYear(), s.getMonth() + 3, 0);
+      label = 'Q' + (Math.floor(s.getMonth() / 3) + 1) + ' ' + s.getFullYear();
+      short = 'Q' + (Math.floor(s.getMonth() / 3) + 1) + " '" + String(s.getFullYear()).slice(2);
+    }
+    return { start: s, end: e, from: iso(s), to: iso(e), label: label, short: short, workdays: workdays(s, e) };
+  }
+
+  function rowsIn(rep, p) {
+    var known = state.settings.map(function (s) { return s.rep; });
+    return state.entries.filter(function (e) {
+      return (rep === null ? known.indexOf(e.rep) !== -1 : e.rep === rep) && e.entry_date >= p.from && e.entry_date <= p.to;
+    });
+  }
+
+  // Monthly target spread over the period: each month it touches contributes its share of working days.
+  // Uses each rep's current target (past targets are not stored).
+  function targetFor(rep, p) {
+    var target = settingsFor(rep).monthly_target || 48, total = 0;
+    var m = new Date(p.start.getFullYear(), p.start.getMonth(), 1);
+    for (; m <= p.end; m.setMonth(m.getMonth() + 1)) {
+      var ms = new Date(m), me = new Date(m.getFullYear(), m.getMonth() + 1, 0);
+      var a = ms < p.start ? p.start : ms, b = me > p.end ? p.end : me;
+      var mDays = workdays(ms, me);
+      if (mDays) total += target * workdays(a, b) / mDays;
+    }
+    return total;
+  }
+
+  function renderHistory(v) {
+    var p = periodFor(hist.kind, hist.offset);
+    var today = iso(new Date());
+    var elapsedEnd = p.to > today ? parse(today) : p.end;
+    var elapsedDays = p.from > today ? 0 : workdays(p.start, elapsedEnd);
+    var metric = HIST_METRICS.find(function (m) { return m.k === hist.metric; });
+
+    var kinds = [['week', 'Week'], ['month', 'Month'], ['quarter', 'Quarter']].map(function (k) {
+      return "<button data-kind='" + k[0] + "' class='" + (hist.kind === k[0] ? 'on' : '') + "'>" + k[1] + '</button>';
+    }).join('');
+    var metrics = HIST_METRICS.map(function (m) {
+      return "<button data-metric='" + m.k + "' class='" + (hist.metric === m.k ? 'on' : '') + "'>" + m.label + '</button>';
+    }).join('');
+
+    // trend: this period and the seven before it, team total
+    var cols = [], max = 0, i;
+    for (i = 7; i >= 0; i--) {
+      var q = periodFor(hist.kind, hist.offset - i);
+      var tot = sum(rowsIn(null, q), hist.metric);
+      max = Math.max(max, tot);
+      cols.push({ off: hist.offset - i, p: q, tot: tot });
+    }
+    var trend = cols.map(function (c) {
+      var h = max > 0 ? Math.round(c.tot / max * 100) : 0;
+      return "<div class='col" + (c.off === hist.offset ? ' sel' : '') + "' data-off='" + c.off + "' title='" + esc(c.p.label) + "'>"
+        + "<div class='n'>" + f0(c.tot) + '</div><div class="bar" style="height:' + h + '%"></div>'
+        + "<div class='l'>" + esc(c.p.short) + '</div></div>';
+    }).join('');
+
+    function cell(n, connects, cls) {
+      return "<td class='" + (cls || '') + "'>" + f1(n) + "<span class='pctu'>" + pct(n, connects) + '</span></td>';
+    }
+    var reps = state.settings.map(function (s) { return s.rep; });
+    var groups = reps.map(function (r) { return { name: r, rows: rowsIn(r, p), target: targetFor(r, p) }; });
+    var all = { name: 'Team', rows: rowsIn(null, p), target: groups.reduce(function (a, g) { return a + g.target; }, 0) };
+
+    function logged(rows) {
+      return rows.filter(function (e) { return Number(e.dials) > 0 || Number(e.connects) > 0 || Number(e.completions) > 0 || Number(e.booked) > 0; }).length;
+    }
+    var perf = groups.concat([all]).map(function (g) {
+      var m = outcomeMix(g.rows), d = sum(g.rows, 'dials');
+      var isTeam = g.name === 'Team';
+      var pctT = g.target > 0 ? m.booked / g.target * 100 : null;
+      return '<tr' + (isTeam ? " class='total'" : '') + '><td>' + esc(g.name) + '</td><td>' + f0(d) + '</td><td>' + f0(m.connects) + '</td><td>' + f0(m.convos)
+        + "</td><td class='req'>" + f1(m.booked) + '</td><td>' + f1(g.target)
+        + "</td><td class='" + (pctT === null ? 'dim' : (pctT >= 100 ? 'good' : '')) + "'>" + (pctT === null ? '&mdash;' : f0(pctT) + '%') + '</td>'
+        + '<td>' + (d > 0 ? f1(m.connects / d * 100) + '%' : '&mdash;') + '</td>'
+        + '<td>' + (m.connectToDB === null ? '&mdash;' : f1(m.connectToDB) + '%') + '</td>'
+        + '<td>' + (isTeam ? '' : logged(g.rows) + ' / ' + elapsedDays) + '</td></tr>';
+    }).join('');
+
+    var mix = groups.concat([all]).map(function (g) {
+      var m = outcomeMix(g.rows);
+      return '<tr' + (g.name === 'Team' ? " class='total'" : '') + '><td>' + esc(g.name) + '</td><td>' + f0(m.connects) + '</td>'
+        + "<td class='req'>" + f1(m.booked) + '</td>'
+        + SPLIT.map(function (d) { return cell(m.counts[d.k], m.connects); }).join('')
+        + cell(m.other, m.connects, m.other < -0.05 ? 'warn' : 'dim')
+        + "<td class='dim'>" + f0(m.counts.disp_mr) + '</td></tr>';
+    }).join('');
+
+    v.innerHTML = "<div class='card'><h2>History</h2>"
+      + "<div class='hbar'><span class='seg' id='h-kind'>" + kinds + '</span>'
+      + "<button class='ghost' id='h-prev'>&larr;</button><span class='label'>" + esc(p.label) + '</span>'
+      + "<button class='ghost' id='h-next'" + (hist.offset >= 0 ? ' disabled' : '') + ">&rarr;</button>"
+      + "<button class='ghost' id='h-now'>Today</button></div>"
+      + "<p class='hint'>" + p.workdays + ' working days in this period' + (elapsedDays < p.workdays ? ' &middot; ' + elapsedDays + ' elapsed' : '') + '. Click any bar to jump to that period.</p>'
+      + "<div style='margin-top:10px'><span class='seg' id='h-metric'>" + metrics + '</span></div>'
+      + "<div class='trend' id='h-trend'>" + trend + '</div></div>'
+
+      + "<div class='card'><h2>All reps &mdash; " + esc(p.label) + "</h2><div class='tablewrap'><table>"
+      + '<thead><tr><th>Rep</th><th>Dials</th><th>Connects</th><th>Convos</th><th>Booked</th><th>Target</th><th>% of target</th>'
+      + '<th>Dial&rarr;connect</th><th>Connect&rarr;DB</th><th>Days logged</th></tr></thead><tbody>' + perf + '</tbody></table></div>'
+      + "<ul class='defs'><li><strong>Target</strong> &mdash; each rep&rsquo;s monthly target spread over the working days in the period. It uses their current target, since past targets are not stored.</li>"
+      + '<li><strong>Days logged</strong> &mdash; days with any activity entered, out of working days elapsed in the period. Gaps mean the totals understate that period.</li></ul></div>'
+
+      + "<div class='card'><h2>What the connects turned into &mdash; " + esc(p.label) + "</h2><div class='tablewrap'><table>"
+      + '<thead><tr><th>Rep</th><th>Connects</th><th>Booked (DB)</th>' + SPLIT.map(function (d) { return '<th>' + d.code + '</th>'; }).join('')
+      + "<th>Other</th><th class='dim'>MR</th></tr></thead><tbody>" + mix + '</tbody></table></div></div>';
+
+    function go() { render(); }
+    Array.prototype.forEach.call(v.querySelectorAll('#h-kind button'), function (b) {
+      b.onclick = function () { hist.kind = b.getAttribute('data-kind'); hist.offset = 0; go(); };
+    });
+    Array.prototype.forEach.call(v.querySelectorAll('#h-metric button'), function (b) {
+      b.onclick = function () { hist.metric = b.getAttribute('data-metric'); go(); };
+    });
+    Array.prototype.forEach.call(v.querySelectorAll('#h-trend .col'), function (c) {
+      c.onclick = function () { hist.offset = Number(c.getAttribute('data-off')); go(); };
+    });
+    document.getElementById('h-prev').onclick = function () { hist.offset--; go(); };
+    document.getElementById('h-next').onclick = function () { if (hist.offset < 0) { hist.offset++; go(); } };
+    document.getElementById('h-now').onclick = function () { hist.offset = 0; go(); };
   }
 
   function renderRep(v, rep) {
@@ -712,8 +873,10 @@
   function render() {
     renderTabs();
     var v = document.getElementById('view');
-    if (active !== 'summary' && !state.settings.some(function (s) { return s.rep === active; })) active = 'summary';
-    if (active === 'summary') renderSummary(v); else renderRep(v, active);
+    if (active !== 'summary' && active !== 'history' && !state.settings.some(function (s) { return s.rep === active; })) active = 'summary';
+    if (active === 'summary') renderSummary(v);
+    else if (active === 'history') renderHistory(v);
+    else renderRep(v, active);
   }
 
   load();

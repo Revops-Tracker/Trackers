@@ -87,6 +87,24 @@
   .subhead { font-size: 12px; text-transform: uppercase; letter-spacing: 0.07em; color: var(--muted);
     font-weight: 600; margin: 14px 0 2px; padding-top: 10px; border-top: 1px dashed var(--line); }
   .src { font-size: 11.5px; color: var(--muted); font-weight: 400; }
+  .seg { display: inline-flex; border: 1px solid var(--line); border-radius: 999px; overflow: hidden; background: var(--panel); }
+  .seg button { font: inherit; font-size: 13.5px; border: none; background: none; color: var(--ink); padding: 6px 16px; cursor: pointer; }
+  .seg button + button { border-left: 1px solid var(--line); }
+  .seg button.on { background: var(--accent); color: #fff; font-weight: 600; }
+  .ghost { font: inherit; font-size: 13px; background: none; border: 1px solid var(--line);
+    color: var(--muted); border-radius: 6px; padding: 5px 12px; cursor: pointer; }
+  .ghost:hover { border-color: var(--accent); color: var(--accent); }
+  .ghost[disabled] { opacity: 0.4; cursor: default; }
+  .hbar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 4px; }
+  .hbar .label { font-size: 17px; font-weight: 700; min-width: 190px; text-align: center; }
+  .trend { display: flex; align-items: flex-end; gap: 8px; height: 150px; margin-top: 12px; }
+  .trend .col { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; height: 100%; cursor: pointer; min-width: 0; }
+  .trend .bar { width: 100%; background: var(--line); border-radius: 4px 4px 0 0; min-height: 2px; }
+  .trend .col:hover .bar { background: var(--accent-soft); }
+  .trend .col.sel .bar { background: var(--accent); }
+  .trend .n { font-size: 12px; font-variant-numeric: tabular-nums; color: var(--muted); margin-bottom: 3px; }
+  .trend .col.sel .n { color: var(--ink); font-weight: 700; }
+  .trend .l { font-size: 11px; color: var(--muted); margin-top: 5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
   .pctu { display: block; font-size: 11.5px; color: var(--muted); font-weight: 400; line-height: 1.3; }
 </style>
 </head>
@@ -109,6 +127,8 @@
   // MRR was gated off 2026-08-23 and re-enabled 2026-09-08 (Vianney: add MRR closed input).
   // Set to false to hide all MRR UI again; DB values are never touched by this flag.
   var SHOW_MRR = true;
+  // Reps who have left: hidden from the live tabs and summary, but their entries stay in History.
+  var RETIRED = ['Armin'];
   var state = null;
   var active = 'summary';
   try { active = sessionStorage.getItem('ae-active-tab') || 'summary'; } catch (err) {}
@@ -257,10 +277,161 @@
     return '<span class="pctu">BDR ' + fmt(bdr) + ' &middot; Inbound ' + fmt(inb) + '</span>';
   }
 
+  // ---- History: any week, month or quarter, with a trend of the periods leading up to it ----
+  var hist = { kind: 'week', offset: 0, metric: 'closed_won' };
+  var MON = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  var HIST_METRICS = [
+    { k: 'closed_won', label: 'Closed won' }, { k: 'discos_run', label: 'Discos run' },
+    { k: 'designs_run', label: 'Designs' }, { k: 'mrr', label: 'MRR closed' }
+  ];
+  function isoDate(d) {
+    return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+  }
+  function wdays(a, b) {
+    var n = 0, d = new Date(a);
+    for (; d <= b; d.setDate(d.getDate() + 1)) if (isWeekday(d)) n++;
+    return n;
+  }
+  function periodFor(kind, offset) {
+    var now = new Date(); now.setHours(0, 0, 0, 0);
+    var s, e, label, short;
+    if (kind === 'week') {
+      s = new Date(now); s.setDate(s.getDate() - ((s.getDay() + 6) % 7) + offset * 7);
+      e = new Date(s); e.setDate(e.getDate() + 6);
+      label = MON[s.getMonth()] + ' ' + s.getDate() + ' – ' + MON[e.getMonth()] + ' ' + e.getDate() + ', ' + e.getFullYear();
+      short = MON[s.getMonth()] + ' ' + s.getDate();
+    } else if (kind === 'month') {
+      s = new Date(now.getFullYear(), now.getMonth() + offset, 1);
+      e = new Date(s.getFullYear(), s.getMonth() + 1, 0);
+      label = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'][s.getMonth()] + ' ' + s.getFullYear();
+      short = MON[s.getMonth()] + " '" + String(s.getFullYear()).slice(2);
+    } else {
+      var q = Math.floor(now.getMonth() / 3);
+      s = new Date(now.getFullYear(), q * 3 + offset * 3, 1);
+      e = new Date(s.getFullYear(), s.getMonth() + 3, 0);
+      label = 'Q' + (Math.floor(s.getMonth() / 3) + 1) + ' ' + s.getFullYear();
+      short = 'Q' + (Math.floor(s.getMonth() / 3) + 1) + " '" + String(s.getFullYear()).slice(2);
+    }
+    return { start: s, end: e, from: isoDate(s), to: isoDate(e), label: label, short: short, workdays: wdays(s, e) };
+  }
+  // weekday entries only, same as the month view
+  function rowsIn(rep, p) {
+    var known = state.settings.concat(state.retired || []).map(function (s) { return s.rep; });
+    return state.entries.filter(function (e) {
+      return (rep === null ? known.indexOf(e.rep) !== -1 : e.rep === rep) && e.entry_date >= p.from && e.entry_date <= p.to
+        && isWeekday(new Date(e.entry_date + 'T12:00:00'));
+    });
+  }
+  // A monthly target spread over the period: each month it touches contributes its share of working days.
+  // Uses each rep's current targets (past targets are not stored).
+  function targetFor(rep, field, p) {
+    var s = state.settings.concat(state.retired || []).filter(function (x) { return x.rep === rep; })[0] || {};
+    var target = Number(s[field] || 0), total = 0;
+    var m = new Date(p.start.getFullYear(), p.start.getMonth(), 1);
+    for (; m <= p.end; m.setMonth(m.getMonth() + 1)) {
+      var ms = new Date(m), me = new Date(m.getFullYear(), m.getMonth() + 1, 0);
+      var a = ms < p.start ? p.start : ms, b = me > p.end ? p.end : me;
+      var md = wdays(ms, me);
+      if (md) total += target * wdays(a, b) / md;
+    }
+    return total;
+  }
+
+  function historyView() {
+    var p = periodFor(hist.kind, hist.offset);
+    var today = todayISO();
+    var elapsedEnd = p.to > today ? new Date(today + 'T12:00:00') : p.end;
+    var elapsedDays = p.from > today ? 0 : wdays(p.start, elapsedEnd);
+
+    var kinds = [['week', 'Week'], ['month', 'Month'], ['quarter', 'Quarter']].map(function (k) {
+      return '<button data-kind="' + k[0] + '" class="' + (hist.kind === k[0] ? 'on' : '') + '">' + k[1] + '</button>';
+    }).join('');
+    var metrics = HIST_METRICS.map(function (m) {
+      return '<button data-metric="' + m.k + '" class="' + (hist.metric === m.k ? 'on' : '') + '">' + m.label + '</button>';
+    }).join('');
+
+    var cols = [], max = 0, i;
+    for (i = 7; i >= 0; i--) {
+      var q = periodFor(hist.kind, hist.offset - i);
+      var tot = sum(rowsIn(null, q), hist.metric);
+      max = Math.max(max, tot);
+      cols.push({ off: hist.offset - i, p: q, tot: tot });
+    }
+    var isMoney = hist.metric === 'mrr';
+    var trend = cols.map(function (c) {
+      var h = max > 0 ? Math.round(c.tot / max * 100) : 0;
+      return '<div class="col' + (c.off === hist.offset ? ' sel' : '') + '" data-off="' + c.off + '" title="' + esc(c.p.label) + '">' +
+        '<div class="n">' + (isMoney ? money(c.tot) : fmt(c.tot)) + '</div><div class="bar" style="height:' + h + '%"></div>' +
+        '<div class="l">' + esc(c.p.short) + '</div></div>';
+    }).join('');
+
+    var reps = state.settings.map(function (s) { return s.rep; });
+    var groups = reps.map(function (r) {
+      return { name: r, rows: rowsIn(r, p), closeT: targetFor(r, 'monthly_close_target', p), mrrT: targetFor(r, 'monthly_mrr_target', p) };
+    });
+    // former AEs appear only in periods where they actually have entries
+    (state.retired || []).forEach(function (s) {
+      var rows = rowsIn(s.rep, p);
+      if (rows.length) groups.push({ name: s.rep + ' (former)', rows: rows,
+        closeT: targetFor(s.rep, 'monthly_close_target', p), mrrT: targetFor(s.rep, 'monthly_mrr_target', p) });
+    });
+    var all = { name: 'Team', rows: rowsIn(null, p),
+      closeT: groups.reduce(function (a, g) { return a + g.closeT; }, 0), mrrT: groups.reduce(function (a, g) { return a + g.mrrT; }, 0) };
+    function logged(rows) {
+      return rows.filter(function (e) { return ACTIVITY_KEYS.some(function (k) { return Number(e[k]) > 0; }) || Number(e.mrr) > 0; }).length;
+    }
+    var body = groups.concat(groups.length > 1 ? [all] : []).map(function (g) {
+      var t = totals(g.rows), ns = t.nsBdr + t.nsInb;
+      var show = (t.discos + ns) > 0 ? t.discos / (t.discos + ns) : NaN;
+      var isTeam = g.name === 'Team';
+      var pc = g.closeT > 0 ? t.closed / g.closeT * 100 : null;
+      return '<tr' + (isTeam ? ' class="total"' : '') + '><td>' + esc(g.name) + '</td>' +
+        '<td>' + fmt(t.discos) + splitSub(t.dBdr, t.dInb) + '</td>' +
+        '<td>' + fmt(ns) + splitSub(t.nsBdr, t.nsInb) + '</td>' +
+        '<td>' + pct(show) + '</td>' +
+        '<td>' + fmt(t.diag) + '</td><td>' + fmt(t.designs) + '</td><td>' + fmt(t.props) + '</td><td>' + fmt(t.contracts) + '</td><td>' + fmt(t.dq) + '</td>' +
+        '<td class="req">' + fmt(t.closed) + '<span class="pctu">target ' + fmt(g.closeT, 1) + (pc === null ? '' : ' &middot; ' + fmt(pc) + '%') + '</span></td>' +
+        '<td>' + (SHOW_MRR ? money(t.mrr) + '<span class="pctu">target ' + money(g.mrrT) + '</span>' : '<span class="dim">&mdash;</span>') + '</td>' +
+        '<td>' + (isTeam ? '' : logged(g.rows) + ' / ' + elapsedDays) + '</td></tr>';
+    }).join('');
+
+    return '<div class="card"><h2>History</h2>' +
+      '<div class="hbar"><span class="seg" id="h-kind">' + kinds + '</span>' +
+      '<button class="ghost" id="h-prev">&larr;</button><span class="label">' + esc(p.label) + '</span>' +
+      '<button class="ghost" id="h-next"' + (hist.offset >= 0 ? ' disabled' : '') + '>&rarr;</button>' +
+      '<button class="ghost" id="h-now">Today</button></div>' +
+      '<p class="hint">' + p.workdays + ' working days in this period' + (elapsedDays < p.workdays ? ' &middot; ' + elapsedDays + ' elapsed' : '') + '. Click any bar to jump to that period.</p>' +
+      '<div style="margin-top:10px"><span class="seg" id="h-metric">' + metrics + '</span></div>' +
+      '<div class="trend" id="h-trend">' + trend + '</div></div>' +
+
+      '<div class="card"><h2>All AEs &mdash; ' + esc(p.label) + '</h2><div class="tablewrap"><table><thead><tr>' +
+      '<th>AE</th><th>Discos run</th><th>No-shows</th><th>Show rate</th><th>Diagnosis</th><th>Designs</th><th>Props run</th><th>Contracts sent</th><th>DQ&rsquo;d</th>' +
+      '<th>Closed won</th><th>MRR closed</th><th>Days logged</th></tr></thead><tbody>' + body + '</tbody></table></div>' +
+      '<ul class="defs"><li><strong>Targets</strong> &mdash; the monthly closed-won and MRR targets spread over the working days in the period. They use each AE&rsquo;s current targets, since past targets are not stored.</li>' +
+      '<li><strong>Show rate</strong> &mdash; discos run &divide; (discos run + no-shows). <strong>Days logged</strong> &mdash; days with any activity entered, out of working days elapsed in the period.</li></ul></div>';
+  }
+
+  function bindHistory() {
+    var v = $('view');
+    Array.prototype.forEach.call(v.querySelectorAll('#h-kind button'), function (b) {
+      b.onclick = function () { hist.kind = b.getAttribute('data-kind'); hist.offset = 0; render(); };
+    });
+    Array.prototype.forEach.call(v.querySelectorAll('#h-metric button'), function (b) {
+      b.onclick = function () { hist.metric = b.getAttribute('data-metric'); render(); };
+    });
+    Array.prototype.forEach.call(v.querySelectorAll('#h-trend .col'), function (c) {
+      c.onclick = function () { hist.offset = Number(c.getAttribute('data-off')); render(); };
+    });
+    $('h-prev').onclick = function () { hist.offset--; render(); };
+    $('h-next').onclick = function () { if (hist.offset < 0) { hist.offset++; render(); } };
+    $('h-now').onclick = function () { hist.offset = 0; render(); };
+  }
+
   // ---- views --------------------------------------------------------------
   function renderTabs() {
     var names = state.settings.map(function (s) { return s.rep; });
-    var html = '<button class="tab' + (active === 'summary' ? ' active' : '') + '" data-t="summary">Team summary</button>';
+    var html = '<button class="tab' + (active === 'summary' ? ' active' : '') + '" data-t="summary">Team summary</button>' +
+      '<button class="tab' + (active === 'history' ? ' active' : '') + '" data-t="history">History</button>';
     names.forEach(function (n) {
       html += '<button class="tab' + (active === n ? ' active' : '') + '" data-t="' + esc(n) + '">' + esc(n) + '</button>';
     });
@@ -521,10 +692,15 @@
   }
   function reload() {
     return fetch(BASE + '/api/state').then(function (r) { return r.json(); })
-      .then(function (j) { state = j; render(); });
+      .then(function (j) {
+        j.retired = j.settings.filter(function (x) { return RETIRED.indexOf(x.rep) !== -1; });
+        j.settings = j.settings.filter(function (x) { return RETIRED.indexOf(x.rep) === -1; });
+        state = j; render();
+      });
   }
   function render() {
     renderTabs();
+    if (active === 'history') { $('view').innerHTML = historyView(); bindHistory(); return; }
     $('view').innerHTML = active === 'summary' ? summaryView() : repView(active);
   }
   reload().catch(function (e) {

@@ -127,6 +127,8 @@
   // this when a rep is converting well — the floor still stands, so it overrides the calculation.
   var DIAL_FLOOR = 780;
   var state = null;
+  // Reps who have left: hidden from the live tabs and summary, but their entries stay in History.
+  var RETIRED = ['Jules'];
   var horizons = {};
   var active = 'summary';
   try { active = sessionStorage.getItem('bdr-active-tab') || 'summary'; } catch (err) {}
@@ -192,7 +194,7 @@
   function sum(rows, k) { return rows.reduce(function (a, r) { return a + Number(r[k] || 0); }, 0); }
 
   function settingsFor(rep) {
-    return state.settings.find(function (s) { return s.rep === rep; }) || {};
+    return state.settings.concat(state.retired || []).find(function (s) { return s.rep === rep; }) || {};
   }
   function entryFor(rep, dateStr) {
     return state.entries.find(function (e) { return e.rep === rep && e.entry_date === dateStr; });
@@ -297,7 +299,11 @@
   }
 
   function load() {
-    return api('/api/state').then(function (s) { state = s; render(); })
+    return api('/api/state').then(function (s) {
+      s.retired = s.settings.filter(function (x) { return RETIRED.indexOf(x.rep) !== -1; });
+      s.settings = s.settings.filter(function (x) { return RETIRED.indexOf(x.rep) === -1; });
+      state = s; render();
+    })
       .catch(function (e) {
         document.getElementById('view').innerHTML =
           '<div class="loading">Could not load data (' + esc(e.message) + '). <button class="ghost" onclick="location.reload()">Retry</button></div>';
@@ -433,7 +439,7 @@
   }
 
   function rowsIn(rep, p) {
-    var known = state.settings.map(function (s) { return s.rep; });
+    var known = state.settings.concat(state.retired || []).map(function (s) { return s.rep; });
     return state.entries.filter(function (e) {
       return (rep === null ? known.indexOf(e.rep) !== -1 : e.rep === rep) && e.entry_date >= p.from && e.entry_date <= p.to;
     });
@@ -487,6 +493,11 @@
     }
     var reps = state.settings.map(function (s) { return s.rep; });
     var groups = reps.map(function (r) { return { name: r, rows: rowsIn(r, p), target: targetFor(r, p) }; });
+    // former reps appear only in periods where they actually have entries
+    (state.retired || []).forEach(function (s) {
+      var rows = rowsIn(s.rep, p);
+      if (rows.length) groups.push({ name: s.rep + ' (former)', rows: rows, target: targetFor(s.rep, p) });
+    });
     var all = { name: 'Team', rows: rowsIn(null, p), target: groups.reduce(function (a, g) { return a + g.target; }, 0) };
 
     function logged(rows) {

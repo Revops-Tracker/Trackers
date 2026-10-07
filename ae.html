@@ -1,0 +1,536 @@
+<!doctype html>
+<html lang="en">
+<head><script>window.JF_PAGE='ae'</script><script src="config.js"></script><script src="sso.js"></script>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AE Shortfall Tracker</title>
+<style>
+  :root {
+    --paper: #FAF9F7; --panel: #FFFFFF; --ink: #211E1D; --muted: #6E6660;
+    --line: #E4DFDA; --accent: #B4292F; --accent-soft: #F7E9E9;
+    --good: #2E7D4F; --good-soft: #E7F2EB; --bad: #B4292F; --bad-soft: #F7E9E9;
+    --input-bg: #FFFDF4; --input-line: #D8CFA8;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --paper: #171514; --panel: #201D1C; --ink: #EDE8E4; --muted: #9C948D;
+      --line: #383331; --accent: #E06A6E; --accent-soft: #3A2425;
+      --good: #6FBF8F; --good-soft: #21352A; --bad: #E06A6E; --bad-soft: #3A2425;
+      --input-bg: #262320; --input-line: #55503E;
+    }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--paper); color: var(--ink);
+    font: 15px/1.5 "Seravek", "Segoe UI", system-ui, sans-serif; }
+  .wrap { max-width: 1060px; margin: 0 auto; padding: 28px 20px 60px; }
+  header h1 { font-size: 26px; margin: 0 0 2px; letter-spacing: -0.01em; }
+  header p { margin: 0 0 20px; color: var(--muted); font-size: 14px; }
+  .tabs { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 20px; }
+  .tab { border: 1px solid var(--line); background: var(--panel); color: var(--ink);
+    padding: 7px 16px; border-radius: 999px; cursor: pointer; font: inherit; font-size: 14px; }
+  .tab:hover { border-color: var(--accent); }
+  .tab.active { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 600; }
+  .tab:focus-visible, button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .cols { display: grid; grid-template-columns: 340px 1fr; gap: 20px; align-items: start; }
+  @media (max-width: 840px) { .cols { grid-template-columns: 1fr; } }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 18px; }
+  .card + .card { margin-top: 20px; }
+  .card h2 { margin: 0 0 12px; font-size: 11.5px; text-transform: uppercase; letter-spacing: 0.09em;
+    color: var(--accent); font-weight: 700; }
+  .row { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 5px 0; }
+  .row label { font-size: 14px; }
+  input[type="number"], input[type="date"] { font: inherit; color: var(--ink); background: var(--input-bg);
+    border: 1px solid var(--input-line); border-radius: 6px; padding: 5px 9px; width: 110px;
+    font-variant-numeric: tabular-nums; }
+  input[type="range"] { flex: 1; accent-color: var(--accent); min-width: 120px; }
+  .simval { min-width: 52px; text-align: right; font-weight: 700; font-variant-numeric: tabular-nums; }
+  .simout { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 12px; }
+  .simbox { flex: 1; min-width: 140px; background: var(--accent-soft); border-radius: 8px; padding: 10px 14px; }
+  .simbox .k { font-size: 11px; text-transform: uppercase; letter-spacing: 0.07em; color: var(--muted); }
+  .simbox .v { font-size: 21px; font-weight: 700; font-variant-numeric: tabular-nums; }
+  .simbox .d { font-size: 12px; font-weight: 600; }
+  .simbox .d.good { color: var(--good); }
+  .simbox .d.bad { color: var(--bad); }
+  .statusbar { display: flex; gap: 14px; flex-wrap: wrap; margin-bottom: 20px; }
+  .stat { background: var(--panel); border: 1px solid var(--line); border-radius: 10px;
+    padding: 12px 18px; min-width: 128px; flex: 1; }
+  .stat .k { font-size: 11.5px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); }
+  .stat .v { font-size: 25px; font-weight: 700; font-variant-numeric: tabular-nums; line-height: 1.25; }
+  .stat .sub { font-size: 12.5px; color: var(--muted); }
+  .pill { display: inline-block; padding: 3px 12px; border-radius: 999px; font-size: 13px; font-weight: 700; }
+  .pill.good { background: var(--good-soft); color: var(--good); }
+  .pill.bad { background: var(--bad-soft); color: var(--bad); }
+  .pill.flat { background: var(--accent-soft); color: var(--accent); }
+  table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
+  th, td { text-align: right; padding: 7px 9px; border-bottom: 1px solid var(--line); font-size: 14px; }
+  th { font-size: 11.5px; text-transform: uppercase; letter-spacing: 0.07em; color: var(--muted); font-weight: 600; }
+  th:first-child, td:first-child { text-align: left; }
+  tr:last-child td { border-bottom: none; }
+  td.req { font-weight: 700; }
+  td.warn { color: var(--bad); font-weight: 600; }
+  td.good { color: var(--good); font-weight: 600; }
+  td.dim, th.dim, span.dim { color: var(--muted); }
+  tr.total td { font-weight: 700; border-top: 1px solid var(--line); }
+  .btn { font: inherit; font-size: 14px; font-weight: 600; background: var(--accent); color: #fff;
+    border: none; border-radius: 6px; padding: 8px 20px; cursor: pointer; }
+  .btn[disabled] { opacity: 0.5; cursor: default; }
+  .hint { font-size: 12.5px; color: var(--muted); margin: 8px 0 0; }
+  .defs { font-size: 12.5px; color: var(--muted); margin: 12px 0 0; padding-left: 18px; }
+  .defs li { margin-bottom: 5px; }
+  .defs strong { color: var(--ink); }
+  .tablewrap { overflow-x: auto; }
+  .toast { position: fixed; bottom: 22px; left: 50%; transform: translateX(-50%);
+    background: var(--ink); color: var(--paper); padding: 9px 20px; border-radius: 999px;
+    font-size: 14px; opacity: 0; transition: opacity 0.25s; pointer-events: none; }
+  .toast.show { opacity: 1; }
+  .loading { color: var(--muted); padding: 40px 0; text-align: center; }
+  .subhead { font-size: 12px; text-transform: uppercase; letter-spacing: 0.07em; color: var(--muted);
+    font-weight: 600; margin: 14px 0 2px; padding-top: 10px; border-top: 1px dashed var(--line); }
+  .src { font-size: 11.5px; color: var(--muted); font-weight: 400; }
+  .pctu { display: block; font-size: 11.5px; color: var(--muted); font-weight: 400; line-height: 1.3; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>AE Shortfall Tracker</h1>
+    <p>Log your day, see your gap to 8 closes. Saved for everyone &mdash; updates on refresh.</p>
+  </header>
+  <nav class="tabs" id="tabs"></nav>
+  <main id="view"><div class="loading">Loading&hellip;</div></main>
+</div>
+<div class="toast" id="toast"></div>
+<script>
+(function () {
+  var BASE = '/api/ae';
+  // Own conversion rates are used once the denominator reaches this sample size AND the
+  // rate is non-zero; below that the goal rate stands in.
+  var MIN_SAMPLE = 5;
+  // MRR was gated off 2026-08-23 and re-enabled 2026-09-08 (Vianney: add MRR closed input).
+  // Set to false to hide all MRR UI again; DB values are never touched by this flag.
+  var SHOW_MRR = true;
+  var state = null;
+  var active = 'summary';
+  try { active = sessionStorage.getItem('ae-active-tab') || 'summary'; } catch (err) {}
+  function remember(id) { try { sessionStorage.setItem('ae-active-tab', id); } catch (err) {} }
+
+  // Form fields, grouped. discos_run itself is computed server-side = BDR + Inbound.
+  var FORM_GROUPS = [
+    { title: 'Discos run (adds up to your disco total)', fields: [
+      { key: 'disco_run_bdr',        label: 'BDR generated' },
+      { key: 'disco_run_inbound',    label: 'Inbound generated' } ] },
+    { title: 'Disco no-shows', fields: [
+      { key: 'disco_noshow_bdr',     label: 'BDR generated' },
+      { key: 'disco_noshow_inbound', label: 'Inbound generated' } ] },
+    { title: 'Pipeline', fields: [
+      { key: 'diagnosis_created',    label: 'Diagnosis created' },
+      { key: 'designs_run',          label: 'Designs created' },
+      { key: 'props_run',            label: 'Props run' },
+      { key: 'contracts_sent',       label: 'Contracts sent' },
+      { key: 'closed_won',           label: 'Closed won' },
+      { key: 'dq',                   label: 'DQ&rsquo;d (disqualified)' } ] }
+  ];
+  var FORM_FIELDS = FORM_GROUPS.reduce(function (a, g) { return a.concat(g.fields); }, []);
+  var ACTIVITY_KEYS = FORM_FIELDS.map(function (f) { return f.key; }).concat(['discos_run']);
+
+  function $(id) { return document.getElementById(id); }
+  function esc(s) { return String(s).replace(/[&<>"]/g, function (c) {
+    return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
+  function toast(msg) {
+    var t = $('toast'); t.textContent = msg; t.classList.add('show');
+    clearTimeout(toast._h); toast._h = setTimeout(function () { t.classList.remove('show'); }, 2200);
+  }
+  function fmt(n, dp) {
+    if (n === null || n === undefined || !isFinite(n)) return '&mdash;';
+    return Number(n).toLocaleString('en-US', { minimumFractionDigits: dp || 0, maximumFractionDigits: dp || 0 });
+  }
+  function money(n) { return isFinite(n) ? '$' + fmt(n) : '&mdash;'; }
+  function pct(n) { return isFinite(n) ? (Math.round(n * 1000) / 10) + '%' : '&mdash;'; }
+  function todayISO() {
+    var d = new Date();
+    return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+  }
+  function isWeekday(d) { var w = d.getDay(); return w >= 1 && w <= 5; }
+  function monthWorkdays(year, month) {
+    var total = 0, elapsed = 0, now = new Date();
+    var last = new Date(year, month + 1, 0).getDate();
+    for (var i = 1; i <= last; i++) {
+      var d = new Date(year, month, i);
+      if (!isWeekday(d)) continue;
+      total++;
+      if (d <= now) elapsed++;
+    }
+    return { total: total, elapsed: elapsed, remaining: Math.max(total - elapsed + 1, 1) };
+  }
+
+  // ---- data shaping -------------------------------------------------------
+  function sum(rows, key) { return rows.reduce(function (a, r) { return a + Number(r[key] || 0); }, 0); }
+
+  function repEntries(rep) {
+    return state.entries.filter(function (e) { return e.rep === rep; });
+  }
+  function monthEntries(rep) {
+    var pre = todayISO().slice(0, 7);
+    return repEntries(rep).filter(function (e) { return e.entry_date.slice(0, 7) === pre && isWeekday(new Date(e.entry_date + 'T12:00:00')); });
+  }
+
+  function stageRate(numer, denom, goalPct) {
+    if (denom >= MIN_SAMPLE && numer > 0) return { rate: numer / denom, own: true };
+    return { rate: goalPct / 100, own: false };
+  }
+
+  function totals(rows) {
+    return {
+      discos: sum(rows, 'discos_run'),
+      dBdr: sum(rows, 'disco_run_bdr'), dInb: sum(rows, 'disco_run_inbound'),
+      nsBdr: sum(rows, 'disco_noshow_bdr'), nsInb: sum(rows, 'disco_noshow_inbound'),
+      diag: sum(rows, 'diagnosis_created'),
+      designs: sum(rows, 'designs_run'), props: sum(rows, 'props_run'),
+      contracts: sum(rows, 'contracts_sent'), closed: sum(rows, 'closed_won'),
+      dq: sum(rows, 'dq'), mrr: sum(rows, 'mrr')
+    };
+  }
+
+  function repMath(rep) {
+    var s = state.settings.filter(function (x) { return x.rep === rep; })[0];
+    var all = repEntries(rep);
+    var mtd = monthEntries(rep);
+    var t = totals(mtd);
+    var h = totals(all);
+    var d2p = stageRate(h.props, h.discos, s.rate_disco_prop);
+    var p2c = stageRate(h.contracts, h.props, s.rate_prop_contract);
+    var c2w = stageRate(h.closed, h.contracts, s.rate_contract_close);
+    var discoToClose = d2p.rate * p2c.rate * c2w.rate;
+    // Design->Close lens: all closes / design runs (closes aren't attributed to the design
+    // path in the log, so this is directional). Own history only - no goal fallback.
+    var designToClose = (h.designs >= MIN_SAMPLE && h.closed > 0) ? h.closed / h.designs : NaN;
+
+    var target = Number(s.monthly_close_target);
+    var needContracts = target / c2w.rate;
+    var needProps = needContracts / p2c.rate;
+    var needDiscos = needProps / d2p.rate;
+
+    var wd = monthWorkdays(new Date().getFullYear(), new Date().getMonth());
+    var closePace = target * (wd.elapsed / wd.total);
+    var closesBehind = Math.max(closePace - t.closed, 0);
+    var discoDebt = closesBehind / discoToClose;
+    var stdDiscosPerDay = needDiscos / wd.total;
+    var reqPerDay = stdDiscosPerDay + discoDebt / wd.remaining;
+
+    var mrrTarget = Number(s.monthly_mrr_target);
+    var mrrPace = mrrTarget * (wd.elapsed / wd.total);
+
+    // Show rate this month: discos run vs (run + no-shows). Split fields are new,
+    // so this only reflects days logged with the new form.
+    var ns = t.nsBdr + t.nsInb;
+    var showRate = (t.discos + ns) > 0 ? t.discos / (t.discos + ns) : NaN;
+
+    return {
+      settings: s, mtd: t, hist: h, wd: wd,
+      d2p: d2p, p2c: p2c, c2w: c2w, discoToClose: discoToClose, designToClose: designToClose,
+      target: target, needDiscos: needDiscos, needProps: needProps, needContracts: needContracts,
+      closePace: closePace, closesBehind: closesBehind, discoDebt: discoDebt,
+      stdDiscosPerDay: stdDiscosPerDay, reqPerDay: reqPerDay,
+      mrrTarget: mrrTarget, mrrPace: mrrPace, noShows: ns, showRate: showRate,
+      loggedDays: mtd.filter(function (e) {
+        return ACTIVITY_KEYS.some(function (k) { return Number(e[k]) > 0; }) || Number(e.mrr) > 0;
+      }).length
+    };
+  }
+
+  function rateCell(r, numer, denom, goalPct) {
+    var src = r.own
+      ? fmt(numer) + ' of ' + fmt(denom) + ' &middot; goal is ' + goalPct + '%'
+      : 'no history yet &mdash; showing goal';
+    return pct(r.rate) + '<span class="pctu">' + src + '</span>';
+  }
+
+  // "since Mar 2026" — the real start of this rep's logged history.
+  function histSince(rep) {
+    var all = repEntries(rep);
+    if (!all.length) return null;
+    var d = new Date(all[0].entry_date + 'T12:00:00');
+    return d.toLocaleString('en-US', { month: 'short', year: 'numeric' });
+  }
+
+  function splitSub(bdr, inb) {
+    return '<span class="pctu">BDR ' + fmt(bdr) + ' &middot; Inbound ' + fmt(inb) + '</span>';
+  }
+
+  // ---- views --------------------------------------------------------------
+  function renderTabs() {
+    var names = state.settings.map(function (s) { return s.rep; });
+    var html = '<button class="tab' + (active === 'summary' ? ' active' : '') + '" data-t="summary">Team summary</button>';
+    names.forEach(function (n) {
+      html += '<button class="tab' + (active === n ? ' active' : '') + '" data-t="' + esc(n) + '">' + esc(n) + '</button>';
+    });
+    $('tabs').innerHTML = html;
+    Array.prototype.forEach.call(document.querySelectorAll('.tab'), function (b) {
+      b.onclick = function () { active = b.getAttribute('data-t'); remember(active); render(); };
+    });
+  }
+
+  function summaryView() {
+    var monthName = new Date().toLocaleString('en-US', { month: 'long' });
+    var maths = state.settings.map(function (s) { return repMath(s.rep); });
+
+    var mtdRows = maths.map(function (m) {
+      var behind = m.closesBehind > 0.05;
+      return '<tr>' +
+        '<td>' + esc(m.settings.rep) + '</td>' +
+        '<td>' + fmt(m.mtd.discos) + splitSub(m.mtd.dBdr, m.mtd.dInb) + '</td>' +
+        '<td>' + fmt(m.noShows) + splitSub(m.mtd.nsBdr, m.mtd.nsInb) + '</td>' +
+        '<td>' + fmt(m.mtd.diag) + '</td>' +
+        '<td>' + fmt(m.mtd.designs) + '</td>' +
+        '<td>' + fmt(m.mtd.props) + '</td>' +
+        '<td>' + fmt(m.mtd.contracts) + '</td>' +
+        '<td>' + fmt(m.mtd.dq) + '</td>' +
+        '<td class="' + (behind ? 'warn' : 'good') + '">' + fmt(m.mtd.closed) + ' / ' + m.target +
+          '<span class="pctu">' + (behind ? fmt(m.closesBehind, 1) + ' behind pace' : 'on pace') + '</span></td>' +
+        '<td>' + (SHOW_MRR ? money(m.mtd.mrr) + '<span class="pctu">target ' + money(m.mrrTarget) + '</span>' : '<span class="dim">&mdash;</span>') + '</td>' +
+        '<td class="req">' + fmt(m.reqPerDay, 1) + '</td>' +
+        '</tr>';
+    }).join('');
+
+    var rateRows = maths.map(function (m) {
+      var since = histSince(m.settings.rep);
+      return '<tr>' +
+        '<td>' + esc(m.settings.rep) + '<span class="pctu">' + (since ? 'since ' + since : 'no history yet') + '</span></td>' +
+        '<td>' + rateCell(m.d2p, m.hist.props, m.hist.discos, m.settings.rate_disco_prop) + '</td>' +
+        '<td>' + rateCell(m.p2c, m.hist.contracts, m.hist.props, m.settings.rate_prop_contract) + '</td>' +
+        '<td>' + rateCell(m.c2w, m.hist.closed, m.hist.contracts, m.settings.rate_contract_close) + '</td>' +
+        '<td>' + pct(m.discoToClose) + '<span class="pctu">goal is ' +
+          pct((m.settings.rate_disco_prop / 100) * (m.settings.rate_prop_contract / 100) * (m.settings.rate_contract_close / 100)) + '</span></td>' +
+        '<td class="req">' + fmt(m.needDiscos, 0) + '<span class="pctu">goal is ' + m.settings.goal_discos + '</span></td>' +
+        '</tr>';
+    }).join('');
+
+    return '<div class="card"><h2>' + monthName + ' so far</h2>' +
+      '<p class="hint" style="margin:0 0 10px">What each AE has logged this month. <strong>Closed won</strong> is shown against the ' +
+      'monthly target; <strong>Discos needed/day</strong> is what it takes from today to still land the target this month.</p>' +
+      '<div class="tablewrap"><table><thead><tr>' +
+      '<th>AE</th><th>Discos run</th><th>No-shows</th><th>Diagnosis</th><th>Designs</th><th>Props run</th><th>Contracts sent</th><th>DQ&rsquo;d</th>' +
+      '<th>Closed won</th><th>MRR closed</th><th>Discos needed/day</th>' +
+      '</tr></thead><tbody>' + mtdRows + '</tbody></table></div></div>' +
+
+      '<div class="card"><h2>Conversion rates &mdash; logged history vs goal</h2>' +
+      '<p class="hint" style="margin:0 0 10px">Each rate = everything the AE has logged since the date under their name (not just this month). ' +
+      'The goal rate is printed under each number. <strong>Discos needed/month</strong> converts the close target back through these rates &mdash; ' +
+      'if it sits far above the goal of a stage, the problem is conversion, not effort.</p>' +
+      '<div class="tablewrap"><table><thead><tr>' +
+      '<th>AE</th><th>Disco &rarr; Prop</th><th>Prop &rarr; Contract</th><th>Contract &rarr; Close</th><th>Disco &rarr; Close</th><th>Discos needed/month</th>' +
+      '</tr></thead><tbody>' + rateRows + '</tbody></table></div>' +
+      '<ul class="defs">' +
+      '<li><strong>Discos run / No-shows</strong> split into BDR-generated and Inbound-generated underneath each total.</li>' +
+      '<li><strong>Diagnosis / Designs</strong> are tracked stages but not part of the close-chain math (disco &rarr; prop &rarr; contract &rarr; close).</li>' +
+      '<li><strong>DQ&rsquo;d</strong> = disqualified discos. High DQ points at lead quality, not the AE.</li>' +
+      '</ul></div>';
+  }
+
+  function repView(rep) {
+    var m = repMath(rep);
+    var behind = m.closesBehind > 0.05;
+    var mtdRows = monthEntries(rep).sort(function (a, b) { return a.entry_date < b.entry_date ? 1 : -1; })
+      .map(function (e) {
+        return '<tr><td>' + esc(e.entry_date) + '</td>' +
+          '<td>' + fmt(e.discos_run) + '</td>' +
+          '<td>' + fmt(e.disco_run_bdr) + '</td>' +
+          '<td>' + fmt(e.disco_run_inbound) + '</td>' +
+          '<td>' + fmt(e.disco_noshow_bdr) + '</td>' +
+          '<td>' + fmt(e.disco_noshow_inbound) + '</td>' +
+          '<td>' + fmt(e.diagnosis_created) + '</td>' +
+          '<td>' + fmt(e.designs_run) + '</td>' +
+          '<td>' + fmt(e.props_run) + '</td>' +
+          '<td>' + fmt(e.contracts_sent) + '</td>' +
+          '<td>' + fmt(e.closed_won) + '</td>' +
+          '<td>' + fmt(e.dq) + '</td>' +
+          '<td>' + (SHOW_MRR ? money(Number(e.mrr)) : '<span class="dim">&mdash;</span>') + '</td></tr>';
+      }).join('');
+
+    var form = '<div class="card"><h2>Log a day</h2>' +
+      '<div class="row"><label for="f-date">Date</label><input type="date" id="f-date" value="' + todayISO() + '"></div>' +
+      FORM_GROUPS.map(function (g) {
+        return '<div class="subhead">' + g.title + '</div>' +
+          g.fields.map(function (f) {
+            return '<div class="row"><label for="f-' + f.key + '">' + f.label + '</label>' +
+              '<input type="number" min="0" step="1" id="f-' + f.key + '" placeholder="0"></div>';
+          }).join('');
+      }).join('') +
+      (SHOW_MRR ? '<div class="subhead">Revenue</div>' +
+        '<div class="row"><label for="f-mrr">MRR closed ($)</label><input type="number" min="0" step="1" id="f-mrr" placeholder="0"></div>' : '') +
+      '<div class="row"><span></span><button class="btn" id="f-save">Save day</button></div>' +
+      '<p class="hint">Re-saving a date overwrites that date. Your disco total for the day = BDR + Inbound.' +
+      (SHOW_MRR ? ' MRR = $ value of deals closed that day.' : ' MRR is off the tracker for now.') + '</p></div>';
+
+    var goals = '<div class="card"><h2>Targets &amp; goal rates</h2>' +
+      '<div class="row"><label for="g-close">Closes / month</label><input type="number" min="1" step="1" id="g-close" value="' + m.target + '"></div>' +
+      (SHOW_MRR ? '<div class="row"><label for="g-mrr">MRR target / month ($)</label><input type="number" min="0" step="500" id="g-mrr" value="' + m.mrrTarget + '"></div>' : '') +
+      '<div class="subhead">Monthly stage goals (L10 KPI)</div>' +
+      '<div class="row"><label for="g-gdiscos">Discos run / month</label><input type="number" min="1" step="1" id="g-gdiscos" value="' + m.settings.goal_discos + '"></div>' +
+      '<div class="row"><label for="g-gprops">Props run / month</label><input type="number" min="1" step="1" id="g-gprops" value="' + m.settings.goal_props + '"></div>' +
+      '<div class="row"><label for="g-gcontracts">Contracts sent / month</label><input type="number" min="1" step="1" id="g-gcontracts" value="' + m.settings.goal_contracts + '"></div>' +
+      '<div class="subhead">Goal conversions (%)</div>' +
+      '<div class="row"><label for="g-d2p">Disco &rarr; Prop</label><input type="number" min="1" max="100" id="g-d2p" value="' + m.settings.rate_disco_prop + '"></div>' +
+      '<div class="row"><label for="g-p2c">Prop &rarr; Contract</label><input type="number" min="1" max="100" id="g-p2c" value="' + m.settings.rate_prop_contract + '"></div>' +
+      '<div class="row"><label for="g-c2w">Contract &rarr; Close</label><input type="number" min="1" max="100" id="g-c2w" value="' + m.settings.rate_contract_close + '"></div>' +
+      '<div class="row"><span></span><button class="btn" id="g-save">Save targets</button></div>' +
+      '<p class="hint">Fallbacks only apply while your own history is thin (&lt;' + MIN_SAMPLE + ' in a stage&rsquo;s denominator). Once you&rsquo;ve logged enough, your real rates take over automatically.</p></div>';
+
+    var stats = '<div class="statusbar">' +
+      '<div class="stat"><div class="k">Closed won MTD</div><div class="v">' + fmt(m.mtd.closed) + ' / ' + m.target + '</div>' +
+        '<div class="sub"><span class="pill ' + (behind ? 'bad' : 'good') + '">' +
+        (behind ? fmt(m.closesBehind, 1) + ' behind pace' : 'on pace') + '</span></div></div>' +
+      (SHOW_MRR ? '<div class="stat"><div class="k">MRR MTD</div><div class="v">' + money(m.mtd.mrr) + '</div>' +
+        '<div class="sub">pace ' + money(m.mrrPace) + ' of ' + money(m.mrrTarget) + '</div></div>' : '') +
+      '<div class="stat"><div class="k">Discos needed / day</div><div class="v">' + fmt(m.reqPerDay, 1) + '</div>' +
+        '<div class="sub">standard ' + fmt(m.stdDiscosPerDay, 1) + (m.discoDebt > 0.05 ? ' + catch-up' : '') + '</div></div>' +
+      '<div class="stat"><div class="k">Disco debt</div><div class="v">' + fmt(m.discoDebt, 1) + '</div>' +
+        '<div class="sub">' + fmt(m.closesBehind, 1) + ' closes behind &times; ' + fmt(1 / m.discoToClose, 1) + ' discos/close</div></div>' +
+      '</div>';
+
+    var since = histSince(rep);
+    var monthName = new Date().toLocaleString('en-US', { month: 'long' });
+    var funnel = '<div class="card"><h2>Your month vs the plan</h2>' +
+      '<p class="hint" style="margin:0 0 10px">' +
+      '<strong>This month</strong> = what you&rsquo;ve logged in ' + monthName + '. ' +
+      '<strong>Monthly goal</strong> = the standing L10 target. ' +
+      '<strong>Needed at your rates</strong> = how many it takes to land ' + m.target + ' closes, using <em>your</em> conversion rates' +
+      (since ? ' (from everything you&rsquo;ve logged since ' + since + ')' : '') + ' instead of the goal rates.</p>' +
+      '<div class="tablewrap"><table><thead><tr><th>Stage</th><th>This month</th><th>Monthly goal</th><th>Needed at your rates</th><th>Your rate' + (since ? ' since ' + since : '') + '</th></tr></thead><tbody>' +
+      '<tr><td>Discos run</td><td>' + fmt(m.mtd.discos) + '</td><td>' + m.settings.goal_discos + '</td><td class="req">' + fmt(m.needDiscos, 1) + '</td><td>' + rateCell(m.d2p, m.hist.props, m.hist.discos, m.settings.rate_disco_prop) + '</td></tr>' +
+      '<tr><td>Props run</td><td>' + fmt(m.mtd.props) + '</td><td>' + m.settings.goal_props + '</td><td class="req">' + fmt(m.needProps, 1) + '</td><td>' + rateCell(m.p2c, m.hist.contracts, m.hist.props, m.settings.rate_prop_contract) + '</td></tr>' +
+      '<tr><td>Contracts sent</td><td>' + fmt(m.mtd.contracts) + '</td><td>' + m.settings.goal_contracts + '</td><td class="req">' + fmt(m.needContracts, 1) + '</td><td>' + rateCell(m.c2w, m.hist.closed, m.hist.contracts, m.settings.rate_contract_close) + '</td></tr>' +
+      '<tr class="total"><td>Closed won</td><td>' + fmt(m.mtd.closed) + '</td><td>' + m.target + '</td><td class="req">' + m.target + '</td><td>' + pct(m.discoToClose) + ' disco&rarr;close<span class="pctu">goal is ' +
+        pct((m.settings.rate_disco_prop / 100) * (m.settings.rate_prop_contract / 100) * (m.settings.rate_contract_close / 100)) + '</span></td></tr>' +
+      '</tbody></table></div>' +
+      '<p class="hint">Read it left to right: are you on volume (this month vs goal)? And is the goal even enough for you ' +
+      '(needed-at-your-rates vs goal)? If &ldquo;needed&rdquo; is far above goal, the fix is conversion, not more volume.</p>' +
+      '<div class="subhead">Also tracked this month</div>' +
+      '<div class="row"><span>Discos run by source</span><strong>BDR ' + fmt(m.mtd.dBdr) + ' &middot; Inbound ' + fmt(m.mtd.dInb) + '</strong></div>' +
+      '<div class="row"><span>Disco no-shows <span class="src">(booked but didn&rsquo;t show)</span></span><strong>' + fmt(m.noShows) +
+        ' <span class="src">BDR ' + fmt(m.mtd.nsBdr) + ' &middot; Inbound ' + fmt(m.mtd.nsInb) +
+        (isFinite(m.showRate) ? ' &middot; show rate ' + pct(m.showRate) : '') + '</span></strong></div>' +
+      '<div class="row"><span>Diagnosis created</span><strong>' + fmt(m.mtd.diag) + '</strong></div>' +
+      '<div class="row"><span>Designs created <span class="src">(disco re-run, lower-quality leads)</span></span><strong>' + fmt(m.mtd.designs) +
+        ' <span class="src">design&rarr;close ' + pct(m.designToClose) + '</span></strong></div>' +
+      '<div class="row"><span>DQ&rsquo;d</span><strong>' + fmt(m.mtd.dq) +
+        ' <span class="src">' + pct(m.mtd.discos ? m.mtd.dq / m.mtd.discos : NaN) + ' of discos</span></strong></div>' +
+      '</div>';
+
+    // What-if simulator: sliders start at the rep's current effective rates.
+    var simDefaults = { d2p: Math.round(m.d2p.rate * 100), p2c: Math.round(m.p2c.rate * 100), c2w: Math.round(m.c2w.rate * 100) };
+    var sim = '<div class="card"><h2>What if you improved a rate?</h2>' +
+      '<p class="hint" style="margin:0 0 10px">Sliders start at your current rates' + (since ? ' (since ' + since + ')' : '') + '. ' +
+      'Drag one and watch how many discos the month actually takes. Small conversion gains beat big volume pushes.</p>' +
+      [['sim-d2p', 'Disco &rarr; Prop', simDefaults.d2p], ['sim-p2c', 'Prop &rarr; Contract', simDefaults.p2c], ['sim-c2w', 'Contract &rarr; Close', simDefaults.c2w]]
+        .map(function (s) {
+          return '<div class="row"><label for="' + s[0] + '" style="min-width:130px">' + s[1] + '</label>' +
+            '<input type="range" id="' + s[0] + '" min="5" max="100" step="1" value="' + s[2] + '" data-def="' + s[2] + '">' +
+            '<span class="simval" id="' + s[0] + '-v">' + s[2] + '%</span></div>';
+        }).join('') +
+      '<div class="simout">' +
+      '<div class="simbox"><div class="k">Discos needed / month</div><div class="v" id="sim-discos">&mdash;</div><div class="d" id="sim-discos-d"></div></div>' +
+      '<div class="simbox"><div class="k">Discos needed / day</div><div class="v" id="sim-perday">&mdash;</div><div class="d" id="sim-perday-d"></div></div>' +
+      '<div class="simbox"><div class="k">Props needed</div><div class="v" id="sim-props">&mdash;</div></div>' +
+      '<div class="simbox"><div class="k">Contracts needed</div><div class="v" id="sim-contracts">&mdash;</div></div>' +
+      '</div>' +
+      '<div class="row" style="margin-top:8px"><span class="hint" style="margin:0">Today it takes <strong>' + fmt(m.needDiscos, 0) + ' discos/mo</strong> at your real rates. This box changes nothing &mdash; it&rsquo;s a sandbox.</span>' +
+      '<button class="ghost" id="sim-reset" style="font:inherit;font-size:13px;background:none;border:1px solid var(--line);color:var(--muted);border-radius:6px;padding:5px 12px;cursor:pointer">Reset to my rates</button></div>' +
+      '</div>';
+
+    var log = '<div class="card"><h2>Month log &mdash; ' + m.loggedDays + ' day(s) logged</h2>' +
+      '<div class="tablewrap"><table><thead><tr>' +
+      '<th>Date</th><th>Discos</th><th class="dim">BDR</th><th class="dim">Inbound</th><th>No-show BDR</th><th>No-show Inbound</th><th>Diag</th><th>Designs</th><th>Props</th><th>Contracts</th><th>Closed</th><th>DQ</th><th>MRR</th>' +
+      '</tr></thead><tbody>' +
+      (mtdRows || '<tr><td colspan="13" class="dim">Nothing logged this month yet.</td></tr>') +
+      '</tbody></table></div>' +
+      '<p class="hint">Rows saved before the BDR/Inbound split existed show a disco total with 0 in the split columns.</p></div>';
+
+    setTimeout(function () { bindRepForm(rep); bindSim(m); }, 0);
+    return stats + '<div class="cols"><div>' + form + goals + '</div><div>' + funnel + sim + log + '</div></div>';
+  }
+
+  function bindSim(m) {
+    var ids = ['sim-d2p', 'sim-p2c', 'sim-c2w'];
+    if (!$(ids[0])) return;
+    function recalc() {
+      var d2p = Number($('sim-d2p').value) / 100, p2c = Number($('sim-p2c').value) / 100, c2w = Number($('sim-c2w').value) / 100;
+      ids.forEach(function (id) { $(id + '-v').textContent = $(id).value + '%'; });
+      var contracts = m.target / c2w, props = contracts / p2c, discos = props / d2p;
+      var perDay = discos / m.wd.total;
+      $('sim-discos').innerHTML = fmt(discos, 0);
+      $('sim-perday').innerHTML = fmt(perDay, 1);
+      $('sim-props').innerHTML = fmt(props, 0);
+      $('sim-contracts').innerHTML = fmt(contracts, 0);
+      var delta = discos - m.needDiscos;
+      var dEl = $('sim-discos-d'), pEl = $('sim-perday-d');
+      if (Math.abs(delta) < 0.5) { dEl.textContent = 'same as today'; dEl.className = 'd'; pEl.textContent = ''; }
+      else {
+        dEl.textContent = (delta < 0 ? '−' : '+') + fmt(Math.abs(delta), 0) + ' vs today';
+        dEl.className = 'd ' + (delta < 0 ? 'good' : 'bad');
+        pEl.textContent = (delta < 0 ? '−' : '+') + fmt(Math.abs(delta) / m.wd.total, 1) + '/day';
+        pEl.className = 'd ' + (delta < 0 ? 'good' : 'bad');
+      }
+    }
+    ids.forEach(function (id) { $(id).addEventListener('input', recalc); });
+    var reset = $('sim-reset');
+    if (reset) reset.onclick = function () {
+      ids.forEach(function (id) { $(id).value = $(id).getAttribute('data-def'); });
+      recalc();
+    };
+    recalc();
+  }
+
+  function bindRepForm(rep) {
+    var save = $('f-save');
+    if (save) save.onclick = function () {
+      var body = { rep: rep, entry_date: $('f-date').value };
+      FORM_FIELDS.forEach(function (f) { body[f.key] = $('f-' + f.key).value || 0; });
+      if (SHOW_MRR && $('f-mrr')) body.mrr = $('f-mrr').value || 0; // absent = server leaves stored MRR alone
+      if (!body.entry_date) { toast('Pick a date'); return; }
+      save.disabled = true;
+      post('/api/entry', body).then(function () { toast('Saved'); return reload(); })
+        .catch(function (e) { toast('Save failed: ' + e.message); })
+        .then(function () { save.disabled = false; });
+    };
+    var gsave = $('g-save');
+    if (gsave) gsave.onclick = function () {
+      gsave.disabled = true;
+      var sbody = {
+        rep: rep,
+        monthly_close_target: $('g-close').value,
+        goal_discos: $('g-gdiscos').value,
+        goal_props: $('g-gprops').value,
+        goal_contracts: $('g-gcontracts').value,
+        rate_disco_prop: $('g-d2p').value,
+        rate_prop_contract: $('g-p2c').value,
+        rate_contract_close: $('g-c2w').value
+      };
+      if (SHOW_MRR && $('g-mrr')) sbody.monthly_mrr_target = $('g-mrr').value;
+      post('/api/settings', sbody).then(function () { toast('Targets saved'); return reload(); })
+        .catch(function (e) { toast('Save failed: ' + e.message); })
+        .then(function () { gsave.disabled = false; });
+    };
+  }
+
+  // ---- io -----------------------------------------------------------------
+  function post(path, body) {
+    return fetch(BASE + path, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) })
+      .then(function (r) { return r.json().then(function (j) {
+        if (!r.ok || j.error) throw new Error(j.error || r.status); return j; }); });
+  }
+  function reload() {
+    return fetch(BASE + '/api/state').then(function (r) { return r.json(); })
+      .then(function (j) { state = j; render(); });
+  }
+  function render() {
+    renderTabs();
+    $('view').innerHTML = active === 'summary' ? summaryView() : repView(active);
+  }
+  reload().catch(function (e) {
+    $('view').innerHTML = '<div class="loading">Could not load data: ' + esc(e.message) + '</div>';
+  });
+})();
+</script>
+</body>
+</html>

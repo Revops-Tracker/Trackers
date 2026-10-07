@@ -1,0 +1,723 @@
+<!doctype html>
+<html lang="en">
+<head><script>window.JF_PAGE='bdr'</script><script src="config.js"></script><script src="sso.js"></script>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>BDR Shortfall Tracker</title>
+<style>
+  :root {
+    --paper: #FAF9F7; --panel: #FFFFFF; --ink: #211E1D; --muted: #6E6660;
+    --line: #E4DFDA; --accent: #B4292F; --accent-soft: #F7E9E9;
+    --good: #2E7D4F; --good-soft: #E7F2EB; --bad: #B4292F; --bad-soft: #F7E9E9;
+    --input-bg: #FFFDF4; --input-line: #D8CFA8;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --paper: #171514; --panel: #201D1C; --ink: #EDE8E4; --muted: #9C948D;
+      --line: #383331; --accent: #E06A6E; --accent-soft: #3A2425;
+      --good: #6FBF8F; --good-soft: #21352A; --bad: #E06A6E; --bad-soft: #3A2425;
+      --input-bg: #262320; --input-line: #55503E;
+    }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--paper); color: var(--ink);
+    font: 15px/1.5 "Seravek", "Segoe UI", system-ui, sans-serif; }
+  .wrap { max-width: 1060px; margin: 0 auto; padding: 28px 20px 60px; }
+  header h1 { font-size: 26px; margin: 0 0 2px; letter-spacing: -0.01em; }
+  header p { margin: 0 0 20px; color: var(--muted); font-size: 14px; }
+  .tabs { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 20px; }
+  .tab { border: 1px solid var(--line); background: var(--panel); color: var(--ink);
+    padding: 7px 16px; border-radius: 999px; cursor: pointer; font: inherit; font-size: 14px; }
+  .tab:hover { border-color: var(--accent); }
+  .tab.active { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 600; }
+  .tab:focus-visible, button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .cols { display: grid; grid-template-columns: 340px 1fr; gap: 20px; align-items: start; }
+  @media (max-width: 840px) { .cols { grid-template-columns: 1fr; } }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 18px; }
+  .card + .card { margin-top: 20px; }
+  .card h2 { margin: 0 0 12px; font-size: 11.5px; text-transform: uppercase; letter-spacing: 0.09em;
+    color: var(--accent); font-weight: 700; }
+  .row { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 5px 0; }
+  input[type="number"], input[type="date"] { font: inherit; color: var(--ink); background: var(--input-bg);
+    border: 1px solid var(--input-line); border-radius: 6px; padding: 5px 9px; width: 110px;
+    font-variant-numeric: tabular-nums; }
+  .statusbar { display: flex; gap: 14px; flex-wrap: wrap; margin-bottom: 20px; }
+  .stat { background: var(--panel); border: 1px solid var(--line); border-radius: 10px;
+    padding: 12px 18px; min-width: 128px; flex: 1; }
+  .stat .k { font-size: 11.5px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); }
+  .stat .v { font-size: 25px; font-weight: 700; font-variant-numeric: tabular-nums; line-height: 1.25; }
+  .stat .sub { font-size: 12.5px; color: var(--muted); }
+  .pill { display: inline-block; padding: 3px 12px; border-radius: 999px; font-size: 13px; font-weight: 700; }
+  .pill.good { background: var(--good-soft); color: var(--good); }
+  .pill.bad { background: var(--bad-soft); color: var(--bad); }
+  .pill.flat { background: var(--accent-soft); color: var(--accent); }
+  table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
+  th, td { text-align: right; padding: 7px 9px; border-bottom: 1px solid var(--line); font-size: 14px; }
+  th { font-size: 11.5px; text-transform: uppercase; letter-spacing: 0.07em; color: var(--muted); font-weight: 600; }
+  th:first-child, td:first-child { text-align: left; }
+  tr:last-child td { border-bottom: none; }
+  td.req { font-weight: 700; }
+  td.warn { color: var(--bad); font-weight: 600; }
+  td.good { color: var(--good); font-weight: 600; }
+  td.dim, th.dim { color: var(--muted); }
+  tr.total td { font-weight: 700; border-top: 1px solid var(--line); }
+  tr.clickable { cursor: pointer; }
+  tr.clickable:hover td { background: var(--accent-soft); }
+  .btn { font: inherit; font-size: 14px; font-weight: 600; background: var(--accent); color: #fff;
+    border: none; border-radius: 6px; padding: 8px 20px; cursor: pointer; }
+  .btn[disabled] { opacity: 0.5; cursor: default; }
+  .ghost { font: inherit; font-size: 13px; background: none; border: 1px solid var(--line);
+    color: var(--muted); border-radius: 6px; padding: 5px 12px; cursor: pointer; }
+  .ghost:hover { border-color: var(--accent); color: var(--accent); }
+  .hint { font-size: 12.5px; color: var(--muted); margin: 8px 0 0; }
+  .defs { font-size: 12.5px; color: var(--muted); margin: 12px 0 0; padding-left: 18px; }
+  .defs li { margin-bottom: 5px; }
+  .defs strong { color: var(--ink); }
+  .ref { font-size: 12px; color: var(--muted); min-width: 110px; text-align: right; font-variant-numeric: tabular-nums; }
+  .tablewrap { overflow-x: auto; }
+  .toast { position: fixed; bottom: 22px; left: 50%; transform: translateX(-50%);
+    background: var(--ink); color: var(--paper); padding: 9px 20px; border-radius: 999px;
+    font-size: 14px; opacity: 0; transition: opacity 0.25s; pointer-events: none; }
+  .toast.show { opacity: 1; }
+  .ratebig { font-size: 19px; font-weight: 700; font-variant-numeric: tabular-nums; }
+  .big-total { font-size: 24px; font-weight: 700; font-variant-numeric: tabular-nums; color: var(--accent); }
+  .loading { color: var(--muted); padding: 40px 0; text-align: center; }
+  .subhead { font-size: 12px; text-transform: uppercase; letter-spacing: 0.07em; color: var(--muted);
+    font-weight: 600; margin: 14px 0 2px; padding-top: 10px; border-top: 1px dashed var(--line); }
+  .outcomes { display: grid; grid-template-columns: 1fr; gap: 2px; margin-top: 4px; }
+  .outcomes label { display: flex; justify-content: space-between; align-items: center; gap: 8px;
+    font-size: 14px; padding: 3px 0; }
+  .outcomes input { width: 82px; }
+  .outcomes .code { font-weight: 700; font-size: 12px; color: var(--muted); }
+  .recon { font-size: 12.5px; margin: 10px 0 0; padding: 7px 10px; border-radius: 6px;
+    background: var(--accent-soft); color: var(--ink); }
+  .recon.bad { background: var(--bad-soft); color: var(--bad); font-weight: 600; }
+  .recon.good { background: var(--good-soft); color: var(--good); }
+  .pctu { display: block; font-size: 11.5px; color: var(--muted); font-weight: 400; line-height: 1.3; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>BDR Shortfall Tracker</h1>
+    <p>Commit in the morning, log your day, see your gap. Saved for everyone &mdash; updates on refresh.</p>
+  </header>
+  <nav class="tabs" id="tabs"></nav>
+  <main id="view"><div class="loading">Loading&hellip;</div></main>
+</div>
+<div class="toast" id="toast"></div>
+<script>
+(function () {
+  var BASE = '/api/bdr';
+  // Team minimum: 780 dials a day across power + parallel. The rate math can ask for less than
+  // this when a rep is converting well — the floor still stands, so it overrides the calculation.
+  var DIAL_FLOOR = 780;
+  var state = null;
+  var horizons = {};
+  var active = 'summary';
+  try { active = sessionStorage.getItem('bdr-active-tab') || 'summary'; } catch (err) {}
+  function remember(id) { try { sessionStorage.setItem('bdr-active-tab', id); } catch (err) {} }
+
+  // Connect outcomes — JF disposition codes (SOP 4a). Discovery Booked is the `booked` field.
+  //   rate  — carries a % of connects (every code that comes out of the connects does)
+  //   split — comes out of the day's connects, so it counts toward the remainder
+  //   group — which block of the log form it sits in
+  // MR is neither: a rebook is not a new booking and not a fresh connect, so it is just a counter.
+  // DNC and Wrong Number are not tracked at all — they land in "other".
+  var DISP = [
+    { k: 'disp_al',   id: 'o-al',   code: 'AL',   label: 'Activated Lead',           rate: true,  split: true,  group: 'mix' },
+    { k: 'disp_ci',   id: 'o-ci',   code: 'CI',   label: 'Connect Incomplete',       rate: true,  split: true,  group: 'mix' },
+    { k: 'disp_nn',   id: 'o-nn',   code: 'NN',   label: 'Not Now',                  rate: true,  split: true,  group: 'mix' },
+    { k: 'disp_ni',   id: 'o-ni',   code: 'NI',   label: 'Not Interested',           rate: true,  split: true,  group: 'mix' },
+    { k: 'disp_nm',   id: 'o-nm',   code: 'NM',   label: 'Not Me',                   rate: true,  split: true,  group: 'dq' },
+    { k: 'disp_nlwc', id: 'o-nlwc', code: 'NLWC', label: 'No Longer With Company',   rate: true,  split: true,  group: 'dq' },
+    { k: 'disp_nisl', id: 'o-nisl', code: 'NISL', label: 'Not in Swim Lane',         rate: true,  split: true,  group: 'dq' },
+    { k: 'disp_ref',  id: 'o-ref',  code: 'REF',  label: 'Referred',                 rate: true,  split: true,  group: 'dq' },
+    { k: 'disp_cst',  id: 'o-cst',  code: 'CST',  label: 'CST (moved to CST offer)', rate: true,  split: true,  group: 'dq' },
+    { k: 'disp_mr',   id: 'o-mr',   code: 'MR',   label: 'Meeting Rebook',           rate: false, split: false, group: 'sep' }
+  ];
+  var SPLIT = DISP.filter(function (d) { return d.split; });
+
+  function toast(msg) {
+    var t = document.getElementById('toast');
+    t.textContent = msg;
+    t.classList.add('show');
+    setTimeout(function () { t.classList.remove('show'); }, 2200);
+  }
+  function esc(s) {
+    return String(s).replace(/[&<>"]/g, function (c) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c];
+    });
+  }
+  function f0(x) { return Math.round(x).toLocaleString(); }
+  function f1(x) { return (Math.round(x * 10) / 10).toLocaleString(undefined, { minimumFractionDigits: 1 }); }
+  function pct(n, d) { return d > 0 ? f1(n / d * 100) + '%' : '&mdash;'; }
+  function iso(d) {
+    return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+  }
+  function parse(v) { var p = v.split('-').map(Number); return new Date(p[0], p[1] - 1, p[2]); }
+  function workdays(a, b) {
+    if (a > b) return 0;
+    var n = 0, d = new Date(a);
+    for (; d <= b; d.setDate(d.getDate() + 1)) { var w = d.getDay(); if (w !== 0 && w !== 6) n++; }
+    return n;
+  }
+  function has(v) { return v !== null && v !== undefined && v !== ''; }
+  function val(id) { var el = document.getElementById(id); return el ? Number(el.value || 0) : 0; }
+
+  function monthWindow() {
+    var now = new Date();
+    var start = new Date(now.getFullYear(), now.getMonth(), 1);
+    var end = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+    var today = new Date(); today.setHours(0, 0, 0, 0);
+    var total = workdays(start, end);
+    var elapsed = workdays(start, today > end ? end : today);
+    return { start: start, end: end, total: total, elapsed: Math.min(elapsed, total), remaining: total - Math.min(elapsed, total) };
+  }
+
+  function sum(rows, k) { return rows.reduce(function (a, r) { return a + Number(r[k] || 0); }, 0); }
+
+  function settingsFor(rep) {
+    return state.settings.find(function (s) { return s.rep === rep; }) || {};
+  }
+  function entryFor(rep, dateStr) {
+    return state.entries.find(function (e) { return e.rep === rep && e.entry_date === dateStr; });
+  }
+
+  // The rates each rep SET for themselves — these drive all the math.
+  function ratesFor(rep) {
+    var s = settingsFor(rep);
+    var d2c = Number(s.rate_d2c || 10) / 100;
+    var comp = Number(s.rate_comp || 49) / 100;
+    var book = Number(s.rate_book || 53) / 100;
+    return { d2c: d2c, comp: comp, book: book,
+      dialsPerBooking: (d2c > 0 && comp > 0 && book > 0) ? 1 / (d2c * comp * book) : 0 };
+  }
+
+  // What this rep's own logged history says — shown as reference only.
+  function loggedRates(rep) {
+    var rows = state.entries.filter(function (e) { return e.rep === rep; });
+    var d = sum(rows, 'dials'), c = sum(rows, 'connects'), cp = sum(rows, 'completions'), b = sum(rows, 'booked');
+    return {
+      d2c: d > 0 ? c / d * 100 : null,
+      comp: c > 0 ? cp / c * 100 : null,
+      book: cp > 0 ? b / cp * 100 : null
+    };
+  }
+
+  // Split a set of days into the outcome codes + booked, and whatever is left over.
+  // "Other" is everything the codes do not name (DNC / Wrong Number — deliberately untracked)
+  // plus any connects the rep has not categorised yet — it is never hidden.
+  function outcomeMix(rows) {
+    var o = {
+      connects: sum(rows, 'connects'), convos: sum(rows, 'completions'),
+      booked: sum(rows, 'booked'), counts: {}, split: 0
+    };
+    DISP.forEach(function (d) {
+      o.counts[d.k] = sum(rows, d.k);
+      if (d.split) o.split += o.counts[d.k];
+    });
+    o.categorized = o.split + o.booked;
+    o.other = o.connects - o.categorized;
+    // The two conversion rates that matter: how much of a connect, and of a real conversation,
+    // turns into a discovery on the calendar.
+    o.connectToDB = o.connects > 0 ? o.booked / o.connects * 100 : null;
+    o.convoToDB = o.convos > 0 ? o.booked / o.convos * 100 : null;
+    return o;
+  }
+
+  function compute(rep) {
+    var mw = monthWindow();
+    var s = settingsFor(rep);
+    var target = s.monthly_target || 48;
+    var mtd = state.entries.filter(function (e) {
+      return e.rep === rep && parse(e.entry_date) >= mw.start && parse(e.entry_date) <= mw.end;
+    });
+    var booked = sum(mtd, 'booked'), dials = sum(mtd, 'dials');
+    var loggedDays = mtd.filter(function (e) {
+      return Number(e.dials) > 0 || Number(e.connects) > 0 || Number(e.completions) > 0 || Number(e.booked) > 0;
+    }).length;
+    var rates = ratesFor(rep);
+    var pace = mw.total ? target * mw.elapsed / mw.total : 0;
+    var behind = pace - booked;
+    var dailyBookTarget = mw.total ? target / mw.total : 0;
+
+    // Commitment adherence — only days where a commitment was actually set count as a denominator.
+    var cd = mtd.filter(function (e) { return has(e.commit_dials); });
+    var cb = mtd.filter(function (e) { return has(e.commit_booked); });
+    // What the rates alone would ask for, then the floor. A rep converting well can "earn" a
+    // 300-dial day on paper; the 780 minimum overrides that.
+    var stdRaw = dailyBookTarget * rates.dialsPerBooking;
+    return {
+      mw: mw, target: target, mtd: mtd, booked: booked, dials: dials, rates: rates,
+      pace: pace, behind: behind,
+      onPace: behind <= 0.001,
+      dailyBookTarget: dailyBookTarget,
+      stdDialsRaw: stdRaw,
+      floored: stdRaw < DIAL_FLOOR,
+      stdDialsDay: Math.max(stdRaw, DIAL_FLOOR),
+      dialDebt: Math.max(0, behind) * rates.dialsPerBooking,
+      cushionDials: Math.max(0, -behind) * rates.dialsPerBooking,
+      loggedDays: loggedDays,
+      curDialsDay: loggedDays > 0 ? dials / loggedDays : 0,
+      mix: outcomeMix(mtd),
+      commitDialDays: cd.length,
+      commitDialKept: cd.filter(function (e) { return Number(e.dials) >= Number(e.commit_dials); }).length,
+      commitDialsSet: sum(cd, 'commit_dials'),
+      commitDialsDone: sum(cd, 'dials'),
+      commitBookDays: cb.length,
+      commitBookKept: cb.filter(function (e) { return Number(e.booked) >= Number(e.commit_booked); }).length
+    };
+  }
+
+  function api(path, body) {
+    return fetch(BASE + path, body
+      ? { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }
+      : undefined
+    ).then(function (r) {
+      return r.json().then(function (j) {
+        if (!r.ok || j.error) throw new Error(j.error || ('HTTP ' + r.status));
+        return j;
+      });
+    });
+  }
+
+  function load() {
+    return api('/api/state').then(function (s) { state = s; render(); })
+      .catch(function (e) {
+        document.getElementById('view').innerHTML =
+          '<div class="loading">Could not load data (' + esc(e.message) + '). <button class="ghost" onclick="location.reload()">Retry</button></div>';
+      });
+  }
+
+  function renderTabs() {
+    var el = document.getElementById('tabs');
+    el.innerHTML = '';
+    function mk(id, label) {
+      var b = document.createElement('button');
+      b.className = 'tab' + (active === id ? ' active' : '');
+      b.textContent = label;
+      b.onclick = function () { active = id; remember(id); render(); };
+      el.appendChild(b);
+    }
+    mk('summary', 'Team Summary');
+    state.settings.forEach(function (s) { mk(s.rep, s.rep); });
+  }
+
+  function renderSummary(v) {
+    var mw = monthWindow();
+    var today = iso(new Date());
+    var computed = state.settings.map(function (s) { return { rep: s.rep, c: compute(s.rep) }; });
+
+    var paceRows = computed.map(function (x) {
+      var c = x.c;
+      var missing = c.loggedDays < mw.elapsed;
+      var t = entryFor(x.rep, today);
+      var cDials = t && has(t.commit_dials) ? Number(t.commit_dials) : null;
+      var cCalls = t && has(t.commit_booked) ? Number(t.commit_booked) : null;
+      var commitCell = (cDials === null && cCalls === null)
+        ? "<td class='warn'>&mdash;<span class='pctu'>not set</span></td>"
+        : "<td class='" + (cDials !== null && cDials < DIAL_FLOOR ? 'warn' : '') + "'>"
+            + (cDials === null ? '&mdash;' : f0(cDials))
+            + "<span class='pctu'>" + (cCalls === null ? 'no calls' : f1(cCalls) + ' calls') + '</span></td>';
+      var keptClass = c.commitDialDays === 0 ? 'dim' : (c.commitDialKept === c.commitDialDays ? 'good' : 'warn');
+      var keptCell = "<td class='" + keptClass + "'>" + c.commitDialKept + ' / ' + c.commitDialDays
+        + "<span class='pctu'>" + (c.commitBookDays === 0 ? 'no call commits' : c.commitBookKept + ' / ' + c.commitBookDays + ' calls') + '</span></td>';
+      return '<tr><td>' + esc(x.rep) + '</td><td>' + f0(c.target) + '</td><td>' + f1(c.booked)
+        + '</td><td>' + f1(c.pace) + '</td><td>' + f1(c.behind)
+        + "</td><td style='text-align:center'><span class='pill " + (c.onPace ? "good'>On pace" : "bad'>Behind") + '</span></td>'
+        + "<td class='req'>" + f0(c.dialDebt) + '</td>'
+        + '<td>' + f0(c.stdDialsDay) + (c.floored ? "<span class='pctu'>floor</span>" : '') + '</td>'
+        + '<td>' + (c.loggedDays > 0 ? f0(c.curDialsDay) : '&mdash;') + '</td>'
+        + commitCell + keptCell
+        + "<td class='" + (missing ? 'warn' : '') + "'>" + c.loggedDays + ' / ' + mw.elapsed
+        + '</td><td>' + f0(c.rates.dialsPerBooking) + '</td></tr>';
+    }).join('');
+
+    // Count over its share of connects, in one cell — nine codes each needing a % would be
+    // eighteen columns otherwise.
+    function cell(n, connects, cls) {
+      return "<td class='" + (cls || '') + "'>" + f1(n)
+        + "<span class='pctu'>" + pct(n, connects) + '</span></td>';
+    }
+
+    var mixRows = computed.map(function (x) {
+      var m = x.c.mix;
+      return '<tr><td>' + esc(x.rep) + '</td><td>' + f0(m.connects) + '</td><td>' + f0(m.convos) + '</td>'
+        + "<td class='req'>" + f1(m.booked) + '</td>'
+        + "<td class='req'>" + (m.connectToDB === null ? '&mdash;' : f1(m.connectToDB) + '%') + '</td>'
+        + "<td class='req'>" + (m.convoToDB === null ? '&mdash;' : f1(m.convoToDB) + '%') + '</td>'
+        + SPLIT.map(function (d) { return cell(m.counts[d.k], m.connects); }).join('')
+        + cell(m.other, m.connects, m.other < -0.05 ? 'warn' : 'dim')
+        + "<td class='dim'>" + f0(m.counts.disp_mr) + '</td></tr>';
+    }).join('');
+
+    var mixHead = SPLIT.map(function (d) { return '<th>' + d.code + '</th>'; }).join('');
+
+    v.innerHTML = "<div class='card'><h2>All reps &mdash; month to date</h2><div class='tablewrap'><table>"
+      + '<thead><tr><th>Rep</th><th>Target</th><th>Meetings booked</th><th>Pace</th><th>Behind</th>'
+      + "<th style='text-align:center'>Status</th><th>Dial debt</th><th>Standard dials/day</th><th>Current dials/day</th>"
+      + "<th>Today's commit</th><th>Commits kept</th><th>Days logged</th><th>Dials per booking</th></tr></thead>"
+      + '<tbody>' + paceRows + '</tbody></table></div>'
+      + "<ul class='defs'>"
+      + '<li><strong>Pace / Behind</strong> &mdash; where the month says they should be by today (target &times; share of working days gone), and how many meetings they are short of it.</li>'
+      + '<li><strong>Dial debt</strong> &mdash; the shortfall converted into dials: meetings behind &times; their dials per booking. This is the catch-up work they owe on top of a standard day. It shrinks with every meeting booked and grows every day they coast.</li>'
+      + '<li><strong>Standard dials/day</strong> &mdash; what a normal day must look like to hit the monthly target: daily meetings target &times; dials per booking, or the <strong>' + f0(DIAL_FLOOR) + '-dial team minimum</strong> if the rate math asks for less. Marked <em>floor</em> when the minimum is what is showing &mdash; a rep converting well still owes the ' + f0(DIAL_FLOOR) + '.</li>'
+      + '<li><strong>Current dials/day</strong> &mdash; how hard they actually dial on the days they logged (total dials &divide; days logged). Not diluted by missing days.</li>'
+      + "<li><strong>Today's commit</strong> &mdash; what they committed to this morning: dials on top, calls underneath. Red means no commitment set today, or a dial commitment under the " + f0(DIAL_FLOOR) + ' minimum.</li>'
+      + '<li><strong>Commits kept</strong> &mdash; days they hit their own committed number, out of the days they set one: dials on top, calls underneath. Days with no commitment are not counted either way.</li>'
+      + '<li><strong>Days logged</strong> &mdash; days with any activity entered vs working days elapsed this month. Red means gaps: the other columns understate reality until those days are backfilled.</li>'
+      + '<li><strong>Dials per booking</strong> &mdash; how many dials one booked meeting costs at the rates that rep set on their own tab (their connect, conversation, and booking rates &mdash; no team averages).</li>'
+      + '</ul></div>'
+
+      + "<div class='card'><h2>What the connects turned into &mdash; month to date</h2><div class='tablewrap'><table>"
+      + "<thead><tr><th>Rep</th><th>Connects</th><th>Convos</th><th>Booked (DB)</th>"
+      + '<th>Connect&rarr;DB</th><th>Convo&rarr;DB</th>' + mixHead
+      + "<th>Other</th><th class='dim'>MR</th></tr></thead>"
+      + '<tbody>' + mixRows + '</tbody></table></div>'
+      + "<ul class='defs'>"
+      + '<li><strong>Every outcome cell shows the count with its share of that rep&rsquo;s connects underneath</strong> &mdash; one denominator across the whole row, printed in the Connects column so nothing hides behind a percentage. Read across a row and you have the full breakdown of what that rep&rsquo;s calls turned into.</li>'
+      + '<li><strong>Connect&rarr;DB</strong> &mdash; discoveries booked &divide; connects. <strong>Convo&rarr;DB</strong> &mdash; discoveries booked &divide; conversations (the 30-second ones).</li>'
+      + '<li><strong>The mix we manage against</strong> &mdash; <strong>AL</strong> Activated Lead &middot; <strong>CI</strong> Connect Incomplete &middot; <strong>NN</strong> Not Now &middot; <strong>NI</strong> Not Interested.</li>'
+      + '<li><strong>Disqualified / redirected</strong> &mdash; <strong>NM</strong> Not Me &middot; <strong>NLWC</strong> No Longer With Company &middot; <strong>NISL</strong> Not in Swim Lane &middot; <strong>REF</strong> Referred &middot; <strong>CST</strong> moved to the CST offer. High percentages here are a list-quality problem, not a rep problem.</li>'
+      + '<li><strong>MR</strong> (Meeting Rebook) is a count with no percentage, and sits outside the split entirely &mdash; a rebooked meeting is not a new discovery booked, it is just worth knowing how many happened.</li>'
+      + '<li><strong>Other</strong> &mdash; connects minus booked and the nine codes. It holds the two outcomes we deliberately do not track (Do Not Contact, Wrong Number) plus anything not yet filled in. A negative number means the outcomes entered exceed the connects entered &mdash; a logging error worth chasing.</li>'
+      + '</ul>'
+      + "<p class='hint'>Refresh the page to pull the latest entries.</p></div>";
+  }
+
+  function renderRep(v, rep) {
+    var c = compute(rep);
+    var s = settingsFor(rep);
+    var lg = loggedRates(rep);
+    var today = iso(new Date());
+    var todayEntry = entryFor(rep, today);
+    var horizon = Math.max(1, Math.round(horizons[rep] || c.mw.remaining || 1));
+    var extraPerDay = c.dialDebt / horizon;
+    var totalPerDay = c.stdDialsDay + extraPerDay;
+
+    var dayList = [];
+    (function () {
+      var t = new Date(); t.setHours(0, 0, 0, 0);
+      var stop = t > c.mw.end ? c.mw.end : t;
+      for (var d = new Date(c.mw.start); d <= stop; d.setDate(d.getDate() + 1)) {
+        var w = d.getDay(); if (w !== 0 && w !== 6) dayList.push(iso(d));
+      }
+      dayList.reverse();
+    })();
+
+    var dayRows = dayList.map(function (ds) {
+      var e = c.mtd.find(function (x) { return x.entry_date === ds; });
+      var logged = e && (Number(e.dials) > 0 || Number(e.connects) > 0 || Number(e.completions) > 0 || Number(e.booked) > 0);
+      var commitCell = e && has(e.commit_dials)
+        ? "<td class='" + (logged ? (Number(e.dials) >= Number(e.commit_dials) ? 'good' : 'warn') : 'dim') + "'>" + f0(e.commit_dials) + '</td>'
+        : "<td class='dim'>&mdash;</td>";
+      var body = logged
+        ? '<td>' + f0(e.dials) + '</td><td>' + f0(e.connects) + '</td><td>' + f0(e.completions) + '</td><td>' + f1(e.booked) + '</td>'
+          + DISP.map(function (d) { return "<td class='dim'>" + f0(e[d.k]) + '</td>'; }).join('')
+        : "<td colspan='14' style='text-align:left;color:var(--muted)'>not logged &mdash; click to backfill</td>";
+      return "<tr class='clickable' data-date='" + ds + "'><td>" + ds + '</td>' + commitCell + body + '</tr>';
+    }).join('');
+
+    function rateRow(label, id, value, logged) {
+      return "<div class='row'><span>" + label + '</span>'
+        + "<span style='display:flex;align-items:center;gap:8px'>"
+        + "<span class='ref'>" + (logged === null ? 'your log: &mdash;' : 'your log: ' + f1(logged) + '%') + '</span>'
+        + "<input type='number' min='0.5' max='100' step='0.5' id='" + id + "' value='" + Number(value) + "' style='width:82px'> %"
+        + '</span></div>';
+    }
+
+    // ---- commitment card -------------------------------------------------
+    var todayDials = todayEntry ? Number(todayEntry.dials) : 0;
+    var todayBooked = todayEntry ? Number(todayEntry.booked) : 0;
+    var hasCommitD = todayEntry && has(todayEntry.commit_dials);
+    var hasCommitB = todayEntry && has(todayEntry.commit_booked);
+    var commitStat;
+    if (!hasCommitD && !hasCommitB) {
+      commitStat = "<div class='v' style='color:var(--bad);font-size:19px'>Not set</div><div class='sub'>Set it before you start dialling</div>";
+    } else {
+      var dialsLeft = hasCommitD ? Number(todayEntry.commit_dials) - todayDials : 0;
+      var callsLeft = hasCommitB ? Number(todayEntry.commit_booked) - todayBooked : 0;
+      var sm = "<span style='font-size:15px;color:var(--muted)'>";
+      commitStat = "<div class='v' style='font-size:21px'>"
+        + (hasCommitD ? f0(todayEntry.commit_dials) + ' ' + sm + 'dials</span>' : '')
+        + (hasCommitD && hasCommitB ? ' ' + sm + '&middot;</span> ' : '')
+        + (hasCommitB ? f1(todayEntry.commit_booked) + ' ' + sm + 'calls</span>' : '')
+        + '</div>'
+        + "<div class='sub'>"
+        + (hasCommitD ? f0(todayDials) + ' dialled &middot; '
+            + (dialsLeft > 0 ? f0(dialsLeft) + ' to go' : "<span style='color:var(--good)'>kept</span>") : '')
+        + (hasCommitD && hasCommitB ? '<br>' : '')
+        + (hasCommitB ? f1(todayBooked) + ' booked &middot; '
+            + (callsLeft > 0 ? f1(callsLeft) + ' to go' : "<span style='color:var(--good)'>kept</span>") : '')
+        + '</div>';
+    }
+
+    var commitCard = "<div class='card'><h2>Today's commitment &mdash; set it this morning</h2>"
+      + "<div class='row'><label for='c-date'>For</label><input type='date' id='c-date' value='" + today + "'></div>"
+      + "<div class='row'><label for='c-dials'>Dials I commit to</label><input type='number' min='0' step='10' id='c-dials' value='"
+        + (hasCommitD ? Number(todayEntry.commit_dials) : '') + "'></div>"
+      + "<div class='row'><label for='c-booked'>Calls I commit to booking</label><input type='number' min='0' step='0.5' id='c-booked' value='"
+        + (hasCommitB ? Number(todayEntry.commit_booked) : '') + "'></div>"
+      + "<div class='recon' id='c-floor'></div>"
+      + "<div class='row' style='justify-content:space-between'>"
+      + "<span class='hint' style='margin:0'>Suggested: " + f0(totalPerDay) + ' dials</span>'
+      + "<button class='btn' id='c-save'>Commit</button></div>"
+      + "<p class='hint'>Your commitment is stamped with the time you save it, so a number set at 9am reads differently from one set at 5pm. Kept this month: <strong>"
+        + c.commitDialKept + ' of ' + c.commitDialDays + '</strong> dial commitments'
+        + (c.commitBookDays > 0 ? ', <strong>' + c.commitBookKept + ' of ' + c.commitBookDays + '</strong> call commitments' : '')
+        + '.</p></div>';
+
+    // ---- outcome inputs on the log form ---------------------------------
+    function outcomeInputs(group) {
+      return "<div class='outcomes'>" + DISP.filter(function (d) { return d.group === group; })
+        .map(function (d) {
+          return "<label for='" + d.id + "'><span>" + d.label + " <span class='code'>" + d.code + '</span></span>'
+            + "<input type='number' min='0' step='1' id='" + d.id + "'></label>";
+        }).join('') + '</div>';
+    }
+
+    var floorNote = c.floored
+      ? "<div class='row' style='border-top:1px dashed var(--line);margin-top:6px;padding-top:10px'><span>Your rates only ask for "
+        + f0(c.stdDialsRaw) + " dials &mdash; the team minimum overrides that</span><span class='ratebig' style='color:var(--accent)'>"
+        + f0(DIAL_FLOOR) + ' floor</span></div>'
+      : '';
+
+    var gapCard;
+    if (c.onPace) {
+      gapCard = "<div class='card'><h2>Your dial math</h2>"
+        + "<div class='row'><span>Standard day (" + f1(c.dailyBookTarget) + ' meetings &times; ' + f0(c.rates.dialsPerBooking) + " dials/booking)</span><span class='ratebig'>" + f0(c.stdDialsDay) + ' dials/day</span></div>'
+        + floorNote
+        + "<div class='row'><span>Dial debt</span><span class='ratebig' style='color:var(--good)'>0 &mdash; on pace</span></div>"
+        + (c.cushionDials > 0 ? "<div class='row'><span>Cushion (booked ahead of pace)</span><span class='ratebig' style='color:var(--good)'>&asymp; " + f0(c.cushionDials) + ' dials</span></div>' : '')
+        + "<p class='hint'>Hold the standard day and the month lands on " + f0(c.target) + ' meetings. Booking well does not buy a shorter day &mdash; ' + f0(DIAL_FLOOR) + ' dials is the floor either way.</p></div>';
+    } else {
+      gapCard = "<div class='card'><h2>Your shortfall &mdash; in dials</h2>"
+        + "<div class='row'><span>Meetings behind pace</span><span class='ratebig'>" + f1(c.behind) + '</span></div>'
+        + "<div class='row'><span><strong>Dial debt</strong> (" + f1(c.behind) + ' &times; ' + f0(c.rates.dialsPerBooking) + " dials/booking)</span><span class='big-total'>" + f0(c.dialDebt) + ' dials owed</span></div>'
+        + "<div class='row' style='border-top:1px dashed var(--line);margin-top:6px;padding-top:10px'><span>Standard day (" + f1(c.dailyBookTarget) + ' meetings &times; ' + f0(c.rates.dialsPerBooking) + ")</span><span class='ratebig'>" + f0(c.stdDialsDay) + ' dials</span></div>'
+        + floorNote
+        + "<div class='row'><span>Clear the debt over</span><span style='display:flex;align-items:center;gap:8px'><input type='number' min='1' max='60' step='1' id='g-days' value='" + horizon + "' style='width:70px'> working days</span></div>"
+        + "<div class='row'><span>Catch-up on top</span><span class='ratebig'>+" + f0(extraPerDay) + ' dials/day</span></div>'
+        + "<div class='row'><span><strong>Total per day</strong> (standard + catch-up)</span><span class='big-total'>" + f0(totalPerDay) + ' dials/day</span></div>'
+        + "<p class='hint'>The debt recalculates daily: every meeting booked pays off " + f0(c.rates.dialsPerBooking) + ' dials of it, and each passing day adds ' + f1(c.dailyBookTarget) + ' meetings to the pace bar. ' + f0(c.mw.remaining) + ' working days left this month.</p></div>';
+    }
+
+    // ---- month-to-date outcome mix --------------------------------------
+    var m = c.mix;
+    var mixRows = [{ label: 'Discovery Booked', code: 'DB', n: m.booked, strong: true }]
+      .concat(SPLIT.map(function (d) { return { label: d.label, code: d.code, n: m.counts[d.k] }; }))
+      .map(function (r) {
+        return '<tr><td>' + r.label + " <span class='code' style='color:var(--muted);font-size:12px'>" + r.code + '</span></td>'
+          + "<td class='" + (r.strong ? 'req' : '') + "'>" + f1(r.n) + '</td>'
+          + '<td>' + pct(r.n, m.connects) + '</td></tr>';
+      }).join('')
+      + "<tr><td class='dim'>Other / not categorised</td><td class='" + (m.other < -0.05 ? 'warn' : 'dim') + "'>" + f1(m.other)
+        + "</td><td class='dim'>" + pct(m.other, m.connects) + '</td></tr>'
+      + "<tr class='total'><td>Connects</td><td>" + f0(m.connects) + '</td><td>100%</td></tr>';
+
+    var mixCard = "<div class='card'><h2>What your connects turned into &mdash; month to date</h2>"
+      + "<div class='row'><span>Connect &rarr; discovery booked <span class='hint' style='margin:0'>("
+        + f1(m.booked) + ' &divide; ' + f0(m.connects) + " connects)</span></span><span class='ratebig' style='color:var(--accent)'>"
+        + (m.connectToDB === null ? '&mdash;' : f1(m.connectToDB) + '%') + '</span></div>'
+      + "<div class='row' style='border-bottom:1px dashed var(--line);padding-bottom:10px;margin-bottom:6px'>"
+        + "<span>Conversation &rarr; discovery booked <span class='hint' style='margin:0'>("
+        + f1(m.booked) + ' &divide; ' + f0(m.convos) + " convos)</span></span><span class='ratebig' style='color:var(--accent)'>"
+        + (m.convoToDB === null ? '&mdash;' : f1(m.convoToDB) + '%') + '</span></div>'
+      + "<div class='tablewrap'><table><thead><tr><th>Outcome</th><th>Count</th><th>% of connects</th></tr></thead>"
+      + '<tbody>' + mixRows + '</tbody></table></div>'
+      + "<p class='hint'>Meetings rebooked (MR) this month: <strong>" + f0(m.counts.disp_mr) + '</strong> '
+      + '&mdash; tracked on its own, outside the split above: a rebook is not a new discovery booked.</p>'
+      + "<p class='hint'>Percentages all share one denominator: your " + f0(m.connects) + ' connects this month. '
+      + (m.other < -0.05
+          ? "<span style='color:var(--bad)'>Your outcomes add up to more than your connects &mdash; check the days you logged.</span>"
+          : 'The two we do not track (Do Not Contact, Wrong Number) sit in <em>Other</em> along with connects you have not categorised.')
+      + '</p></div>';
+
+    v.innerHTML =
+      "<div class='statusbar'>"
+      + "<div class='stat'><div class='k'>Status</div><div class='v'><span class='pill " + (c.onPace ? "good'>On pace" : "bad'>Behind") + '</span></div></div>'
+      + "<div class='stat'><div class='k'>Today's commitment</div>" + commitStat + '</div>'
+      + "<div class='stat'><div class='k'>Meetings MTD</div><div class='v'>" + f1(c.booked) + " <span style='font-size:15px;color:var(--muted)'>of " + f0(c.target) + '</span></div></div>'
+      + "<div class='stat'><div class='k'>Meetings behind</div><div class='v' style='color:var(--" + (c.onPace ? 'good' : 'bad') + ")'>" + f1(c.behind) + '</div></div>'
+      + "<div class='stat'><div class='k'>Dial debt</div><div class='v' style='color:var(--" + (c.onPace ? 'good' : 'bad') + ")'>" + f0(c.dialDebt) + '</div></div>'
+      + "<div class='stat'><div class='k'>Standard dials/day</div><div class='v'>" + f0(c.stdDialsDay) + '</div>'
+        + (c.floored ? "<div class='sub'>" + f0(DIAL_FLOOR) + ' floor</div>' : '') + '</div>'
+      + '</div>'
+      + "<div class='cols'><div>"
+
+      + commitCard
+
+      + "<div class='card'><h2>Log a day &mdash; straight from Nooks</h2>"
+      + "<div class='row'><label for='e-date'>Date</label><input type='date' id='e-date' value='" + today + "'></div>"
+      + "<div class='row'><label for='e-dials'>Dials</label><input type='number' min='0' step='1' id='e-dials'></div>"
+      + "<div class='row'><label for='e-connects'>Connects</label><input type='number' min='0' step='1' id='e-connects'></div>"
+      + "<div class='row'><label for='e-completions'>Conversations (30s)</label><input type='number' min='0' step='1' id='e-completions'></div>"
+      + "<div class='row'><label for='e-booked'>Meetings booked (DB)</label><input type='number' min='0' step='0.5' id='e-booked'></div>"
+      + "<div class='subhead'>What the connects turned into</div>"
+      + outcomeInputs('mix')
+      + "<div class='subhead'>Disqualified / redirected</div>"
+      + outcomeInputs('dq')
+      + "<div class='subhead'>Also tracked</div>"
+      + outcomeInputs('sep')
+      + "<div class='recon' id='e-recon'></div>"
+      + "<div class='row' style='justify-content:flex-end'><button class='btn' id='e-save'>Save day</button></div>"
+      + "<p class='hint'>Dials, connects, conversations and meetings come straight off your Nooks dialing report &mdash; conversations use the 30-second threshold. The outcome boxes split those connects the way you dispositioned them in HubSpot. <strong>MR</strong> sits outside the split &mdash; a rebooked meeting is not a new discovery booked, we just count them. Do Not Contact and Wrong Number are not tracked. Backfill any day: pick a past date or click a row in the month log. Re-saving a date overwrites it.</p></div>"
+
+      + "<div class='card'><h2>Your rates &mdash; you set these</h2>"
+      + rateRow('Connect rate**', 'r-d2c', s.rate_d2c || 10, lg.d2c)
+      + rateRow('Conversation rate**', 'r-comp', s.rate_comp || 49, lg.comp)
+      + rateRow('Booking rate**', 'r-book', s.rate_book || 53, lg.book)
+      + "<div class='row'><span><strong>Dials per booked call</strong></span><span class='ratebig' style='color:var(--accent)'>" + f0(c.rates.dialsPerBooking) + '</span></div>'
+      + "<p class='hint'>** Connect rate = connects &divide; dials &middot; Conversation rate = conversations &divide; connects &middot; Booking rate = meetings booked &divide; conversations.</p>"
+      + "<p class='hint'>All your shortfall math runs off these three numbers &mdash; yours, not a team average. &ldquo;Your log&rdquo; shows what your logged history works out to, so you can true them up over time.</p></div>"
+
+      + "<div class='card'><h2>Month setup</h2>"
+      + "<div class='row'><label for='t-target'>Monthly meetings target</label><input type='number' min='1' step='1' id='t-target' value='" + c.target + "'></div>"
+      + "<div class='row'><span>Daily meetings target</span><span class='ratebig'>" + f1(c.dailyBookTarget) + '</span></div>'
+      + "<div class='row'><span>Working days left</span><span class='ratebig'>" + f0(c.mw.remaining) + ' of ' + f0(c.mw.total) + '</span></div></div>'
+
+      + "</div><div>"
+
+      + gapCard
+      + mixCard
+
+      + "<div class='card'><h2>This month's log &mdash; every working day</h2><div class='tablewrap'><table>"
+      + "<thead><tr><th>Date</th><th>Commit</th><th>Dials</th><th>Connects</th><th>Convos</th><th>Meetings</th>"
+      + DISP.map(function (d) { return "<th class='dim'>" + d.code + '</th>'; }).join('')
+      + '</tr></thead><tbody>'
+      + (dayRows || "<tr><td colspan='16' style='text-align:center;color:var(--muted)'>Month has not started yet</td></tr>")
+      + '</tbody></table></div>'
+      + "<p class='hint'>Commit is what you promised that morning &mdash; green when the day's dials met it, red when they did not. Click any row to load that day into the form, including empty ones to backfill.</p></div>"
+
+      + '</div></div>';
+
+    // ---- reconciliation: do the outcomes account for the connects? -------
+    function recon() {
+      var el = document.getElementById('e-recon');
+      var connects = val('e-connects');
+      var categorized = val('e-booked')
+        + DISP.reduce(function (a, d) { return a + (d.split ? val(d.id) : 0); }, 0);
+      var other = connects - categorized;
+      el.className = 'recon' + (other < -0.05 ? ' bad' : (connects > 0 && Math.abs(other) < 0.05 ? ' good' : ''));
+      if (connects === 0 && categorized === 0) {
+        el.innerHTML = 'Enter your connects and split them by outcome.';
+      } else if (other < -0.05) {
+        el.innerHTML = 'Outcomes add up to ' + f1(categorized) + ' but you logged ' + f0(connects)
+          + ' connects &mdash; ' + f1(-other) + ' too many. Fix one or the other before saving.';
+      } else {
+        el.innerHTML = f1(categorized) + ' of ' + f0(connects) + ' connects categorised &middot; '
+          + f1(other) + ' other / not categorised'
+          + (other > 0.05 ? ' (Do Not Contact, Wrong Number &mdash; or still to fill in)' : '');
+      }
+    }
+
+    function fillForm(dateStr) {
+      var e = entryFor(rep, dateStr);
+      document.getElementById('e-dials').value = e ? e.dials : '';
+      document.getElementById('e-connects').value = e ? e.connects : '';
+      document.getElementById('e-completions').value = e ? e.completions : '';
+      document.getElementById('e-booked').value = e ? e.booked : '';
+      DISP.forEach(function (d) { document.getElementById(d.id).value = e ? e[d.k] : ''; });
+      recon();
+    }
+    fillForm(today);
+    document.getElementById('e-date').onchange = function () { fillForm(this.value); };
+    ['e-connects', 'e-booked'].concat(DISP.map(function (d) { return d.id; })).forEach(function (id) {
+      document.getElementById(id).oninput = recon;
+    });
+
+    v.querySelectorAll('tr.clickable').forEach(function (tr) {
+      tr.onclick = function () {
+        document.getElementById('e-date').value = tr.dataset.date;
+        fillForm(tr.dataset.date);
+        document.getElementById('e-dials').focus();
+      };
+    });
+
+    document.getElementById('e-save').onclick = function () {
+      var btn = this; btn.disabled = true;
+      var body = {
+        rep: rep,
+        entry_date: document.getElementById('e-date').value,
+        dials: document.getElementById('e-dials').value || 0,
+        connects: document.getElementById('e-connects').value || 0,
+        completions: document.getElementById('e-completions').value || 0,
+        booked: document.getElementById('e-booked').value || 0
+      };
+      DISP.forEach(function (d) { body[d.k] = document.getElementById(d.id).value || 0; });
+      api('/api/entry', body)
+        .then(function () { toast('Saved'); return load(); })
+        .catch(function (e) { toast('Save failed: ' + e.message); })
+        .finally(function () { btn.disabled = false; });
+    };
+
+    document.getElementById('c-save').onclick = function () {
+      var btn = this; btn.disabled = true;
+      var d = document.getElementById('c-dials').value;
+      var b = document.getElementById('c-booked').value;
+      if (d === '' && b === '') { toast('Enter a dial or call commitment'); btn.disabled = false; return; }
+      api('/api/commit', {
+        rep: rep,
+        entry_date: document.getElementById('c-date').value,
+        commit_dials: d === '' ? null : d,
+        commit_booked: b === '' ? null : b
+      }).then(function () { toast('Commitment saved'); return load(); })
+        .catch(function (e) { toast('Save failed: ' + e.message); })
+        .finally(function () { btn.disabled = false; });
+    };
+    document.getElementById('c-date').onchange = function () {
+      var e = entryFor(rep, this.value);
+      document.getElementById('c-dials').value = e && has(e.commit_dials) ? e.commit_dials : '';
+      document.getElementById('c-booked').value = e && has(e.commit_booked) ? e.commit_booked : '';
+      floorCheck();
+    };
+
+    // The 780 floor is a hard minimum, not a suggestion — say so while they type it.
+    function floorCheck() {
+      var el = document.getElementById('c-floor');
+      var v = document.getElementById('c-dials').value;
+      if (v === '') { el.className = 'recon'; el.innerHTML = 'Minimum is ' + f0(DIAL_FLOOR) + ' dials a day across power and parallel.'; return; }
+      var n = Number(v);
+      if (n < DIAL_FLOOR) {
+        el.className = 'recon bad';
+        el.innerHTML = f0(n) + ' is below the ' + f0(DIAL_FLOOR) + '-dial daily minimum &mdash; that is '
+          + f0(DIAL_FLOOR - n) + ' short of the floor.';
+      } else {
+        el.className = 'recon good';
+        el.innerHTML = f0(n) + ' dials &mdash; at or above the ' + f0(DIAL_FLOOR) + ' minimum.';
+      }
+    }
+    document.getElementById('c-dials').oninput = floorCheck;
+    floorCheck();
+
+    function saveSetting(field, value, label) {
+      var body = { rep: rep };
+      body[field] = value;
+      api('/api/settings', body)
+        .then(function () { toast(label + ' saved'); return load(); })
+        .catch(function (e) { toast('Save failed: ' + e.message); });
+    }
+    document.getElementById('t-target').onchange = function () { saveSetting('monthly_target', this.value, 'Target'); };
+    document.getElementById('r-d2c').onchange = function () { saveSetting('rate_d2c', this.value, 'Connect rate'); };
+    document.getElementById('r-comp').onchange = function () { saveSetting('rate_comp', this.value, 'Conversation rate'); };
+    document.getElementById('r-book').onchange = function () { saveSetting('rate_book', this.value, 'Booking rate'); };
+    var gd = document.getElementById('g-days');
+    if (gd) gd.onchange = function () {
+      horizons[rep] = Math.max(1, Math.round(Number(this.value) || 1));
+      render();
+    };
+  }
+
+  function render() {
+    renderTabs();
+    var v = document.getElementById('view');
+    if (active !== 'summary' && !state.settings.some(function (s) { return s.rep === active; })) active = 'summary';
+    if (active === 'summary') renderSummary(v); else renderRep(v, active);
+  }
+
+  load();
+})();
+</script>
+</body>
+</html>

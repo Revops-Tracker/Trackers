@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sign in</title>
+<script>window.JF_LOGIN = true;</script>
+<script src="config.js"></script>
+<script src="sso.js"></script>
+<script src="https://accounts.google.com/gsi/client" async defer></script>
+<style>
+body{font-family:system-ui,sans-serif;background:#f9f9f7;margin:0}
+#card{max-width:360px;margin:12vh auto;background:#fff;padding:40px;border-radius:12px;box-shadow:0 1px 6px rgba(0,0,0,.15);text-align:center}
+h1{font-size:20px;margin:0 0 24px}#err{color:#d03b3b;font-size:14px;margin-top:16px;display:none}
+.g_id_signin{display:flex;justify-content:center}
+</style></head><body>
+<div id="card"><h1>Sign in to continue</h1>
+<div id="g_id_onload" data-callback="onCred" data-auto_prompt="false"></div>
+<div class="g_id_signin" data-type="standard"></div>
+<div id="err"></div></div>
+<script>
+document.getElementById('g_id_onload').setAttribute('data-client_id', JF_CONFIG.CLIENT_ID);
+function showErr(m){var e=document.getElementById('err');e.textContent=m;e.style.display='block'}
+function onCred(r){
+  fetch('/auth/google',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({credential:r.credential})})
+  .then(function(x){return x.json()}).then(function(j){
+    if(!j.ok){showErr(j.error);return}
+    JF.setToken(j.token);
+    if(JF.enter(j.user)===false) showErr('Your account has no page access yet. Ask RevOps.');
+  }).catch(function(){showErr('Sign-in failed, try again.')});
+}
+</script></body></html>

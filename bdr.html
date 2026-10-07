@@ -554,7 +554,6 @@
       + "<button class='ghost' id='h-prev'>&larr;</button><span class='label'>" + esc(p.label) + '</span>'
       + "<button class='ghost' id='h-next'" + (hist.offset >= 0 ? ' disabled' : '') + ">&rarr;</button>"
       + "<input type='date' id='h-date' value='" + p.from + "' max='" + today + "' style='width:150px'></div>"
-      + "<p class='hint'>" + p.workdays + (p.workdays === 1 ? ' working day' : ' working days') + ' in this period' + (elapsedDays < p.workdays ? ' &middot; ' + elapsedDays + ' elapsed' : '') + '. Click any bar to jump to that period.</p>'
       + "<div style='margin-top:10px'><span class='seg' id='h-metric'>" + metrics + '</span></div>'
       + "<div class='trend' id='h-trend'>" + trend + '</div></div>'
 

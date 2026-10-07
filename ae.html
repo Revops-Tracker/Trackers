@@ -292,10 +292,34 @@
     for (; d <= b; d.setDate(d.getDate() + 1)) if (isWeekday(d)) n++;
     return n;
   }
+  function wk(d) { return isWeekday(d); }
+  // Which period (as an offset from today's) contains this date.
+  function offsetFor(kind, ds) {
+    var d = new Date(ds + 'T12:00:00'), now = new Date(); now.setHours(0, 0, 0, 0);
+    if (d >= now) return 0;
+    if (kind === 'day') {
+      var n = 0;
+      for (var c = new Date(now); isoDate(c) > ds;) { c.setDate(c.getDate() - 1); if (wk(c) && isoDate(c) >= ds) n--; }
+      return n;
+    }
+    if (kind === 'week') {
+      var mn = function (x) { var m = new Date(x); m.setHours(0, 0, 0, 0); m.setDate(m.getDate() - ((m.getDay() + 6) % 7)); return m; };
+      return -Math.round((mn(now) - mn(d)) / (7 * 864e5));
+    }
+    if (kind === 'month') return (d.getFullYear() - now.getFullYear()) * 12 + d.getMonth() - now.getMonth();
+    return (d.getFullYear() * 4 + Math.floor(d.getMonth() / 3)) - (now.getFullYear() * 4 + Math.floor(now.getMonth() / 3));
+  }
+
   function periodFor(kind, offset) {
     var now = new Date(); now.setHours(0, 0, 0, 0);
     var s, e, label, short;
-    if (kind === 'week') {
+    if (kind === 'day') {
+      s = new Date(now);
+      for (var n = offset; n < 0;) { s.setDate(s.getDate() - 1); if (wk(s)) n++; }
+      e = new Date(s);
+      label = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][s.getDay()] + ', ' + MON[s.getMonth()] + ' ' + s.getDate() + ', ' + s.getFullYear();
+      short = MON[s.getMonth()] + ' ' + s.getDate();
+    } else if (kind === 'week') {
       s = new Date(now); s.setDate(s.getDate() - ((s.getDay() + 6) % 7) + offset * 7);
       e = new Date(s); e.setDate(e.getDate() + 6);
       label = MON[s.getMonth()] + ' ' + s.getDate() + ' – ' + MON[e.getMonth()] + ' ' + e.getDate() + ', ' + e.getFullYear();
@@ -343,7 +367,7 @@
     var elapsedEnd = p.to > today ? new Date(today + 'T12:00:00') : p.end;
     var elapsedDays = p.from > today ? 0 : wdays(p.start, elapsedEnd);
 
-    var kinds = [['week', 'Week'], ['month', 'Month'], ['quarter', 'Quarter']].map(function (k) {
+    var kinds = [['day', 'Day'], ['week', 'Week'], ['month', 'Month'], ['quarter', 'Quarter']].map(function (k) {
       return '<button data-kind="' + k[0] + '" class="' + (hist.kind === k[0] ? 'on' : '') + '">' + k[1] + '</button>';
     }).join('');
     var metrics = HIST_METRICS.map(function (m) {
@@ -399,8 +423,8 @@
       '<div class="hbar"><span class="seg" id="h-kind">' + kinds + '</span>' +
       '<button class="ghost" id="h-prev">&larr;</button><span class="label">' + esc(p.label) + '</span>' +
       '<button class="ghost" id="h-next"' + (hist.offset >= 0 ? ' disabled' : '') + '>&rarr;</button>' +
-      '<button class="ghost" id="h-now">Today</button></div>' +
-      '<p class="hint">' + p.workdays + ' working days in this period' + (elapsedDays < p.workdays ? ' &middot; ' + elapsedDays + ' elapsed' : '') + '. Click any bar to jump to that period.</p>' +
+      '<input type="date" id="h-date" value="' + p.from + '" max="' + today + '" style="width:150px"></div>' +
+      '<p class="hint">' + p.workdays + (p.workdays === 1 ? ' working day' : ' working days') + ' in this period' + (elapsedDays < p.workdays ? ' &middot; ' + elapsedDays + ' elapsed' : '') + '. Click any bar to jump to that period.</p>' +
       '<div style="margin-top:10px"><span class="seg" id="h-metric">' + metrics + '</span></div>' +
       '<div class="trend" id="h-trend">' + trend + '</div></div>' +
 
@@ -424,7 +448,7 @@
     });
     $('h-prev').onclick = function () { hist.offset--; render(); };
     $('h-next').onclick = function () { if (hist.offset < 0) { hist.offset++; render(); } };
-    $('h-now').onclick = function () { hist.offset = 0; render(); };
+    $('h-date').onchange = function () { if (this.value) { hist.offset = offsetFor(hist.kind, this.value); render(); } };
   }
 
   // ---- views --------------------------------------------------------------

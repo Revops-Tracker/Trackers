@@ -214,8 +214,8 @@ const BDR_FIELDS = [
   {k:"cw",    label:"Closed won",         goal:1.2}
 ];
 const BDR_RANK = [
-  {id:"booked", label:"Discos booked", calc:t=>t.ob+t.ib, goal:12},
   {id:"shown",  label:"Discos shown",  calc:t=>t.shown, goal:8},
+  {id:"booked", label:"Discos booked", calc:t=>t.ob+t.ib, goal:12},
   {id:"des",    label:"Designs booked",calc:t=>t.des, goal:4},
   {id:"act",    label:"Activated leads",calc:t=>t.act, goal:9.6},
   {id:"comp",   label:"Completions",   calc:t=>t.comp, goal:48},
@@ -268,7 +268,7 @@ function paceFraction(p){
 }
 
 /* ---------- state ---------- */
-const state = { kind:"week", offset:0, rank:"booked", me:null, docs:new Map(), own:new Map(), live:false, lastAt:null, canWrite:false };
+const state = { kind:"week", offset:0, rank:"shown", me:null, docs:new Map(), own:new Map(), live:false, lastAt:null, canWrite:false };
 let db = null;
 
 /* ---------- aggregation ---------- */
@@ -338,9 +338,9 @@ function render(){
         ${barHTML(b.v, goal, pace, topV)}
         <div class="bar-meta">${goal?`<span>${fmt(b.v)} of ${fmt(goal)} goal</span>`:`<span>No set goal, scaled to leader</span>`}${paceText(b.v, goal, pace)}</div>
         <div class="stats">
-          <span>Booked <b>${fmt(t.ob+t.ib)}</b></span>
           <span>Shown <b>${fmt(t.shown)}</b></span>
           <span>Show rate <b>${pct(t.shown, t.shown+t.ns)}</b></span>
+          <span>Booked <b>${fmt(t.ob+t.ib)}</b></span>
           <span>Designs <b>${fmt(t.des)}</b></span>
           <span>Activated <b>${fmt(t.act)}</b></span>
           <span>Completions <b>${fmt(t.comp)}</b></span>
@@ -432,8 +432,8 @@ document.getElementById("prev").onclick=()=>{state.offset--; render();};
 document.getElementById("next").onclick=()=>{state.offset++; render();};
 document.getElementById("today").onclick=()=>{state.offset=0; render();};
 document.getElementById("bdrChips").addEventListener("click",e=>{const b=e.target.closest("button"); if(b){state.rank=b.dataset.r; render();}});
-try{ const r=localStorage.getItem("lb-rank"); if(r && BDR_RANK.some(x=>x.id===r)) state.rank=r; }catch(e){}
-document.getElementById("bdrChips").addEventListener("click",()=>{ try{localStorage.setItem("lb-rank",state.rank);}catch(e){} });
+try{ const r=localStorage.getItem("lb-rank2"); if(r && BDR_RANK.some(x=>x.id===r)) state.rank=r; }catch(e){}
+document.getElementById("bdrChips").addEventListener("click",()=>{ try{localStorage.setItem("lb-rank2",state.rank);}catch(e){} });
 
 /* ---------- log dialog ---------- */
 const dlg=document.getElementById("dlg");

@@ -4,8 +4,8 @@
    - Sends people to a page they're allowed on, and adds the small "signed in as" bar. */
 (function () {
   var C = window.JF_CONFIG, KEY = 'jf_token';
-  var PAGES = { bdr: ['bdr.html', 'BDR tracker'], ae: ['ae.html', 'AE tracker'], cst: ['cst.html', 'CST tracker'], leaderboard: ['leaderboard-auto.html', 'Leaderboard'] }; // auto leaderboard (HubSpot-driven, daily); Max's leaderboard.html still reachable by URL
-  var ORDER = ['bdr', 'ae', 'cst', 'leaderboard'];
+  var PAGES = { bdr: ['bdr.html', 'BDR tracker'], ae: ['ae.html', 'AE tracker'], cst: ['cst.html', 'CST tracker'], leaderboard: ['leaderboard-auto.html', 'Leaderboard'], reporting: ['reporting.html', 'Reporting'] }; // auto leaderboard (HubSpot-driven, daily); Max's leaderboard.html still reachable by URL
+  var ORDER = ['bdr', 'ae', 'cst', 'leaderboard', 'reporting']; // reporting = admins only (granted by jf-sso)
 
   function get() { try { return localStorage.getItem(KEY); } catch (e) { return null; } }
   function set(t) { try { localStorage.setItem(KEY, t); } catch (e) {} }

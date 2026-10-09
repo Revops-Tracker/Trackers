@@ -165,6 +165,9 @@ button.linkish{border:0;background:transparent;padding:0;color:var(--fill);font-
 .tf button.t{color:var(--ahead);border-color:color-mix(in srgb,var(--ahead) 45%,var(--line))}
 .tf button.f{color:var(--behind);border-color:color-mix(in srgb,var(--behind) 45%,var(--line))}
 .ok{color:var(--ahead);font-weight:600}
+.dlg-head{position:relative;padding-right:56px}
+.dlg-x{position:absolute;top:12px;right:12px;width:36px;height:36px;border:0;border-radius:999px;background:var(--chip);color:var(--ink);font-size:22px;line-height:1;cursor:pointer;display:flex;align-items:center;justify-content:center}
+.dlg-x:hover{background:var(--line)}
 .deal .pend{background:color-mix(in srgb,var(--fill) 12%,transparent);border-radius:8px;padding:6px 9px;font-size:13px;margin-top:6px}
 </style>
 <div class="wrap">
@@ -173,6 +176,7 @@ button.linkish{border:0;background:transparent;padding:0;color:var(--fill);font-
       <h1>Sales floor leaderboard <span class="auto-tag">Auto</span></h1>
       <div class="live"><span class="dot" id="liveDot"></span><span id="liveText">Loading</span></div>
     </div>
+    <button class="btn ghost" type="button" id="refreshBtn" hidden title="Pull the latest numbers from HubSpot now (Vianney / Max only)">Refresh now</button>
   </header>
 
   <div class="banner" id="banner">Every number here comes straight from HubSpot and refreshes at 8 AM each day, covering everything up to the end of yesterday. Click any underlined number to see the deals behind it. Reps: each morning, go through your new deals and mark each one <b>True</b> or <b>False</b> (Oct 1 to 8 is already confirmed). A "False" needs a short note and goes to Vianney or Max to approve before the numbers change.</div>
@@ -200,7 +204,7 @@ button.linkish{border:0;background:transparent;padding:0;color:var(--fill);font-
     </div>
     <div class="lanes" id="lanes"></div>
     <div class="table-wrap" id="bdrTable"></div>
-    <div class="legend"><b>Books</b>: new bookings whose first slot falls in the period. <b>Runs due</b>: discovery calls whose slot arrived in the period. <b>Runs had</b>: due calls that were held. <b>Overall show</b> = runs had ÷ runs due. <b>1st-time show</b> = new books held at their first slot ÷ new books whose first slot came due. <b>Designs held</b>: Proposal Review meetings marked Completed in HubSpot.</div>
+    <div class="legend"><b>Books</b>: new bookings whose first slot falls in the period. <b>Runs due</b>: discovery calls whose slot arrived in the period. <b>Runs had</b>: due calls that were held. <b>Overall show</b> = runs had ÷ runs due. <b>1st-time show</b> = new books held at their first slot ÷ new books whose first slot came due. <b>Designs</b> (designs created): deals moved into the Design/Prop Review stage in HubSpot. <b>Designs held</b>: deals moved from Design on to a later stage (Prop Update or beyond).</div>
   </section>
 
   <section>
@@ -211,6 +215,7 @@ button.linkish{border:0;background:transparent;padding:0;color:var(--fill);font-
 
 <dialog id="dlg">
   <div class="dlg-head">
+    <button class="dlg-x" type="button" id="dlgX" aria-label="Close">&times;</button>
     <h3 id="dlgTitle"></h3>
     <p id="dlgSub"></p>
   </div>
@@ -237,7 +242,7 @@ const BDR_RANK = [
   {id:"books", label:"Books (new)",   goal:12, fmt:"n"},
   {id:"show",  label:"Overall show",  goal:null, fmt:"pct"},
   {id:"first", label:"1st-time show", goal:null, fmt:"pct"},
-  {id:"des",   label:"Designs held",  goal:4,  fmt:"n"},
+  {id:"des",   label:"Designs",       goal:4,  fmt:"n"},
 ];
 const LABEL = {
   first_time_show:"Showed 1st time", moved_show:"Moved & showed", recovered_show:"Recovered (missed, then held)",
@@ -248,7 +253,7 @@ const LABEL = {
 };
 const SHOWS = new Set(["first_time_show","moved_show","recovered_show","cst_show"]);
 const GOOD = SHOWS, BAD = new Set(["no_show","cst_unverified","closed_no_mtg","awaiting","awaiting_recovery"]);
-const EV_LABEL = {design:"Design held", prop:"Prop update held", diag:"Moved to Diagnosis", contract:"Contract sent", won:"Closed won"};
+const EV_LABEL = {design:"Design created", dheld:"Design held", prop:"Prop update held", diag:"Moved to Diagnosis", contract:"Contract sent", won:"Closed won"};
 
 /* ---------- date helpers ---------- */
 const pad = n => String(n).padStart(2,"0");
@@ -363,7 +368,7 @@ function statsFor(person, role, p){
   const ev = effEvents().filter(r=>!r.dropped && (role==="ae" ? r.ae===person : r.booker===person) && inP(r.at,p));
   const s = showupStats(su, p);
   const k = kind => ev.filter(e=>e.kind===kind);
-  return {...s, des:k("design"), prop:k("prop"), diag:k("diag"), con:k("contract"), won:k("won"),
+  return {...s, des:k("design"), dheld:k("dheld"), prop:k("prop"), diag:k("diag"), con:k("contract"), won:k("won"),
     cwd: k("won").reduce((a,e)=>a+(Number(e.amount)||0),0)};
 }
 const valOf = (t,id) => id==="had"?t.had.length : id==="books"?t.books.length : id==="des"?t.des.length : id==="show"?t.show : t.first;
@@ -436,7 +441,8 @@ function render(){
     ["1st-time show", t=>pctS(t.first), "fdue", null],
     ["No-shows", t=>t.ns.length, "ns", null],
     ["Cancelled / DQ'd ahead", t=>t.ca.length, "ca", null],
-    ["Designs held", t=>t.des.length, "des", 4],
+    ["Designs created", t=>t.des.length, "des", 4],
+    ["Designs held", t=>t.dheld.length, "dheld", null],
     ["Closed won", t=>t.won.length, "won", null],
   ];
   const team = BDRS.map(b=>({...b, t:statsFor(b.key,"bdr",p)}));
@@ -460,7 +466,8 @@ function render(){
       tile("Overall show", pctS(t.show), "due", null, 0),
       tile("1st-time show", pctS(t.first), "fdue", null, 0),
       tile("Moved to Diagnosis", t.diag.length, "diag", null, 0),
-      tile("Designs held", t.des.length, "des", 5, t.des.length),
+      tile("Designs created", t.des.length, "des", null, 0),
+      tile("Designs held", t.dheld.length, "dheld", 5, t.dheld.length),
       tile("Prop updates held", t.prop.length, "prop", 8, t.prop.length),
       tile("Contracts sent", t.con.length, "con", 4, t.con.length),
       tile("Closed won (#)", t.won.length, "won", 2, t.won.length),
@@ -478,6 +485,7 @@ function render(){
   }).join("");
   updateLive();
   renderReviewBar();
+  document.getElementById("refreshBtn").hidden = !(state.me && state.me.approver);
 }
 
 function renderReviewBar(){
@@ -564,7 +572,7 @@ function openList(person, role, metric, title){
   else if(metric==="fdue") groups.push(["Held at first slot", s.f1], ["First slot came due, not held there", s.fdue.filter(r=>!s.f1.includes(r))]);
   else if(metric==="ns") groups.push(["No-shows", s.ns]);
   else if(metric==="ca") groups.push(["Cancelled / DQ'd ahead", s.ca]);
-  else if(["des","prop","diag","con","won"].includes(metric)) groups.push([null, evOf({des:"design",prop:"prop",diag:"diag",con:"contract",won:"won"}[metric])]);
+  else if(["des","dheld","prop","diag","con","won"].includes(metric)) groups.push([null, evOf({des:"design",dheld:"dheld",prop:"prop",diag:"diag",con:"contract",won:"won"}[metric])]);
   else {
     groups.push(["Held", s.had], ["Due but not held", s.notHad], ["Booked, not due yet", s.books.filter(r=>!s.due.includes(r))]);
     if(ev.length) groups.push(["Pipeline", ev]);
@@ -668,7 +676,25 @@ document.addEventListener("click", e=>{
   const q = e.target.closest("[data-queue]"); if(q){ openQueue(q.dataset.queue); return; }
   const aq = e.target.closest("[data-approvals]"); if(aq){ openApprovals(); return; }
 });
+// admin-only: re-run the HubSpot pull now, then reload once the new run lands
+document.getElementById("refreshBtn").onclick = async ()=>{
+  const btn = document.getElementById("refreshBtn");
+  const before = state.lastRun ? state.lastRun.ran_at : null;
+  btn.disabled = true; btn.textContent = "Refreshing…";
+  const r = await call("/refresh", {});
+  if(!r.ok){ toast(r.error || "Could not start the refresh"); btn.disabled = false; btn.textContent = "Refresh now"; return; }
+  toast("Pulling from HubSpot, about a minute");
+  for(let i=0; i<16; i++){
+    await new Promise(res=>setTimeout(res, 15000));
+    await refresh();
+    if(state.lastRun && state.lastRun.ran_at !== before){ toast("Numbers updated"); break; }
+  }
+  btn.disabled = false; btn.textContent = "Refresh now";
+};
 document.getElementById("closeBtn").onclick=()=>document.getElementById("dlg").close();
+document.getElementById("dlgX").onclick=()=>document.getElementById("dlg").close();
+// clicking the dark area outside the box also closes it
+document.getElementById("dlg").addEventListener("click", e=>{ if(e.target.id==="dlg") e.target.close(); });
 render(); refresh();
 </script>
 </body>

@@ -936,11 +936,18 @@ function renderTrends(){
   document.getElementById("trLegend").innerHTML = used.map(s=>`<span${s.title?` title="${esc(s.title)}"`:""}><i style="background:${s.c}"></i>${esc(s.name)}</span>`).join("");
 
   // geometry
-  const W = Math.max(320, el.clientWidth || 800), H = 280, L = m.money ? 64 : 36, R = 6, T = 22, Bm = 30;
+  // every bar gets its total on top: full value when it fits, compact ($5k) when the bar is narrow, turned upright when even that won't fit
+  const W = Math.max(320, el.clientWidth || 800), L = m.money ? 64 : 36, R = 6, Bm = 30;
+  const band = (W-L-R)/Math.max(1,B.length), bw = Math.min(56, band*0.62);
+  const compact = v => !m.money ? fmt(v) : v>=1000 ? "$"+(Math.round(v/100)/10).toString().replace(/[.]0$/,"")+"k" : "$"+Math.round(v);
+  const totFs = band>=34 ? 12 : 10, cw = totFs*0.62;
+  const full = B.map(b=>trVal(b.total,m)), fitsFull = full.every(t=>t.length*cw <= band-2);
+  const totTxt = fitsFull ? full : B.map(b=>compact(b.total));
+  const upright = !fitsFull && totTxt.some(t=>t.length*cw > band-2);
+  const T = upright ? 14 + Math.max(0,...totTxt.map(t=>t.length))*cw : 22, H = 280 + (upright ? T-22 : 0);
   const max = Math.max(0, ...B.map(b=>b.total));
   const step = niceStep(max/4 || 1), ymax = Math.max(step, Math.ceil(max/step)*step);
   const y = v => T + (H-T-Bm) * (1 - v/ymax);
-  const band = (W-L-R)/Math.max(1,B.length), bw = Math.min(56, band*0.62);
   const everyN = Math.ceil(B.length / Math.max(1, Math.floor((W-L-R)/58)));   // thin axis labels on small screens
   let svg = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc(m.label)} by ${trend.scale}, stacked by source">`;
   for(let v=0; v<=ymax+1e-9; v+=step){
@@ -957,7 +964,9 @@ function renderTrends(){
       const d = `M${x},${yy+h} V${yy+r} Q${x},${yy} ${x+r},${yy} H${x+bw-r} Q${x+bw},${yy} ${x+bw},${yy+r} V${yy+h} Z`;
       svg += `<path class="seg-r" d="${d}" fill="${s.c}" opacity="${b.partial?0.55:1}" data-src="${esc(s.key)}" data-i="${i}"/>`;
     });
-    if(b.total>0 && band>=34) svg += `<text class="tot" x="${cx}" y="${y(b.total)-6}" text-anchor="middle">${trVal(b.total,m)}</text>`;
+    if(b.total>0) svg += upright
+      ? `<text class="tot" style="font-size:${totFs}px" transform="translate(${cx+totFs*0.35},${y(b.total)-4}) rotate(-90)" text-anchor="start">${totTxt[i]}</text>`
+      : `<text class="tot" style="font-size:${totFs}px" x="${cx}" y="${y(b.total)-6}" text-anchor="middle">${totTxt[i]}</text>`;
     if((B.length-1-i) % everyN === 0) svg += `<text x="${cx}" y="${H-Bm+16}" text-anchor="middle">${b.short}${b.partial?"*":""}</text>`;
     svg += `</g>`;
   });

@@ -245,6 +245,20 @@ html.view-reporting .lb-only{display:none!important}
     </div>
   </section>
 
+
+  <section class="lb-only">
+    <div class="sec-head">
+      <h2>AEs</h2>
+      <div class="chips" id="aeChips" role="group" aria-label="Rank AEs by"></div>
+    </div>
+    <div class="lanes" id="aeLanes"></div>
+    <div class="tbl-toggle"><button class="btn ghost" type="button" id="aeTableBtn" aria-expanded="false" aria-controls="aeMetrics">Show metrics table</button></div>
+    <div id="aeMetrics" hidden>
+      <div class="table-wrap" id="aeTable"></div>
+      <div class="legend"><b>Discos run</b>: discovery calls held. <b>Designs held</b>: deals moved from Design to a later stage. <b>Closed won revenue</b>: monthly retainer (USD) by close date. Goals are weekly × the number of weeks in the period.</div>
+    </div>
+  </section>
+
   <section class="tr-root">
     <div class="sec-head">
       <h2>Team trends</h2>
@@ -285,19 +299,6 @@ html.view-reporting .lb-only{display:none!important}
     </div>
     <div class="table-wrap" id="trTableWrap" hidden></div>
     <div class="legend">Each bar is split by who booked the deal. <b>BDRs only</b> = Brandon, Erich, Issa and former BDRs. <b>Inbound</b> = calls with no BDR (booked by the lead) plus CloseBot. AE-booked calls only show under All sources. The number on top is the total. Closes and MRR are by close date. Click a coloured block to see the deals. * = period not finished or cut by the range.</div>
-  </section>
-
-  <section class="lb-only">
-    <div class="sec-head">
-      <h2>AEs</h2>
-      <div class="chips" id="aeChips" role="group" aria-label="Rank AEs by"></div>
-    </div>
-    <div class="lanes" id="aeLanes"></div>
-    <div class="tbl-toggle"><button class="btn ghost" type="button" id="aeTableBtn" aria-expanded="false" aria-controls="aeMetrics">Show metrics table</button></div>
-    <div id="aeMetrics" hidden>
-      <div class="table-wrap" id="aeTable"></div>
-      <div class="legend"><b>Discos run</b>: discovery calls held. <b>Designs held</b>: deals moved from Design to a later stage. <b>Closed won revenue</b>: monthly retainer (USD) by close date. Goals are weekly × the number of weeks in the period.</div>
-    </div>
   </section>
 </div>
 

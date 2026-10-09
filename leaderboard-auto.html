@@ -171,9 +171,9 @@ button.linkish{border:0;background:transparent;padding:0;color:var(--fill);font-
 .nav button:disabled{opacity:.35;cursor:not-allowed}
 .nav button.btn{width:auto;padding:0 14px;font-size:15px;white-space:nowrap}
 .deal .pend{background:color-mix(in srgb,var(--fill) 12%,transparent);border-radius:8px;padding:6px 9px;font-size:13px;margin-top:6px}
-.tr-root{--s1:#2a78d6;--s2:#eb6834;--s3:#1baf7a;--s4:#eda100;--s5:#e87ba4;--s6:#008300}
-@media (prefers-color-scheme: dark){:root:not([data-theme="light"]) .tr-root{--s1:#3987e5;--s2:#d95926;--s3:#199e70;--s4:#c98500;--s5:#d55181;--s6:#008300}}
-:root[data-theme="dark"] .tr-root{--s1:#3987e5;--s2:#d95926;--s3:#199e70;--s4:#c98500;--s5:#d55181;--s6:#008300}
+.tr-root{--s1:#2a78d6;--s2:#eb6834;--s3:#1baf7a;--s4:#eda100;--s5:#e87ba4;--s6:#008300;--s7:#4a3aa7}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]) .tr-root{--s1:#3987e5;--s2:#d95926;--s3:#199e70;--s4:#c98500;--s5:#d55181;--s6:#008300;--s7:#9085e9}}
+:root[data-theme="dark"] .tr-root{--s1:#3987e5;--s2:#d95926;--s3:#199e70;--s4:#c98500;--s5:#d55181;--s6:#008300;--s7:#9085e9}
 .tr-bar{display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:space-between;margin:0 0 12px}
 .tr-card{position:relative;background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:14px 16px 8px}
 .tr-legend{display:flex;flex-wrap:wrap;gap:14px;font-size:13px;color:var(--muted);margin-bottom:6px}
@@ -192,6 +192,12 @@ button.linkish{border:0;background:transparent;padding:0;color:var(--fill);font-
 .tr-tip .r i{width:8px;height:8px;border-radius:2px;display:inline-block}
 .tr-tip .t{border-top:1px solid var(--line);margin-top:4px;padding-top:4px;font-weight:600}
 #trTableWrap{margin-top:12px}
+.tr-ctl{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+.tr-range{display:inline-flex;align-items:center;gap:8px;font-size:14px;color:var(--muted);font-weight:500}
+.tr-range select,.tr-custom input{border:1px solid var(--line);background:var(--panel);color:var(--ink);border-radius:8px;padding:7px 10px;font:inherit;font-size:14px}
+.tr-custom{display:inline-flex;align-items:center;gap:6px;font-size:14px;color:var(--muted)}
+.tr-custom[hidden]{display:none}
+.tr-sub{font-size:13px;color:var(--muted);margin-bottom:8px}
 </style>
 <div class="wrap">
   <header class="top">
@@ -232,23 +238,44 @@ button.linkish{border:0;background:transparent;padding:0;color:var(--fill);font-
 
   <section class="tr-root">
     <div class="sec-head">
-      <h2>Team trends since Jul 1</h2>
+      <h2>Team trends</h2>
       <div class="chips" id="trMetric" role="group" aria-label="Trend metric"></div>
     </div>
     <div class="tr-bar">
-      <div class="seg" id="trScale" role="group" aria-label="Group by">
-        <button data-s="week" aria-pressed="true">Weekly</button>
-        <button data-s="month" aria-pressed="false">Monthly</button>
+      <div class="tr-ctl">
+        <div class="seg" id="trScale" role="group" aria-label="Group by">
+          <button data-s="week" aria-pressed="true">Weekly</button>
+          <button data-s="month" aria-pressed="false">Monthly</button>
+        </div>
+        <div class="seg" id="trGroup" role="group" aria-label="Sources">
+          <button data-g="all" aria-pressed="true">All sources</button>
+          <button data-g="bdr" aria-pressed="false">BDRs only</button>
+          <button data-g="inbound" aria-pressed="false">Inbound</button>
+        </div>
+        <label class="tr-range">Range
+          <select id="trRange">
+            <option value="q3">Since Jul 1</option>
+            <option value="thisq">This quarter</option>
+            <option value="lastq">Last quarter</option>
+            <option value="l8w">Last 8 weeks</option>
+            <option value="l3m">Last 3 months</option>
+            <option value="custom">Custom dates…</option>
+          </select>
+        </label>
+        <span class="tr-custom" id="trCustom" hidden>
+          <input type="date" id="trFrom" aria-label="From"> to <input type="date" id="trTo" aria-label="To">
+        </span>
       </div>
       <button class="btn ghost" type="button" id="trTableBtn">Show table</button>
     </div>
     <div class="tr-card">
+      <div class="tr-sub" id="trSub"></div>
       <div class="tr-legend" id="trLegend"></div>
       <div class="tr-plot" id="trend"></div>
       <div class="tr-tip" id="trTip"></div>
     </div>
     <div class="table-wrap" id="trTableWrap" hidden></div>
-    <div class="legend">Each bar is split by source: who booked the deal (Inbound = no BDR). The number on top is the total. Closes and MRR are by close date. Click a coloured block to see the deals. The last bar is the period so far.</div>
+    <div class="legend">Each bar is split by who booked the deal. <b>BDRs only</b> = Brandon, Erich, Issa and former BDRs. <b>Inbound</b> = calls with no BDR (booked by the lead) plus CloseBot. AE-booked calls only show under All sources. The number on top is the total. Closes and MRR are by close date. Click a coloured block to see the deals. * = period not finished or cut by the range.</div>
   </section>
 
   <section>
@@ -287,7 +314,7 @@ const FORMER = "Former reps", OTHER = "Other";
 const CUR_BDR = new Set(BDRS.map(b=>b.key)), CUR_AE = new Set(AES.map(a=>a.key));
 function whoMatches(r, person, role){
   const v = role==="ae" ? r.ae : r.booker;
-  if(person===OTHER) return role==="bdr" && !!v && (NOT_A_BDR.has(v) && v!=="Inbound" || CUR_AE.has(v));
+  if(person===OTHER) return role==="bdr" && !!v && CUR_AE.has(v);   // calls an AE booked themselves
   if(person!==FORMER) return v===person;
   if(!v) return false;
   return role==="ae" ? !CUR_AE.has(v) : !CUR_BDR.has(v) && !CUR_AE.has(v) && !NOT_A_BDR.has(v);
@@ -738,7 +765,7 @@ document.addEventListener("click", e=>{
   const q = e.target.closest("[data-queue]"); if(q){ openQueue(q.dataset.queue); return; }
   const aq = e.target.closest("[data-approvals]"); if(aq){ openApprovals(); return; }
 });
-/* ---------- trends since Jul 1: stacked bars by source ---------- */
+/* ---------- team trends: stacked bars by source, any range since Jul 1 ---------- */
 const TR_METRICS = [
   {id:"books", label:"Books",           f:t=>t.books.length, list:"books"},
   {id:"had",   label:"Runs had",        f:t=>t.had.length,   list:"had"},
@@ -747,43 +774,73 @@ const TR_METRICS = [
   {id:"won",   label:"Closes",          f:t=>t.won.length,   list:"won"},
   {id:"mrr",   label:"MRR generated",   f:t=>t.cwd,          list:"won", money:true},
 ];
-// fixed colour per source (never by rank); Other only appears when it has numbers
+// fixed colour per source (never by rank). Stack order + slots validated for colour-blind separation in light and dark.
 const TR_SOURCES = [
-  ...BDRS.map((b,i)=>({key:b.key, name:b.name.split(" ")[0], c:`var(--s${i+1})`})),
-  {key:"Inbound", name:"Inbound",     c:"var(--s4)"},
-  {key:FORMER,    name:"Former reps", c:"var(--s5)"},
-  {key:OTHER,     name:"Other (CloseBot, AE-booked)", c:"var(--s6)"},
+  {key:"Brandon Cameron", name:"Brandon",     g:"bdr",     c:"var(--s1)"},
+  {key:"Erich Roeder",    name:"Erich",       g:"bdr",     c:"var(--s2)"},
+  {key:"Issa Hattar",     name:"Issa",        g:"bdr",     c:"var(--s3)"},
+  {key:FORMER,            name:"Former BDRs", g:"bdr",     c:"var(--s7)"},
+  {key:"Inbound",         name:"Inbound",     g:"inbound", c:"var(--s4)"},
+  {key:"CloseBot AI",     name:"CloseBot",    g:"inbound", c:"var(--s5)"},
+  {key:OTHER,             name:"AE-booked",   g:"other",   c:"var(--s6)"},
 ];
-const trend = {metric:"books", scale:"week", table:false};
+const ALWAYS = new Set(["Brandon Cameron","Erich Roeder","Issa Hattar","Inbound"]);   // shown in legend/table even at zero
+const trend = {metric:"books", scale:"week", group:"all", range:"q3", from:null, to:null, table:false};
 const trVal = (v,m) => m.money ? fmt(v,true) : fmt(v);
+const dOf = s => new Date(s+"T00:00:00");
+function trYesterday(){ const y=new Date(); y.setHours(0,0,0,0); y.setDate(y.getDate()-1); return y; }
+function trendRange(){
+  const y = trYesterday(); let f, t = new Date(y);
+  const qStart = d => new Date(d.getFullYear(), Math.floor(d.getMonth()/3)*3, 1);
+  if(trend.range==="thisq") f = qStart(y);
+  else if(trend.range==="lastq"){ const q = qStart(y); f = new Date(q.getFullYear(), q.getMonth()-3, 1); t = new Date(q); t.setDate(0); }
+  else if(trend.range==="l8w"){ f = new Date(y); f.setDate(f.getDate()-((f.getDay()+6)%7)-49); }
+  else if(trend.range==="l3m") f = new Date(y.getFullYear(), y.getMonth()-2, 1);
+  else if(trend.range==="custom"){ f = trend.from ? dOf(trend.from) : dOf(DATA_FROM); t = trend.to ? dOf(trend.to) : y; }
+  else f = dOf(DATA_FROM);
+  if(f < dOf(DATA_FROM)) f = dOf(DATA_FROM);
+  if(t > y) t = y;
+  if(t < f) t = new Date(f);
+  return {f, t};
+}
 function trendBuckets(scale){
-  const y = new Date(); y.setHours(0,0,0,0); y.setDate(y.getDate()-1);
-  const from = new Date(DATA_FROM+"T00:00:00");
+  const {f:from, t:to} = trendRange();
   let s = new Date(from);
-  if(scale==="week"){ const dow=(s.getDay()+6)%7; s.setDate(s.getDate()-dow); }
+  if(scale==="week"){ s.setDate(s.getDate()-((s.getDay()+6)%7)); } else s.setDate(1);
   const out = [];
-  while(s<=y){
+  while(s<=to){
     const e = new Date(s); if(scale==="week") e.setDate(e.getDate()+6); else e.setMonth(e.getMonth()+1,0);
-    const s2 = s<from ? from : s;
-    out.push({start:ymd(s2), end:ymd(e), partial:e>y,
+    const s2 = s<from ? from : s, e2 = e>to ? to : e;
+    out.push({start:ymd(s2), end:ymd(e2), partial: s<from || e>to,
       short: scale==="week" ? `${MON[s2.getMonth()]} ${s2.getDate()}` : MON[s2.getMonth()],
       label: scale==="week" ? `Week of ${MON[s2.getMonth()]} ${s2.getDate()}` : `${MONTHS[s2.getMonth()]} ${s2.getFullYear()}`});
     s = new Date(e); s.setDate(s.getDate()+1);
   }
-  return out;
+  return {buckets:out, from, to};
 }
 function niceStep(raw){ if(raw<=0) return 1; const p=10**Math.floor(Math.log10(raw)), f=raw/p; return (f<=1?1:f<=2?2:f<=5?5:10)*p; }
+const trSources = () => TR_SOURCES.filter(s=> trend.group==="all" || s.g===trend.group);
 function renderTrends(){
   const el = document.getElementById("trend"); if(!el) return;
   const m = TR_METRICS.find(x=>x.id===trend.metric);
   document.getElementById("trMetric").innerHTML = TR_METRICS.map(x=>`<button data-tm="${x.id}" aria-pressed="${x.id===trend.metric}">${x.label}</button>`).join("");
   document.querySelectorAll("#trScale button").forEach(b=>b.setAttribute("aria-pressed", b.dataset.s===trend.scale));
-  const B = trendBuckets(trend.scale).map(b=>{
-    const v = {}; TR_SOURCES.forEach(src=>{ v[src.key] = m.f(statsFor(src.key,"bdr",b)); });
-    return {...b, v, total: TR_SOURCES.reduce((a,src)=>a+v[src.key],0)};
+  document.querySelectorAll("#trGroup button").forEach(b=>b.setAttribute("aria-pressed", b.dataset.g===trend.group));
+  document.getElementById("trRange").value = trend.range;
+  document.getElementById("trCustom").hidden = trend.range!=="custom";
+  const {buckets, from, to} = trendBuckets(trend.scale);
+  const fi = document.getElementById("trFrom"), ti = document.getElementById("trTo");
+  fi.min = ti.min = DATA_FROM; fi.max = ti.max = ymd(trYesterday());
+  if(trend.range==="custom"){ fi.value = ymd(from); ti.value = ymd(to); }
+  const srcs = trSources();
+  const B = buckets.map(b=>{
+    const v = {}; srcs.forEach(src=>{ v[src.key] = m.f(statsFor(src.key,"bdr",b)); });
+    return {...b, v, total: srcs.reduce((a,src)=>a+v[src.key],0)};
   });
-  const used = TR_SOURCES.filter((src,i)=> i<=BDRS.length || B.some(b=>b.v[src.key]));
-  state.trendRows = B;
+  const used = srcs.filter(src=> ALWAYS.has(src.key) || B.some(b=>b.v[src.key]));
+  state.trendRows = B; state.trendUsed = used;
+  const grpName = {all:"all sources", bdr:"BDRs only", inbound:"Inbound only"}[trend.group];
+  document.getElementById("trSub").textContent = `${m.label}, ${grpName}, ${MON[from.getMonth()]} ${from.getDate()} to ${MON[to.getMonth()]} ${to.getDate()}, ${to.getFullYear()} · total ${trVal(B.reduce((a,b)=>a+b.total,0),m)}`;
   document.getElementById("trLegend").innerHTML = used.map(s=>`<span><i style="background:${s.c}"></i>${esc(s.name)}</span>`).join("");
 
   // geometry
@@ -828,9 +885,8 @@ function trendTip(e){
   const tip = document.getElementById("trTip"), g = e.target.closest && e.target.closest(".col");
   if(!g || !state.trendRows){ tip.style.display="none"; return; }
   const b = state.trendRows[+g.dataset.i], m = TR_METRICS.find(x=>x.id===trend.metric);
-  const used = TR_SOURCES.filter((src,i)=> i<=BDRS.length || state.trendRows.some(r=>r.v[src.key]));
-  tip.innerHTML = `<div class="h">${esc(b.label)}${b.partial?" (so far)":""}</div>` +
-    [...used].reverse().map(s=>`<div class="r"><span><i style="background:${s.c}"></i>${esc(s.name)}</span><b>${trVal(b.v[s.key],m)}</b></div>`).join("") +
+  tip.innerHTML = `<div class="h">${esc(b.label)}${b.partial?" (partial)":""}</div>` +
+    [...state.trendUsed].reverse().map(s=>`<div class="r"><span><i style="background:${s.c}"></i>${esc(s.name)}</span><b>${trVal(b.v[s.key],m)}</b></div>`).join("") +
     `<div class="r t"><span>Total</span><b>${trVal(b.total,m)}</b></div>`;
   const card = tip.parentElement.getBoundingClientRect();
   tip.style.display = "block";
@@ -843,6 +899,10 @@ function trendOpen(srcKey, i){
 }
 document.getElementById("trMetric").onclick = e=>{ const b=e.target.closest("button[data-tm]"); if(b){ trend.metric=b.dataset.tm; renderTrends(); } };
 document.getElementById("trScale").onclick = e=>{ const b=e.target.closest("button[data-s]"); if(b){ trend.scale=b.dataset.s; renderTrends(); } };
+document.getElementById("trGroup").onclick = e=>{ const b=e.target.closest("button[data-g]"); if(b){ trend.group=b.dataset.g; renderTrends(); } };
+document.getElementById("trRange").onchange = e=>{ trend.range=e.target.value; if(trend.range==="custom" && !trend.from){ trend.from=DATA_FROM; trend.to=ymd(trYesterday()); } renderTrends(); };
+document.getElementById("trFrom").onchange = e=>{ if(e.target.value){ trend.from=e.target.value; renderTrends(); } };
+document.getElementById("trTo").onchange = e=>{ if(e.target.value){ trend.to=e.target.value; renderTrends(); } };
 document.getElementById("trTableBtn").onclick = ()=>{ trend.table=!trend.table; renderTrends(); };
 const trPlot = document.getElementById("trend");
 trPlot.addEventListener("mousemove", trendTip);

@@ -168,6 +168,7 @@ button.linkish{border:0;background:transparent;padding:0;color:var(--fill);font-
 .dlg-head{position:relative;padding-right:56px}
 .dlg-x{position:absolute;top:12px;right:12px;width:36px;height:36px;border:0;border-radius:999px;background:var(--chip);color:var(--ink);font-size:22px;line-height:1;cursor:pointer;display:flex;align-items:center;justify-content:center}
 .dlg-x:hover{background:var(--line)}
+.nav button:disabled{opacity:.35;cursor:not-allowed}
 .nav button.btn{width:auto;padding:0 14px;font-size:15px;white-space:nowrap}
 .deal .pend{background:color-mix(in srgb,var(--fill) 12%,transparent);border-radius:8px;padding:6px 9px;font-size:13px;margin-top:6px}
 </style>
@@ -237,6 +238,22 @@ const BDRS = [
   {key:"Issa Hattar",     name:"Issa Hattar"},
 ];
 const AES = [{key:"Dipen Mistry", name:"Dipen Mistry"}];
+const DATA_FROM = "2026-07-01";   // history is backfilled from the start of Q3
+const NOT_A_BDR = new Set(["Inbound","CloseBot AI"]);
+// current roster plus anyone else (former reps) who has numbers in the period
+function bdrsFor(p){
+  const have = new Set(BDRS.map(b=>b.key)); AES.forEach(a=>have.add(a.key));
+  const extra = new Set();
+  effShowup().forEach(r=>{ if(!r.dropped && r.booker && !have.has(r.booker) && !NOT_A_BDR.has(r.booker) && (inP(r.first_slot,p) || (r.due_ts||[]).some(t=>inP(t,p)) || inP(r.run_at,p))) extra.add(r.booker); });
+  return [...BDRS, ...[...extra].sort().map(k=>({key:k, name:k, former:true}))];
+}
+function aesFor(p){
+  const have = new Set(AES.map(a=>a.key)), extra = new Set();
+  effEvents().forEach(r=>{ if(!r.dropped && r.ae && !have.has(r.ae) && inP(r.at,p)) extra.add(r.ae); });
+  effShowup().forEach(r=>{ if(!r.dropped && r.ae && !have.has(r.ae) && ((r.due_ts||[]).some(t=>inP(t,p)) || inP(r.run_at,p))) extra.add(r.ae); });
+  return [...AES, ...[...extra].sort().map(k=>({key:k, name:k, former:true}))];
+}
+const formerTag = x => x.former ? ` <span class="auto-tag" style="margin-left:6px">Former</span>` : "";
 const MULT = {week:1, month:4, quarter:12};
 const BDR_RANK = [
   {id:"had",   label:"Runs had",      goal:8,  fmt:"n"},
@@ -411,7 +428,9 @@ function render(){
   const metric = BDR_RANK.find(r=>r.id===state.rank);
   const isPct = metric.fmt==="pct";
   const goal = metric.goal ? metric.goal*mult : null;
-  const bdrs = BDRS.map(b=>{ const t=statsFor(b.key,"bdr",p); return {...b, t, v:valOf(t,metric.id)}; })
+  const roster = bdrsFor(p);
+  document.getElementById("prev").disabled = p.start <= DATA_FROM;
+  const bdrs = roster.map(b=>{ const t=statsFor(b.key,"bdr",p); return {...b, t, v:valOf(t,metric.id)}; })
     .sort((a,b)=>((b.v??-1)-(a.v??-1)) || a.name.localeCompare(b.name));
   const topV = Math.max(...bdrs.map(b=>b.v||0), 0);
   let rank=0, prev=null;
@@ -423,7 +442,7 @@ function render(){
     const metricKey = {had:"had",books:"books",des:"des",show:"due",first:"fdue"}[metric.id];
     return `<div class="lane${lead?" lead":""}">
       <div class="rank">${rank}</div>
-      <div class="who"><div class="name">${esc(b.name)}</div>
+      <div class="who"><div class="name">${esc(b.name)}${formerTag(b)}</div>
         <div class="sub"><button class="linkish" data-person="${esc(b.key)}" data-role="bdr" data-metric="all" data-title="${esc(b.name)}: all deals">See deals</button></div></div>
       <div class="track">${isPct ? barHTML((b.v||0)*100, null, pace, 100) : barHTML(b.v||0, goal, pace, topV)}
         <div class="bar-meta">${isPct ? `<span>${t.had.length} of ${t.due.length} due held · 1st-time ${t.f1.length} of ${t.fdue.length}</span>` : (goal?`<span>Goal ${fmt(goal)}</span>${paceText(b.v||0, goal, pace)}`:"")}</div>
@@ -446,14 +465,14 @@ function render(){
     ["Designs held", t=>t.dheld.length, "dheld", null],
     ["Closed won", t=>t.won.length, "won", null],
   ];
-  const team = BDRS.map(b=>({...b, t:statsFor(b.key,"bdr",p)}));
+  const team = roster.map(b=>({...b, t:statsFor(b.key,"bdr",p)}));
   const inb = statsFor("Inbound","bdr",p);
   document.getElementById("bdrTable").innerHTML = `<table><thead><tr><th>Metric</th>${team.map(b=>`<th>${esc(b.name.split(" ")[0])}</th>`).join("")}<th>Inbound</th><th>Goal</th></tr></thead><tbody>
     ${rows.map(([lbl,f,m,g])=>`<tr><td>${lbl}</td>${team.map(b=>`<td>${num(f(b.t), b.key, "bdr", m, `${b.name}: ${lbl}`)}</td>`).join("")}<td>${num(f(inb),"Inbound","bdr",m,`Inbound: ${lbl}`)}</td><td class="goal">${g?fmt(g*mult):"–"}</td></tr>`).join("")}
   </tbody></table>`;
 
   // AE board
-  document.getElementById("ae").innerHTML = AES.map(a=>{
+  document.getElementById("ae").innerHTML = aesFor(p).map(a=>{
     const t = statsFor(a.key,"ae",p); const g = 10750*mult;
     const tile = (lbl, v, metric, goalWk, raw) => {
       const fg = goalWk ? goalWk*mult : null;
@@ -475,7 +494,7 @@ function render(){
     ].join("");
     return `<div class="ae-card" style="margin-bottom:16px">
       <div class="ae-hero">
-        <div><div class="who"><div class="name">${esc(a.name)}</div></div>
+        <div><div class="who"><div class="name">${esc(a.name)}${formerTag(a)}</div></div>
           <div class="big">${num(fmt(t.cwd,true), a.key, "ae", "won", `${a.name}: closed won`)}</div>
           <div class="lbl">Closed won revenue (USD, by close date) against ${fmt(g,true)} goal</div></div>
         <div class="track" style="width:min(380px,100%)">${barHTML(t.cwd, g, pace)}
@@ -662,7 +681,7 @@ function toast(msg){ const t=document.getElementById("toast"); t.textContent=msg
 
 /* ---------- events ---------- */
 document.querySelectorAll(".seg button").forEach(b=>b.onclick=()=>{state.kind=b.dataset.p; state.offset=0; render();});
-document.getElementById("prev").onclick=()=>{state.offset--; render();};
+document.getElementById("prev").onclick=()=>{ if(periodFor(state.kind, state.offset).start > DATA_FROM){ state.offset--; render(); } };
 document.getElementById("next").onclick=()=>{state.offset++; render();};
 document.getElementById("today").onclick=()=>{state.offset=0; render();};
 document.getElementById("bdrChips").onclick=e=>{const b=e.target.closest("button[data-r]"); if(b){state.rank=b.dataset.r; render();}};

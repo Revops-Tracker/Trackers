@@ -205,11 +205,16 @@ html.view-reporting .lb-only{display:none!important}
 .tr-custom[hidden]{display:none}
 .tr-sub{font-size:13px;color:var(--muted);margin-bottom:8px}
 /* Connect rate dashboard + Nooks CSV drop zone */
-.cr-drop{border:2px dashed var(--line);border-radius:14px;background:var(--panel);padding:22px 18px;text-align:center;color:var(--muted);cursor:pointer;transition:border-color .15s,background .15s}
+.cr-drop{border:2px dashed var(--line);border-radius:12px;background:var(--panel);padding:14px 10px;text-align:center;color:var(--muted);cursor:pointer;transition:border-color .15s,background .15s;display:flex;flex-direction:column;align-items:center;gap:2px}
 .cr-drop:hover,.cr-drop.over,.cr-drop:focus-visible{border-color:var(--fill);background:color-mix(in srgb,var(--fill) 7%,var(--panel))}
-.cr-drop b{color:var(--ink);font-size:18px}
+.cr-drop b{color:var(--ink);font-size:16px}
+.cr-up{color:var(--fill);margin-bottom:2px}
 .cr-drop .hint{font-size:13px;margin-top:4px}
-.cr-weekpick{display:flex;flex-wrap:wrap;gap:8px 12px;align-items:center;margin:12px 0 4px;color:var(--muted);font-size:14px}
+.cr-weekpick{display:flex;flex-direction:column;gap:6px;margin:10px 0 0;color:var(--muted);font-size:13px}
+.cr-layout{display:grid;grid-template-columns:minmax(0,1fr) 210px;gap:20px;align-items:start}
+.cr-main{min-width:0}
+.cr-side{position:sticky;top:70px}
+@media (max-width:900px){.cr-layout{grid-template-columns:1fr}.cr-side{position:static;order:-1;display:grid;grid-template-columns:150px 1fr;gap:12px;align-items:start}.cr-weekpick{margin:0}}
 .cr-weekpick input{border:1px solid var(--line);background:var(--panel);color:var(--ink);border-radius:8px;padding:7px 10px;font:inherit;font-size:14px}
 .cr-weekpick .wk{color:var(--ink);font-weight:600}
 .cr-prev{background:var(--panel);border:1px solid var(--gold);border-radius:14px;padding:16px 18px;margin:14px 0}
@@ -312,26 +317,34 @@ section[hidden]{display:none}
       </div>
     </div>
 
-    <div class="cr-drop" id="crDrop" tabindex="0" role="button" aria-describedby="crDropHint">
-      <b>Drop the Nooks CSV here</b> or click to choose the file
-      <div class="hint" id="crDropHint">Use the Sequence performance export from Nooks. It replaces the connect rate for the week you pick below. You get a preview first.</div>
-      <input type="file" id="crFile" accept=".csv,text/csv" hidden>
-    </div>
-    <div class="cr-weekpick">
-      <label for="crSunday">The file is for the week starting (Sunday)</label>
-      <input type="date" id="crSunday">
-      <span class="wk" id="crWeekLbl"></span>
-    </div>
     <div id="crPreview"></div>
 
-    <div class="cr-tiles" id="crTiles"></div>
-    <div class="table-wrap"><table class="cr-tbl" id="crTable"></table></div>
-    <div class="legend" id="crLegend"></div>
-    <details>
-      <summary>Recent weeks</summary>
-      <div class="table-wrap" id="crTrend"></div>
-    </details>
-    <div class="legend" id="crFoot"></div>
+    <div class="cr-layout">
+      <div class="cr-main">
+        <div class="cr-tiles" id="crTiles"></div>
+        <div class="table-wrap"><table class="cr-tbl" id="crTable"></table></div>
+        <div class="legend" id="crLegend"></div>
+        <details>
+          <summary>Recent weeks</summary>
+          <div class="table-wrap" id="crTrend"></div>
+        </details>
+        <div class="legend" id="crFoot"></div>
+      </div>
+
+      <aside class="cr-side" aria-label="Add a week from Nooks">
+        <div class="cr-drop" id="crDrop" tabindex="0" role="button" aria-describedby="crDropHint" title="Use the Sequence performance export from Nooks. It replaces the connect rate for the week you pick, and you see a preview first.">
+          <svg class="cr-up" viewBox="0 0 24 24" width="22" height="22" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 16V4M7 9l5-5 5 5M5 20h14"/></svg>
+          <b>Drop Nooks CSV</b>
+          <div class="hint" id="crDropHint">or click to choose</div>
+          <input type="file" id="crFile" accept=".csv,text/csv" hidden>
+        </div>
+        <div class="cr-weekpick">
+          <label for="crSunday">File is for the week starting (Sunday)</label>
+          <input type="date" id="crSunday">
+          <span class="wk" id="crWeekLbl"></span>
+        </div>
+      </aside>
+    </div>
   </section>
 
   <section class="tr-root" id="rpTrends" role="tabpanel" aria-labelledby="rpTabTrends">

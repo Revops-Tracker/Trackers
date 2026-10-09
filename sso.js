@@ -36,15 +36,34 @@
     });
   };
 
+  // Tab bar across the top of every page: one tab per page the person can open, current page highlighted.
   function bar(u) {
-    var nav = ORDER.filter(function (k) { return k !== window.JF_PAGE && u.access.indexOf(k) !== -1; })
-      .map(function (k) { return '<a href="' + PAGES[k][0] + '" style="color:#9cf;text-decoration:none">' + PAGES[k][1] + '</a>'; }).join('');
-    var d = document.createElement('div');
-    d.style.cssText = 'position:fixed;bottom:12px;right:12px;z-index:99999;font:12px system-ui,sans-serif;background:rgba(20,20,20,.85);color:#eee;padding:6px 10px;border-radius:8px;display:flex;gap:10px;align-items:center';
-    d.innerHTML = nav + '<span></span><button style="font:inherit;background:transparent;color:#eee;border:1px solid #777;border-radius:5px;padding:2px 8px;cursor:pointer">Sign out</button>';
-    d.querySelector('span').textContent = 'Signed in as ' + u.email;
+    var css = document.createElement('style');
+    css.textContent =
+      '.jfnav{position:sticky;top:0;z-index:9999;display:flex;align-items:center;gap:16px;padding:0 20px;height:54px;background:#14213D;color:#E8ECF5;font:14px/1.2 "Segoe UI",system-ui,sans-serif;box-shadow:0 1px 0 rgba(255,255,255,.06),0 4px 14px rgba(10,20,40,.18)}' +
+      '.jfnav-brand{font-weight:700;letter-spacing:.02em;white-space:nowrap;opacity:.9}' +
+      '.jfnav-tabs{display:flex;gap:4px;overflow-x:auto;scrollbar-width:none;flex:1;min-width:0}' +
+      '.jfnav-tabs::-webkit-scrollbar{display:none}' +
+      '.jfnav-tabs a{color:#C9D3EA;text-decoration:none;padding:8px 14px;border-radius:8px;font-weight:600;white-space:nowrap}' +
+      '.jfnav-tabs a:hover{background:rgba(255,255,255,.08);color:#fff}' +
+      '.jfnav-tabs a[aria-current="page"]{background:#fff;color:#14213D}' +
+      '.jfnav-me{display:flex;align-items:center;gap:10px;white-space:nowrap;font-size:13px;color:#97A3BD}' +
+      '.jfnav-me button{font:inherit;background:transparent;color:#E8ECF5;border:1px solid rgba(255,255,255,.25);border-radius:7px;padding:5px 10px;cursor:pointer}' +
+      '.jfnav-me button:hover{background:rgba(255,255,255,.08)}' +
+      '@media (max-width:1000px){.jfnav-email{display:none}}' +
+      '@media (max-width:720px){.jfnav{gap:10px;padding:0 12px}.jfnav-brand{display:none}}';
+    document.head.appendChild(css);
+    var tabs = ORDER.filter(function (k) { return u.access.indexOf(k) !== -1; })
+      .map(function (k) { return '<a href="' + PAGES[k][0] + '"' + (k === window.JF_PAGE ? ' aria-current="page"' : '') + '>' + PAGES[k][1] + '</a>'; }).join('');
+    var d = document.createElement('nav');
+    d.className = 'jfnav';
+    d.setAttribute('aria-label', 'Trackers');
+    d.innerHTML = '<span class="jfnav-brand">JF Sales</span><div class="jfnav-tabs">' + tabs + '</div>' +
+      '<div class="jfnav-me"><span class="jfnav-email"></span><button type="button">Sign out</button></div>';
+    d.querySelector('.jfnav-email').textContent = u.email;
+    d.querySelector('button').title = 'Signed in as ' + u.email;
     d.querySelector('button').onclick = function () { clear(); goLogin(); };
-    document.body.appendChild(d);
+    document.body.insertBefore(d, document.body.firstChild);
   }
 
   window.JF = {

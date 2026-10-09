@@ -168,6 +168,9 @@ button.linkish{border:0;background:transparent;padding:0;color:var(--fill);font-
 .dlg-head{position:relative;padding-right:56px}
 .dlg-x{position:absolute;top:12px;right:12px;width:36px;height:36px;border:0;border-radius:999px;background:var(--chip);color:var(--ink);font-size:22px;line-height:1;cursor:pointer;display:flex;align-items:center;justify-content:center}
 .dlg-x:hover{background:var(--line)}
+.tbl-toggle{display:flex;justify-content:flex-end;margin:14px 0 0}
+#bdrMetrics{margin-top:12px}
+#bdrMetrics[hidden]{display:none}
 .nav button:disabled{opacity:.35;cursor:not-allowed}
 .nav button.btn{width:auto;padding:0 14px;font-size:15px;white-space:nowrap}
 .deal .pend{background:color-mix(in srgb,var(--fill) 12%,transparent);border-radius:8px;padding:6px 9px;font-size:13px;margin-top:6px}
@@ -232,8 +235,11 @@ button.linkish{border:0;background:transparent;padding:0;color:var(--fill);font-
       <div class="chips" id="bdrChips" role="group" aria-label="Rank BDRs by"></div>
     </div>
     <div class="lanes" id="lanes"></div>
+    <div class="tbl-toggle"><button class="btn ghost" type="button" id="bdrTableBtn" aria-expanded="false" aria-controls="bdrMetrics">Show metrics table</button></div>
+    <div id="bdrMetrics" hidden>
     <div class="table-wrap" id="bdrTable"></div>
     <div class="legend"><b>Books</b>: new bookings whose first slot falls in the period. <b>Runs due</b>: discovery calls whose slot arrived in the period. <b>Runs had</b>: due calls that were held. <b>Overall show</b> = runs had ÷ runs due. <b>1st-time show</b> = new books held at their first slot ÷ new books whose first slot came due. <b>MRR generated</b>: monthly retainer (USD) of deals closed won in the period, credited to the rep who booked them. <b>Designs</b> (designs created): deals moved into the Design/Prop Review stage in HubSpot. <b>Designs held</b>: deals moved from Design on to a later stage (Prop Update or beyond).</div>
+    </div>
   </section>
 
   <section class="tr-root">
@@ -910,6 +916,14 @@ trPlot.addEventListener("mouseleave", ()=>{ document.getElementById("trTip").sty
 trPlot.addEventListener("click", e=>{ const p=e.target.closest("[data-src]"); if(p) trendOpen(p.dataset.src, +p.dataset.i); });
 document.getElementById("trTableWrap").addEventListener("click", e=>{ const c=e.target.closest("[data-trsrc]"); if(c){ e.stopPropagation(); trendOpen(c.dataset.trsrc, +c.dataset.tri); } });
 let trResize; window.addEventListener("resize", ()=>{ clearTimeout(trResize); trResize=setTimeout(renderTrends,150); });
+// BDR metrics table: collapsed by default, each viewer's choice remembered on their device
+(function(){
+  const btn = document.getElementById("bdrTableBtn"), box = document.getElementById("bdrMetrics");
+  let open = false; try { open = localStorage.getItem("lb_bdr_table")==="1"; } catch(e){}
+  const apply = ()=>{ box.hidden = !open; btn.textContent = open ? "Hide metrics table" : "Show metrics table"; btn.setAttribute("aria-expanded", open); };
+  btn.onclick = ()=>{ open = !open; try { localStorage.setItem("lb_bdr_table", open?"1":"0"); } catch(e){} apply(); };
+  apply();
+})();
 // admin-only: re-run the HubSpot pull now, then reload once the new run lands
 document.getElementById("refreshBtn").onclick = async ()=>{
   const btn = document.getElementById("refreshBtn");

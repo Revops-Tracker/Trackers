@@ -206,7 +206,7 @@ button.linkish{border:0;background:transparent;padding:0;color:var(--fill);font-
     </div>
     <div class="lanes" id="lanes"></div>
     <div class="table-wrap" id="bdrTable"></div>
-    <div class="legend"><b>Books</b>: new bookings whose first slot falls in the period. <b>Runs due</b>: discovery calls whose slot arrived in the period. <b>Runs had</b>: due calls that were held. <b>Overall show</b> = runs had ÷ runs due. <b>1st-time show</b> = new books held at their first slot ÷ new books whose first slot came due. <b>Designs</b> (designs created): deals moved into the Design/Prop Review stage in HubSpot. <b>Designs held</b>: deals moved from Design on to a later stage (Prop Update or beyond).</div>
+    <div class="legend"><b>Books</b>: new bookings whose first slot falls in the period. <b>Runs due</b>: discovery calls whose slot arrived in the period. <b>Runs had</b>: due calls that were held. <b>Overall show</b> = runs had ÷ runs due. <b>1st-time show</b> = new books held at their first slot ÷ new books whose first slot came due. <b>MRR generated</b>: monthly retainer (USD) of deals closed won in the period, credited to the rep who booked them. <b>Designs</b> (designs created): deals moved into the Design/Prop Review stage in HubSpot. <b>Designs held</b>: deals moved from Design on to a later stage (Prop Update or beyond).</div>
   </section>
 
   <section>
@@ -240,20 +240,16 @@ const BDRS = [
 const AES = [{key:"Dipen Mistry", name:"Dipen Mistry"}];
 const DATA_FROM = "2026-07-01";   // history is backfilled from the start of Q3
 const NOT_A_BDR = new Set(["Inbound","CloseBot AI"]);
-// current roster plus anyone else (former reps) who has numbers in the period
-function bdrsFor(p){
-  const have = new Set(BDRS.map(b=>b.key)); AES.forEach(a=>have.add(a.key));
-  const extra = new Set();
-  effShowup().forEach(r=>{ if(!r.dropped && r.booker && !have.has(r.booker) && !NOT_A_BDR.has(r.booker) && (inP(r.first_slot,p) || (r.due_ts||[]).some(t=>inP(t,p)) || inP(r.run_at,p))) extra.add(r.booker); });
-  return [...BDRS, ...[...extra].sort().map(k=>({key:k, name:k, former:true}))];
+// Reps who have left (e.g. Jules, Hannah, Armin in Q3) are not shown by name: their numbers roll up into one "Former reps" bucket.
+const FORMER = "Former reps";
+const CUR_BDR = new Set(BDRS.map(b=>b.key)), CUR_AE = new Set(AES.map(a=>a.key));
+function whoMatches(r, person, role){
+  const v = role==="ae" ? r.ae : r.booker;
+  if(person!==FORMER) return v===person;
+  if(!v) return false;
+  return role==="ae" ? !CUR_AE.has(v) : !CUR_BDR.has(v) && !CUR_AE.has(v) && !NOT_A_BDR.has(v);
 }
-function aesFor(p){
-  const have = new Set(AES.map(a=>a.key)), extra = new Set();
-  effEvents().forEach(r=>{ if(!r.dropped && r.ae && !have.has(r.ae) && inP(r.at,p)) extra.add(r.ae); });
-  effShowup().forEach(r=>{ if(!r.dropped && r.ae && !have.has(r.ae) && ((r.due_ts||[]).some(t=>inP(t,p)) || inP(r.run_at,p))) extra.add(r.ae); });
-  return [...AES, ...[...extra].sort().map(k=>({key:k, name:k, former:true}))];
-}
-const formerTag = x => x.former ? ` <span class="auto-tag" style="margin-left:6px">Former</span>` : "";
+function formerHasData(t){ return !!(t.books.length || t.due.length || t.des.length || t.dheld.length || t.diag.length || t.prop.length || t.con.length || t.won.length); }
 const MULT = {week:1, month:4, quarter:12};
 const BDR_RANK = [
   {id:"had",   label:"Runs had",      goal:8,  fmt:"n"},
@@ -382,8 +378,8 @@ function showupStats(rows, p){
     first: fdue.length ? f1.length/fdue.length : null };
 }
 function statsFor(person, role, p){
-  const su = effShowup().filter(r=>!r.dropped && (role==="ae" ? r.ae===person : r.booker===person));
-  const ev = effEvents().filter(r=>!r.dropped && (role==="ae" ? r.ae===person : r.booker===person) && inP(r.at,p));
+  const su = effShowup().filter(r=>!r.dropped && whoMatches(r, person, role));
+  const ev = effEvents().filter(r=>!r.dropped && whoMatches(r, person, role) && inP(r.at,p));
   const s = showupStats(su, p);
   const k = kind => ev.filter(e=>e.kind===kind);
   return {...s, des:k("design"), dheld:k("dheld"), prop:k("prop"), diag:k("diag"), con:k("contract"), won:k("won"),
@@ -428,9 +424,8 @@ function render(){
   const metric = BDR_RANK.find(r=>r.id===state.rank);
   const isPct = metric.fmt==="pct";
   const goal = metric.goal ? metric.goal*mult : null;
-  const roster = bdrsFor(p);
   document.getElementById("prev").disabled = p.start <= DATA_FROM;
-  const bdrs = roster.map(b=>{ const t=statsFor(b.key,"bdr",p); return {...b, t, v:valOf(t,metric.id)}; })
+  const bdrs = BDRS.map(b=>{ const t=statsFor(b.key,"bdr",p); return {...b, t, v:valOf(t,metric.id)}; })
     .sort((a,b)=>((b.v??-1)-(a.v??-1)) || a.name.localeCompare(b.name));
   const topV = Math.max(...bdrs.map(b=>b.v||0), 0);
   let rank=0, prev=null;
@@ -442,7 +437,7 @@ function render(){
     const metricKey = {had:"had",books:"books",des:"des",show:"due",first:"fdue"}[metric.id];
     return `<div class="lane${lead?" lead":""}">
       <div class="rank">${rank}</div>
-      <div class="who"><div class="name">${esc(b.name)}${formerTag(b)}</div>
+      <div class="who"><div class="name">${esc(b.name)}</div>
         <div class="sub"><button class="linkish" data-person="${esc(b.key)}" data-role="bdr" data-metric="all" data-title="${esc(b.name)}: all deals">See deals</button></div></div>
       <div class="track">${isPct ? barHTML((b.v||0)*100, null, pace, 100) : barHTML(b.v||0, goal, pace, topV)}
         <div class="bar-meta">${isPct ? `<span>${t.had.length} of ${t.due.length} due held · 1st-time ${t.f1.length} of ${t.fdue.length}</span>` : (goal?`<span>Goal ${fmt(goal)}</span>${paceText(b.v||0, goal, pace)}`:"")}</div>
@@ -464,18 +459,21 @@ function render(){
     ["Designs created", t=>t.des.length, "des", 4],
     ["Designs held", t=>t.dheld.length, "dheld", null],
     ["Closed won", t=>t.won.length, "won", null],
+    ["MRR generated (USD/mo)", t=>fmt(t.cwd,true), "won", null],
   ];
-  const team = roster.map(b=>({...b, t:statsFor(b.key,"bdr",p)}));
+  const team = BDRS.map(b=>({...b, t:statsFor(b.key,"bdr",p)}));
   const inb = statsFor("Inbound","bdr",p);
-  document.getElementById("bdrTable").innerHTML = `<table><thead><tr><th>Metric</th>${team.map(b=>`<th>${esc(b.name.split(" ")[0])}</th>`).join("")}<th>Inbound</th><th>Goal</th></tr></thead><tbody>
-    ${rows.map(([lbl,f,m,g])=>`<tr><td>${lbl}</td>${team.map(b=>`<td>${num(f(b.t), b.key, "bdr", m, `${b.name}: ${lbl}`)}</td>`).join("")}<td>${num(f(inb),"Inbound","bdr",m,`Inbound: ${lbl}`)}</td><td class="goal">${g?fmt(g*mult):"–"}</td></tr>`).join("")}
+  const fmr = statsFor(FORMER,"bdr",p), showF = formerHasData(fmr);
+  document.getElementById("bdrTable").innerHTML = `<table><thead><tr><th>Metric</th>${team.map(b=>`<th>${esc(b.name.split(" ")[0])}</th>`).join("")}<th>Inbound</th>${showF?`<th>Former reps</th>`:""}<th>Goal</th></tr></thead><tbody>
+    ${rows.map(([lbl,f,m,g])=>`<tr><td>${lbl}</td>${team.map(b=>`<td>${num(f(b.t), b.key, "bdr", m, `${b.name}: ${lbl}`)}</td>`).join("")}<td>${num(f(inb),"Inbound","bdr",m,`Inbound: ${lbl}`)}</td>${showF?`<td>${num(f(fmr),FORMER,"bdr",m,`Former reps: ${lbl}`)}</td>`:""}<td class="goal">${g?fmt(g*mult):"–"}</td></tr>`).join("")}
   </tbody></table>`;
 
   // AE board
-  document.getElementById("ae").innerHTML = aesFor(p).map(a=>{
-    const t = statsFor(a.key,"ae",p); const g = 10750*mult;
+  const aeList = [...AES]; if(formerHasData(statsFor(FORMER,"ae",p))) aeList.push({key:FORMER, name:"Former reps", former:true});
+  document.getElementById("ae").innerHTML = aeList.map(a=>{
+    const t = statsFor(a.key,"ae",p); const g = a.former ? 0 : 10750*mult;
     const tile = (lbl, v, metric, goalWk, raw) => {
-      const fg = goalWk ? goalWk*mult : null;
+      const fg = goalWk && !a.former ? goalWk*mult : null;
       return `<div class="tile"><div class="t-top"><span class="t-name">${lbl}</span><span class="t-val">${num(v, a.key, "ae", metric, `${a.name}: ${lbl}`)}${fg?` <span>/ ${fmt(fg)}</span>`:""}</span></div>
         ${fg?barHTML(raw, fg, pace):""}${fg?`<div class="bar-meta">${paceText(raw, fg, pace)}</div>`:""}</div>`;
     };
@@ -494,11 +492,11 @@ function render(){
     ].join("");
     return `<div class="ae-card" style="margin-bottom:16px">
       <div class="ae-hero">
-        <div><div class="who"><div class="name">${esc(a.name)}${formerTag(a)}</div></div>
+        <div><div class="who"><div class="name">${esc(a.name)}</div></div>
           <div class="big">${num(fmt(t.cwd,true), a.key, "ae", "won", `${a.name}: closed won`)}</div>
-          <div class="lbl">Closed won revenue (USD, by close date) against ${fmt(g,true)} goal</div></div>
-        <div class="track" style="width:min(380px,100%)">${barHTML(t.cwd, g, pace)}
-          <div class="bar-meta"><span>${g?Math.round(t.cwd/g*100):0}% of goal</span>${paceText(Math.round(t.cwd), g, pace).replace(/([\d,.]+) (ahead|behind)/, (m,n,w)=>"$"+Math.round(Number(n.replace(/,/g,""))).toLocaleString()+" "+w)}</div></div>
+          <div class="lbl">Closed won revenue (USD, by close date)${g?` against ${fmt(g,true)} goal`:""}</div></div>
+        ${a.former ? "" : `<div class="track" style="width:min(380px,100%)">${barHTML(t.cwd, g, pace)}
+          <div class="bar-meta"><span>${g?Math.round(t.cwd/g*100):0}% of goal</span>${paceText(Math.round(t.cwd), g, pace).replace(/([\d,.]+) (ahead|behind)/, (m,n,w)=>"$"+Math.round(Number(n.replace(/,/g,""))).toLocaleString()+" "+w)}</div></div>`}
       </div>
       <div class="tiles">${tiles}</div>
     </div>`;
@@ -579,10 +577,10 @@ let lastOpen = null;
 function openList(person, role, metric, title){
   lastOpen = {person, role, metric, title};
   const p = periodFor(state.kind, state.offset);
-  const allSu = effShowup().filter(r=>(role==="ae" ? r.ae===person : r.booker===person));
+  const allSu = effShowup().filter(r=>whoMatches(r, person, role));
   const live = allSu.filter(r=>!r.dropped);
   const s = showupStats(live, p);
-  const ev = effEvents().filter(r=>(role==="ae" ? r.ae===person : r.booker===person) && inP(r.at,p));
+  const ev = effEvents().filter(r=>whoMatches(r, person, role) && inP(r.at,p));
   const dropped = allSu.filter(r=>r.dropped && (inP(r.first_slot,p) || (r.due_ts||[]).some(t=>inP(t,p))));
   const groups = [];
   const evOf = k => ev.filter(e=>e.kind===k);

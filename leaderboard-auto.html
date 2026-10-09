@@ -171,7 +171,8 @@ button.linkish{border:0;background:transparent;padding:0;color:var(--fill);font-
 /* Reporting page (admins): same data and code, leaderboard sections hidden */
 html.view-reporting .lb-only{display:none!important}
 .tbl-toggle{display:flex;justify-content:flex-end;margin:14px 0 0}
-#bdrMetrics{margin-top:12px}
+#bdrMetrics,#aeMetrics{margin-top:12px}
+#aeMetrics[hidden]{display:none}
 #bdrMetrics[hidden]{display:none}
 .nav button:disabled{opacity:.35;cursor:not-allowed}
 .nav button.btn{width:auto;padding:0 14px;font-size:15px;white-space:nowrap}
@@ -287,8 +288,16 @@ html.view-reporting .lb-only{display:none!important}
   </section>
 
   <section class="lb-only">
-    <div class="sec-head"><h2>AEs</h2></div>
-    <div id="ae"></div>
+    <div class="sec-head">
+      <h2>AEs</h2>
+      <div class="chips" id="aeChips" role="group" aria-label="Rank AEs by"></div>
+    </div>
+    <div class="lanes" id="aeLanes"></div>
+    <div class="tbl-toggle"><button class="btn ghost" type="button" id="aeTableBtn" aria-expanded="false" aria-controls="aeMetrics">Show metrics table</button></div>
+    <div id="aeMetrics" hidden>
+      <div class="table-wrap" id="aeTable"></div>
+      <div class="legend"><b>Discos run</b>: discovery calls held. <b>Designs held</b>: deals moved from Design to a later stage. <b>Closed won revenue</b>: monthly retainer (USD) by close date. Goals are weekly × the number of weeks in the period.</div>
+    </div>
   </section>
 </div>
 
@@ -317,6 +326,15 @@ const BDRS = [
   {key:"Issa Hattar",     name:"Issa Hattar"},
 ];
 const AES = [{key:"Dipen Mistry", name:"Dipen Mistry"}];
+const AE_RANK = [
+  {id:"cwd",  label:"Closed won $",     goal:10750, fmt:"money", f:t=>t.cwd,           list:"won"},
+  {id:"had",  label:"Discos run",       goal:20,    fmt:"n",     f:t=>t.had.length,    list:"had"},
+  {id:"dheld",label:"Designs held",     goal:5,     fmt:"n",     f:t=>t.dheld.length,  list:"dheld"},
+  {id:"prop", label:"Prop updates",     goal:8,     fmt:"n",     f:t=>t.prop.length,   list:"prop"},
+  {id:"con",  label:"Contracts sent",   goal:4,     fmt:"n",     f:t=>t.con.length,    list:"con"},
+  {id:"won",  label:"Closes",           goal:2,     fmt:"n",     f:t=>t.won.length,    list:"won"},
+  {id:"show", label:"Overall show",     goal:null,  fmt:"pct",   f:t=>t.show,          list:"due"},
+];
 const DATA_FROM = "2026-07-01";   // history is backfilled from the start of Q3
 const NOT_A_BDR = new Set(["Inbound","CloseBot AI"]);
 // Reps who have left (e.g. Jules, Hannah, Armin in Q3) are not shown by name: their numbers roll up into one "Former reps" bucket.
@@ -388,7 +406,7 @@ function paceFraction(p){
 }
 
 /* ---------- state ---------- */
-const state = { kind:"week", offset:0, rank:"had", me:null, showup:[], events:[], ov:new Map(), pend:new Map(), reviews:new Map(), lastRun:null };
+const state = { kind:"week", offset:0, rank:"had", aeRank:"cwd", me:null, showup:[], events:[], ov:new Map(), pend:new Map(), reviews:new Map(), lastRun:null };
 const REVIEW_SINCE = "2026-10-01";   // reps sign off on everything from here on
 const REPS = ["Brandon","Erich","Issa","Dipen"];
 
@@ -548,39 +566,49 @@ function render(){
     ${rows.map(([lbl,f,m,g])=>`<tr><td>${lbl}</td>${team.map(b=>`<td>${num(f(b.t), b.key, "bdr", m, `${b.name}: ${lbl}`)}</td>`).join("")}<td>${num(f(inb),"Inbound","bdr",m,`Inbound: ${lbl}`)}</td>${showF?`<td>${num(f(fmr),FORMER,"bdr",m,`Former reps: ${lbl}`)}</td>`:""}<td class="goal">${g?fmt(g*mult):"–"}</td></tr>`).join("")}
   </tbody></table>`;
 
-  // AE board
-  const aeList = [...AES]; if(formerHasData(statsFor(FORMER,"ae",p))) aeList.push({key:FORMER, name:"Former reps", former:true});
-  document.getElementById("ae").innerHTML = aeList.map(a=>{
-    const t = statsFor(a.key,"ae",p); const g = a.former ? 0 : 10750*mult;
-    const tile = (lbl, v, metric, goalWk, raw) => {
-      const fg = goalWk && !a.former ? goalWk*mult : null;
-      return `<div class="tile"><div class="t-top"><span class="t-name">${lbl}</span><span class="t-val">${num(v, a.key, "ae", metric, `${a.name}: ${lbl}`)}${fg?` <span>/ ${fmt(fg)}</span>`:""}</span></div>
-        ${fg?barHTML(raw, fg, pace):""}${fg?`<div class="bar-meta">${paceText(raw, fg, pace)}</div>`:""}</div>`;
-    };
-    const tiles = [
-      tile("Discos run (runs had)", t.had.length, "had", 20, t.had.length),
-      tile("Runs due", t.due.length, "due", null, 0),
-      tile("Disco no-shows", t.ns.length, "ns", null, 0),
-      tile("Overall show", pctS(t.show), "due", null, 0),
-      tile("1st-time show", pctS(t.first), "fdue", null, 0),
-      tile("Moved to Diagnosis", t.diag.length, "diag", null, 0),
-      tile("Designs created", t.des.length, "des", null, 0),
-      tile("Designs held", t.dheld.length, "dheld", 5, t.dheld.length),
-      tile("Prop updates held", t.prop.length, "prop", 8, t.prop.length),
-      tile("Contracts sent", t.con.length, "con", 4, t.con.length),
-      tile("Closed won (#)", t.won.length, "won", 2, t.won.length),
-    ].join("");
-    return `<div class="ae-card" style="margin-bottom:16px">
-      <div class="ae-hero">
-        <div><div class="who"><div class="name">${esc(a.name)}</div></div>
-          <div class="big">${num(fmt(t.cwd,true), a.key, "ae", "won", `${a.name}: closed won`)}</div>
-          <div class="lbl">Closed won revenue (USD, by close date)${g?` against ${fmt(g,true)} goal`:""}</div></div>
-        ${a.former ? "" : `<div class="track" style="width:min(380px,100%)">${barHTML(t.cwd, g, pace)}
-          <div class="bar-meta"><span>${g?Math.round(t.cwd/g*100):0}% of goal</span>${paceText(Math.round(t.cwd), g, pace).replace(/([\d,.]+) (ahead|behind)/, (m,n,w)=>"$"+Math.round(Number(n.replace(/,/g,""))).toLocaleString()+" "+w)}</div></div>`}
+  // AE lanes (same layout as the BDR lanes) + show/hide metrics table
+  const aeM = AE_RANK.find(r=>r.id===state.aeRank);
+  document.getElementById("aeChips").innerHTML = AE_RANK.map(r=>`<button data-ar="${r.id}" aria-pressed="${r.id===state.aeRank}">${r.label}</button>`).join("");
+  const aeGoal = aeM.goal ? aeM.goal*mult : null, aePct = aeM.fmt==="pct", aeMoney = aeM.fmt==="money";
+  const aes = AES.map(a=>{ const t=statsFor(a.key,"ae",p); return {...a, t, v:aeM.f(t)}; })
+    .sort((a,b)=>((b.v??-1)-(a.v??-1)) || a.name.localeCompare(b.name));
+  const aeTop = Math.max(...aes.map(a=>a.v||0), 0);
+  const moneyPace = (v,g) => paceText(Math.round(v), g, pace).replace(/([\d,.]+) (ahead|behind)/, (m,n,w)=>"$"+Math.round(Number(n.replace(/,/g,""))).toLocaleString()+" "+w);
+  let aRank=0, aPrev=null;
+  document.getElementById("aeLanes").innerHTML = aes.map((a,i)=>{
+    if(a.v!==aPrev){ aRank=i+1; aPrev=a.v; }
+    const t = a.t, lead = aRank===1 && (a.v||0)>0;
+    const shown = aePct ? pctS(a.v) : fmt(a.v||0, aeMoney);
+    return `<div class="lane${lead?" lead":""}">
+      <div class="rank">${aRank}</div>
+      <div class="who"><div class="name">${esc(a.name)}</div>
+        <div class="sub"><button class="linkish" data-person="${esc(a.key)}" data-role="ae" data-metric="all" data-title="${esc(a.name)}: all deals">See deals</button></div></div>
+      <div class="track">${aePct ? barHTML((a.v||0)*100, null, pace, 100) : barHTML(a.v||0, aeGoal, pace, aeTop)}
+        <div class="bar-meta">${aePct ? `<span>${t.had.length} of ${t.due.length} due held</span>` : (aeGoal?`<span>Goal ${fmt(aeGoal, aeMoney)}</span>${aeMoney ? moneyPace(a.v||0, aeGoal) : paceText(a.v||0, aeGoal, pace)}`:"")}</div>
+        <div class="stats"><span>Run <b>${t.had.length}</b></span><span>No-shows <b>${t.ns.length}</b></span><span>Show <b>${pctS(t.show)}</b></span><span>Designs held <b>${t.dheld.length}</b></span><span>Props <b>${t.prop.length}</b></span><span>Contracts <b>${t.con.length}</b></span><span>Closes <b>${t.won.length}</b></span><span>MRR <b>${fmt(t.cwd,true)}</b></span></div>
       </div>
-      <div class="tiles">${tiles}</div>
+      <div class="score">${num(shown, a.key, "ae", aeM.list, `${a.name}: ${aeM.label}`)}<small>${aeM.label.toLowerCase()}</small></div>
     </div>`;
   }).join("");
+  const aeRows = [
+    ["Discos run (runs had)", t=>t.had.length, "had", 20],
+    ["Runs due", t=>t.due.length, "due", null],
+    ["Disco no-shows", t=>t.ns.length, "ns", null],
+    ["Overall show", t=>pctS(t.show), "due", null],
+    ["1st-time show", t=>pctS(t.first), "fdue", null],
+    ["Moved to Diagnosis", t=>t.diag.length, "diag", null],
+    ["Designs created", t=>t.des.length, "des", null],
+    ["Designs held", t=>t.dheld.length, "dheld", 5],
+    ["Prop updates held", t=>t.prop.length, "prop", 8],
+    ["Contracts sent", t=>t.con.length, "con", 4],
+    ["Closed won (#)", t=>t.won.length, "won", 2],
+    ["Closed won revenue (USD/mo)", t=>fmt(t.cwd,true), "won", 10750, true],
+  ];
+  const aeTeam = AES.map(a=>({...a, t:statsFor(a.key,"ae",p)}));
+  const aeF = statsFor(FORMER,"ae",p), aeShowF = formerHasData(aeF);
+  document.getElementById("aeTable").innerHTML = `<table><thead><tr><th>Metric</th>${aeTeam.map(a=>`<th>${esc(a.name.split(" ")[0])}</th>`).join("")}${aeShowF?`<th>Former reps</th>`:""}<th>Goal</th></tr></thead><tbody>
+    ${aeRows.map(([lbl,f,m,g,money])=>`<tr><td>${lbl}</td>${aeTeam.map(a=>`<td>${num(f(a.t), a.key, "ae", m, `${a.name}: ${lbl}`)}</td>`).join("")}${aeShowF?`<td>${num(f(aeF),FORMER,"ae",m,`Former reps: ${lbl}`)}</td>`:""}<td class="goal">${g?fmt(g*mult, money):"–"}</td></tr>`).join("")}
+  </tbody></table>`;
   updateLive();
   renderReviewBar();
   document.getElementById("refreshBtn").hidden = !(state.me && state.me.approver);
@@ -763,6 +791,7 @@ document.querySelectorAll(".seg button").forEach(b=>b.onclick=()=>{state.kind=b.
 document.getElementById("prev").onclick=()=>{ if(periodFor(state.kind, state.offset).start > DATA_FROM){ state.offset--; render(); } };
 document.getElementById("next").onclick=()=>{state.offset++; render();};
 document.getElementById("today").onclick=()=>{state.offset=0; render();};
+document.getElementById("aeChips").onclick=e=>{const b=e.target.closest("button[data-ar]"); if(b){state.aeRank=b.dataset.ar; render();}};
 document.getElementById("bdrChips").onclick=e=>{const b=e.target.closest("button[data-r]"); if(b){state.rank=b.dataset.r; render();}};
 document.addEventListener("click", e=>{
   const n = e.target.closest("[data-metric]");
@@ -920,14 +949,16 @@ trPlot.addEventListener("mouseleave", ()=>{ document.getElementById("trTip").sty
 trPlot.addEventListener("click", e=>{ const p=e.target.closest("[data-src]"); if(p) trendOpen(p.dataset.src, +p.dataset.i); });
 document.getElementById("trTableWrap").addEventListener("click", e=>{ const c=e.target.closest("[data-trsrc]"); if(c){ e.stopPropagation(); trendOpen(c.dataset.trsrc, +c.dataset.tri); } });
 let trResize; window.addEventListener("resize", ()=>{ clearTimeout(trResize); trResize=setTimeout(renderTrends,150); });
-// BDR metrics table: collapsed by default, each viewer's choice remembered on their device
-(function(){
-  const btn = document.getElementById("bdrTableBtn"), box = document.getElementById("bdrMetrics");
-  let open = false; try { open = localStorage.getItem("lb_bdr_table")==="1"; } catch(e){}
+// metrics tables: collapsed by default, each viewer's choice remembered on their device
+function tableToggle(btnId, boxId, key){
+  const btn = document.getElementById(btnId), box = document.getElementById(boxId);
+  let open = false; try { open = localStorage.getItem(key)==="1"; } catch(e){}
   const apply = ()=>{ box.hidden = !open; btn.textContent = open ? "Hide metrics table" : "Show metrics table"; btn.setAttribute("aria-expanded", open); };
-  btn.onclick = ()=>{ open = !open; try { localStorage.setItem("lb_bdr_table", open?"1":"0"); } catch(e){} apply(); };
+  btn.onclick = ()=>{ open = !open; try { localStorage.setItem(key, open?"1":"0"); } catch(e){} apply(); };
   apply();
-})();
+}
+tableToggle("bdrTableBtn", "bdrMetrics", "lb_bdr_table");
+tableToggle("aeTableBtn", "aeMetrics", "lb_ae_table");
 // admin-only: re-run the HubSpot pull now, then reload once the new run lands
 document.getElementById("refreshBtn").onclick = async ()=>{
   const btn = document.getElementById("refreshBtn");

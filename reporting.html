@@ -242,8 +242,6 @@ html.view-reporting .lb-only{display:none!important}
 .cr-tgl[aria-expanded="true"] i{transform:rotate(90deg)}
 .cr-none{color:var(--muted);font-weight:400}
 .cr-root details{margin-top:14px}
-.ld-tbl .ld-barcol{width:36%;min-width:160px;text-align:left}
-.ld-tbl .bar{height:12px}
 .rp-tabs{margin:0 0 26px}
 .rp-tabs button[aria-selected="true"]{background:var(--panel);color:var(--ink);box-shadow:0 1px 2px rgba(20,33,61,.12)}
 .rp-tabs button{border:0;background:transparent;padding:8px 18px;border-radius:7px;cursor:pointer;font-weight:600;color:var(--muted)}
@@ -261,7 +259,6 @@ section[hidden]{display:none}
   <div class="seg rp-tabs" id="rpTabs" role="tablist" aria-label="Sales L10 sections">
     <button type="button" role="tab" id="rpTabTrends" data-tab="trends" aria-selected="true" aria-controls="rpTrends">Team trends</button>
     <button type="button" role="tab" id="rpTabConnect" data-tab="connect-rates" aria-selected="false" aria-controls="crSec">Connect rates</button>
-    <button type="button" role="tab" id="rpTabLeads" data-tab="leads-delivered" aria-selected="false" aria-controls="ldSec">Leads delivered</button>
   </div>
 
   <div class="banner lb-only" id="banner">Every number here comes straight from HubSpot and refreshes at 8 AM each day, covering everything up to the end of yesterday. Click any underlined number to see the deals behind it. Reps: each morning, go through your new deals and mark each one <b>True</b> or <b>False</b> (Oct 1 to 8 is already confirmed). A "False" needs a short note and goes to Vianney or Max to approve before the numbers change.</div>
@@ -348,26 +345,6 @@ section[hidden]{display:none}
         </div>
       </aside>
     </div>
-  </section>
-
-  <section class="ld-root" id="ldSec" role="tabpanel" aria-labelledby="rpTabLeads" hidden>
-    <div class="sec-head">
-      <h2>Leads delivered</h2>
-      <div class="nav">
-        <button type="button" id="ldPrev" aria-label="Previous week">‹</button>
-        <div class="period" id="ldWeekLabel" aria-live="polite"></div>
-        <button type="button" id="ldNext" aria-label="Next week">›</button>
-        <button class="btn ghost" type="button" id="ldLatest" style="margin-left:6px">Latest</button>
-      </div>
-    </div>
-    <div class="cr-tiles" id="ldTiles"></div>
-    <div class="table-wrap"><table class="cr-tbl ld-tbl" id="ldTable"></table></div>
-    <div class="legend" id="ldLegend"></div>
-    <details>
-      <summary>Recent weeks</summary>
-      <div class="table-wrap" id="ldTrend"></div>
-    </details>
-    <div class="legend" id="ldFoot"></div>
   </section>
 
   <section class="tr-root" id="rpTrends" role="tabpanel" aria-labelledby="rpTabTrends">
@@ -1226,6 +1203,7 @@ function buildWeek(w){
     return (ia<0?99:ia) - (ib<0?99:ib) || a.bdr.localeCompare(b.bdr);
   });
   const team = list.reduce((a,b)=>({ d:a.d+b.d, c:a.c+b.c, v:a.v+b.v, books:a.books+b.books, inb:a.inb+b.inb, leads:a.leads+b.leads }), { d:0, c:0, v:0, books:0, inb:0, leads:0 });
+  team.leadN = list.filter(b=>b.leads > 0).length;   // BDRs that were given leads this week
   return { bdrs:list, team };
 }
 
@@ -1250,7 +1228,7 @@ function render(){
   $("crTiles").innerHTML =
     tile("Team connect rate", T.d ? '<span class="'+((T.c/T.d)>=target()?"ahead":"behind")+'">'+pct(T.c,T.d)+'</span>' : "–", "target "+(target()*100).toFixed(1)+"%") +
     tile("Dials", num(T.d), "") + tile("Connects", num(T.c), "") + tile("Conversations", num(T.v), "") +
-    tile("Outbound books", num(T.books), "") + tile("Inbound books", num(T.inb), "") + tile("Leads delivered", num(T.leads), "");
+    tile("Outbound books", num(T.books), "") + tile("Inbound books", num(T.inb), "") + tile("Avg leads per BDR", T.leadN ? num(Math.round(T.leads/T.leadN)) : "–", T.leadN ? "across "+T.leadN+" BDRs" : "");
 
   let rows = '<thead><tr><th></th><th>Dials</th><th>Connects</th><th>Connect rate</th><th>Conversations</th><th>Outbound books</th></tr></thead><tbody>';
   rows += '<tr class="team"><td>Team</td><td>'+num(T.d)+'</td><td>'+num(T.c)+'</td><td>'+rateCell(T.c,T.d)+'</td><td>'+num(T.v)+'</td><td>'+num(T.books)+'</td></tr>';
@@ -1440,64 +1418,8 @@ function wire(){
   sec.addEventListener("drop", e=>{ if(e.target.closest("#crDrop")) return; e.preventDefault(); const f = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0]; onFile(f); });
 }
 wire();
-/* ---------- Leads delivered tab: per BDR and team, by week ---------- */
-const LS = { week:null };
-const cfgNum = (k, d) => { const v = parseFloat((S.data && S.data.config && S.data.config[k]) || ""); return isFinite(v) && v > 0 ? v : d; };
-function leadWeeks(){
-  const set = new Set(); ((S.data && S.data.leads) || []).forEach(r=>set.add(r.week_ending));
-  return Array.from(set).sort().reverse();
-}
-const byOrder = (a,b) => { const ia = ORDER.indexOf(a), ib = ORDER.indexOf(b); return (ia<0?99:ia) - (ib<0?99:ib) || String(a).localeCompare(String(b)); };
-function renderLeads(){
-  const D = S.data; if(!D) return;
-  const weeks = leadWeeks();
-  if(!LS.week || weeks.indexOf(LS.week) < 0) LS.week = weeks[0] || null;
-  const i = weeks.indexOf(LS.week);
-  $("ldPrev").disabled = i < 0 || i >= weeks.length-1;
-  $("ldNext").disabled = i <= 0;
-  $("ldLatest").disabled = i <= 0;
-  if(!LS.week){
-    $("ldWeekLabel").textContent = "No data yet"; $("ldTiles").innerHTML = "";
-    $("ldTable").innerHTML = '<tbody><tr><td class="empty">No leads delivered numbers yet.</td></tr></tbody>';
-    $("ldTrend").innerHTML = ""; $("ldLegend").innerHTML = ""; $("ldFoot").innerHTML = ""; return;
-  }
-  $("ldWeekLabel").textContent = weekLabel(LS.week);
-  const per = cfgNum("leads_target_per_bdr", 300), lo = cfgNum("team_leads_target_low", 800), hi = cfgNum("team_leads_target_high", 1000);
-  const rows = (D.leads||[]).filter(r=>r.week_ending === LS.week).sort((a,b)=>byOrder(a.bdr,b.bdr));
-  const total = rows.reduce((a,r)=>a+r.leads_delivered, 0);
-  const teamCls = total >= lo ? "ahead" : "behind";
-  $("ldTiles").innerHTML =
-    tile("Team leads delivered", '<span class="'+teamCls+'">'+num(total)+'</span>', "target "+num(lo)+" to "+num(hi)) +
-    tile("Per BDR target", num(per), "weekly") +
-    tile("Average per BDR", rows.length ? num(Math.round(total/rows.length)) : "–", rows.length+" BDRs");
-  let t = '<thead><tr><th>BDR</th><th>Leads delivered</th><th>% of target</th><th class="ld-barcol">vs '+num(per)+' target</th></tr></thead><tbody>';
-  rows.forEach(r=>{
-    const p = r.leads_delivered / per, cls = p >= 1 ? "ahead" : "behind";
-    t += '<tr><td>'+h(r.bdr)+'</td><td>'+num(r.leads_delivered)+'</td><td><span class="'+cls+'">'+Math.round(100*p)+'%</span></td><td class="ld-barcol"><div class="bar"><div class="bar-fill" style="width:'+Math.min(100, Math.round(100*p))+'%"></div></div></td></tr>';
-  });
-  t += '<tr class="team"><td>Team</td><td>'+num(total)+'</td><td><span class="'+teamCls+'">'+Math.round(100*total/((lo+hi)/2))+'%</span></td><td class="ld-barcol" style="color:var(--muted)">of the '+num((lo+hi)/2)+' midpoint</td></tr></tbody>';
-  $("ldTable").innerHTML = t;
-  $("ldLegend").innerHTML = '<b>Leads delivered</b> = leads distributed to each BDR for the week, counted by the current HubSpot owner of each contact in the distribution list. Green is at or above target: '+num(per)+' per BDR, and at least '+num(lo)+' for the team (goal '+num(lo)+' to '+num(hi)+'). % of target for the team is against the midpoint.';
-  const notes = Array.from(new Set(rows.map(r=>r.notes).filter(Boolean)));
-  const synced = D.booksSyncedAt ? new Date(D.booksSyncedAt).toLocaleString("en-US",{month:"short",day:"numeric",hour:"numeric",minute:"2-digit"}) : null;
-  $("ldFoot").innerHTML = (notes.length ? 'Source: '+notes.map(h).join(" | ")+'. ' : '') + 'These numbers come from the Weekly BDR Report sheet'+(synced ? ' (last synced '+h(synced)+')' : '')+'.';
-  // recent weeks
-  const names = []; (D.leads||[]).forEach(r=>{ if(names.indexOf(r.bdr) < 0) names.push(r.bdr); }); names.sort(byOrder);
-  let tr = '<table><thead><tr><th>Week</th><th>Team</th>'+names.map(n=>'<th>'+h(n)+'</th>').join("")+'</tr></thead><tbody>';
-  weeks.slice(0,10).forEach(w=>{
-    const rs = (D.leads||[]).filter(r=>r.week_ending === w), tt = rs.reduce((a,r)=>a+r.leads_delivered, 0);
-    tr += '<tr class="pick" data-w="'+h(w)+'"'+(w === LS.week ? ' style="background:var(--chip)"' : '')+'><td>'+h(weekLabel(w))+'</td><td><span class="'+(tt >= lo ? "ahead" : "behind")+'">'+num(tt)+'</span></td>'+
-      names.map(n=>{ const x = rs.find(r=>r.bdr === n); return '<td>'+(x ? '<span class="'+(x.leads_delivered >= per ? "ahead" : "behind")+'">'+num(x.leads_delivered)+'</span>' : "–")+'</td>'; }).join("")+'</tr>';
-  });
-  $("ldTrend").innerHTML = tr + '</tbody></table>';
-}
-$("ldPrev").onclick = () => { const w = leadWeeks(), i = w.indexOf(LS.week); if(i >= 0 && i < w.length-1){ LS.week = w[i+1]; renderLeads(); } };
-$("ldNext").onclick = () => { const w = leadWeeks(), i = w.indexOf(LS.week); if(i > 0){ LS.week = w[i-1]; renderLeads(); } };
-$("ldLatest").onclick = () => { LS.week = leadWeeks()[0] || null; renderLeads(); };
-$("ldTrend").addEventListener("click", e=>{ const r = e.target.closest("tr[data-w]"); if(!r) return; LS.week = r.getAttribute("data-w"); renderLeads(); });
-
-/* tabs under Sales L10: Team trends | Connect rates | Leads delivered (add more panels the same way) */
-const PANELS = { "trends":"rpTrends", "connect-rates":"crSec", "leads-delivered":"ldSec" };
+/* tabs under Sales L10: Team trends | Connect rates (add more panels the same way) */
+const PANELS = { "trends":"rpTrends", "connect-rates":"crSec" };
 function showTab(name){
   if(!PANELS[name]) name = "trends";
   Object.keys(PANELS).forEach(k=>{ const el = $(PANELS[k]); if(el) el.hidden = (k !== name); });
@@ -1513,7 +1435,7 @@ $("rpTabs").addEventListener("keydown", e=>{
 });
 window.addEventListener("hashchange", ()=>showTab(location.hash.replace("#","")));
 showTab(location.hash.replace("#",""));
-load().then(()=>{ render(); renderLeads(); }).catch(e=>{
+load().then(()=>{ render(); }).catch(e=>{
   $("crTable").innerHTML = '<tbody><tr><td class="empty">Could not load the connect rate data: '+h(e.message)+'</td></tr></tbody>';
 });
 })();

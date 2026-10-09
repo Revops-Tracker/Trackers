@@ -172,7 +172,7 @@ button.linkish{border:0;background:transparent;padding:0;color:var(--fill);font-
 html.view-reporting .lb-only{display:none!important}
 .tbl-toggle{display:flex;justify-content:flex-end;margin:14px 0 0}
 #bdrMetrics,#aeMetrics{margin-top:12px}
-#aeMetrics[hidden]{display:none}
+#aeMetrics[hidden],#trPickWrap[hidden]{display:none}
 #bdrMetrics[hidden]{display:none}
 .nav button:disabled{opacity:.35;cursor:not-allowed}
 .nav button.btn{width:auto;padding:0 14px;font-size:15px;white-space:nowrap}
@@ -267,6 +267,7 @@ html.view-reporting .lb-only{display:none!important}
     <div class="tr-bar">
       <div class="tr-ctl">
         <div class="seg" id="trScale" role="group" aria-label="Group by">
+          <button data-s="day" aria-pressed="false">Daily</button>
           <button data-s="week" aria-pressed="true">Weekly</button>
           <button data-s="month" aria-pressed="false">Monthly</button>
         </div>
@@ -283,6 +284,8 @@ html.view-reporting .lb-only{display:none!important}
             <option value="q3">Since Jul 1</option>
             <option value="thisq">This quarter</option>
             <option value="lastq">Last quarter</option>
+            <option value="l14d">Last 14 days</option>
+            <option value="l30d">Last 30 days</option>
             <option value="l8w">Last 8 weeks</option>
             <option value="l3m">Last 3 months</option>
             <option value="custom">Custom dates…</option>
@@ -857,6 +860,8 @@ function trendRange(){
   const qStart = d => new Date(d.getFullYear(), Math.floor(d.getMonth()/3)*3, 1);
   if(trend.range==="thisq") f = qStart(y);
   else if(trend.range==="lastq"){ const q = qStart(y); f = new Date(q.getFullYear(), q.getMonth()-3, 1); t = new Date(q); t.setDate(0); }
+  else if(trend.range==="l14d"){ f = new Date(y); f.setDate(f.getDate()-13); }
+  else if(trend.range==="l30d"){ f = new Date(y); f.setDate(f.getDate()-29); }
   else if(trend.range==="l8w"){ f = new Date(y); f.setDate(f.getDate()-((f.getDay()+6)%7)-49); }
   else if(trend.range==="l3m") f = new Date(y.getFullYear(), y.getMonth()-2, 1);
   else if(trend.range==="custom"){ f = trend.from ? dOf(trend.from) : dOf(DATA_FROM); t = trend.to ? dOf(trend.to) : y; }
@@ -869,18 +874,20 @@ function trendRange(){
 function trendBuckets(scale){
   const {f:from, t:to} = trendRange();
   let s = new Date(from);
-  if(scale==="week"){ s.setDate(s.getDate()-((s.getDay()+6)%7)); } else s.setDate(1);
+  if(scale==="week"){ s.setDate(s.getDate()-((s.getDay()+6)%7)); } else if(scale==="month") s.setDate(1);
   const out = [];
   while(s<=to){
-    const e = new Date(s); if(scale==="week") e.setDate(e.getDate()+6); else e.setMonth(e.getMonth()+1,0);
+    const e = new Date(s); if(scale==="week") e.setDate(e.getDate()+6); else if(scale==="month") e.setMonth(e.getMonth()+1,0);
     const s2 = s<from ? from : s, e2 = e>to ? to : e;
     out.push({start:ymd(s2), end:ymd(e2), partial: s<from || e>to,
-      short: scale==="week" ? `${MON[s2.getMonth()]} ${s2.getDate()}` : MON[s2.getMonth()],
-      label: scale==="week" ? `Week of ${MON[s2.getMonth()]} ${s2.getDate()}` : `${MONTHS[s2.getMonth()]} ${s2.getFullYear()}`});
+      weekend: scale==="day" && (s2.getDay()===0 || s2.getDay()===6),
+      short: scale==="month" ? MON[s2.getMonth()] : `${MON[s2.getMonth()]} ${s2.getDate()}`,
+      label: scale==="day" ? `${DOW[s2.getDay()]}, ${MON[s2.getMonth()]} ${s2.getDate()}` : scale==="week" ? `Week of ${MON[s2.getMonth()]} ${s2.getDate()}` : `${MONTHS[s2.getMonth()]} ${s2.getFullYear()}`});
     s = new Date(e); s.setDate(s.getDate()+1);
   }
   return {buckets:out, from, to};
 }
+const DOW = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
 function niceStep(raw){ if(raw<=0) return 1; const p=10**Math.floor(Math.log10(raw)), f=raw/p; return (f<=1?1:f<=2?2:f<=5?5:10)*p; }
 const trSources = () => TR_SOURCES.filter(s=> (trend.group==="all" || s.g===trend.group) && !(trend.group==="bdr" && trend.pick && s.key!==trend.pick));
 // first-touch UTM values among inbound-booked deals in the range, most common first
@@ -941,7 +948,7 @@ function renderTrends(){
   }
   B.forEach((b,i)=>{
     const cx = L + band*i + band/2, x = cx - bw/2;
-    svg += `<g class="col" data-i="${i}"><rect class="hit" x="${L+band*i}" y="${T}" width="${band}" height="${H-T-Bm}" fill="transparent" rx="6"/>`;
+    svg += `<g class="col" data-i="${i}"><rect class="hit" x="${L+band*i}" y="${T}" width="${band}" height="${H-T-Bm}" fill="${b.weekend?"currentColor":"transparent"}"${b.weekend?' fill-opacity=".05"':""} rx="${b.weekend?0:6}"/>`;
     let acc = 0; const segs = used.filter(s=>b.v[s.key]>0);
     segs.forEach((s,k)=>{
       const y0 = y(acc), y1 = y(acc + b.v[s.key]); acc += b.v[s.key];
@@ -984,7 +991,9 @@ function trendOpen(srcKey, i){
   else openList(srcKey, "bdr", m.list, `${s.name}${b.utm?" ("+utmName(b.utm)+")":""}: ${m.label}`, b);
 }
 document.getElementById("trMetric").onclick = e=>{ const b=e.target.closest("button[data-tm]"); if(b){ trend.metric=b.dataset.tm; renderTrends(); } };
-document.getElementById("trScale").onclick = e=>{ const b=e.target.closest("button[data-s]"); if(b){ trend.scale=b.dataset.s; renderTrends(); } };
+document.getElementById("trScale").onclick = e=>{ const b=e.target.closest("button[data-s]"); if(!b) return;
+  if(b.dataset.s==="day" && trend.scale!=="day" && ["q3","thisq","lastq","l3m"].includes(trend.range)) trend.range="l30d";
+  trend.scale=b.dataset.s; renderTrends(); };
 document.getElementById("trGroup").onclick = e=>{ const b=e.target.closest("button[data-g]"); if(b && b.dataset.g!==trend.group){ trend.group=b.dataset.g; trend.pick=""; renderTrends(); } };
 document.getElementById("trPick").onchange = e=>{ trend.pick=e.target.value; renderTrends(); };
 document.getElementById("trRange").onchange = e=>{ trend.range=e.target.value; if(trend.range==="custom" && !trend.from){ trend.from=DATA_FROM; trend.to=ymd(trYesterday()); } renderTrends(); };

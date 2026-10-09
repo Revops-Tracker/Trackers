@@ -275,6 +275,9 @@ html.view-reporting .lb-only{display:none!important}
           <button data-g="bdr" aria-pressed="false">BDRs only</button>
           <button data-g="inbound" aria-pressed="false">Inbound</button>
         </div>
+        <label class="tr-range" id="trPickWrap" hidden><span id="trPickLbl">BDR</span>
+          <select id="trPick"></select>
+        </label>
         <label class="tr-range">Range
           <select id="trRange">
             <option value="q3">Since Jul 1</option>
@@ -298,7 +301,7 @@ html.view-reporting .lb-only{display:none!important}
       <div class="tr-tip" id="trTip"></div>
     </div>
     <div class="table-wrap" id="trTableWrap" hidden></div>
-    <div class="legend">Each bar is split by who booked the deal. <b>BDRs only</b> = Brandon, Erich, Issa and former BDRs. <b>Inbound</b> = calls with no BDR (booked by the lead) plus CloseBot. AE-booked calls only show under All sources. The number on top is the total. Closes and MRR are by close date. Click a coloured block to see the deals. * = period not finished or cut by the range.</div>
+    <div class="legend">Each bar is split by who booked the deal. <b>BDRs only</b> = Brandon, Erich, Issa and former BDRs. <b>Inbound</b> = calls with no BDR (booked by the lead) plus CloseBot; pick a source to filter by the deal's first-touch UTM. AE-booked calls only show under All sources. The number on top is the total. Closes and MRR are by close date. Click a coloured block to see the deals. * = period not finished or cut by the range.</div>
   </section>
 </div>
 
@@ -476,9 +479,13 @@ function showupStats(rows, p){
     show: due.length ? had.length/due.length : null,
     first: fdue.length ? f1.length/fdue.length : null };
 }
+const NO_UTM = "(no first-touch UTM)";
+const utmOf = r => r.utm || NO_UTM;
+const utmOk = (r,p) => !p || p.utm==null || utmOf(r)===p.utm;
+const utmName = u => u===NO_UTM ? "No UTM" : u.replace(/^Inbound - /,"");
 function statsFor(person, role, p){
-  const su = effShowup().filter(r=>!r.dropped && whoMatches(r, person, role));
-  const ev = effEvents().filter(r=>!r.dropped && whoMatches(r, person, role) && inP(r.at,p));
+  const su = effShowup().filter(r=>!r.dropped && whoMatches(r, person, role) && utmOk(r,p));
+  const ev = effEvents().filter(r=>!r.dropped && whoMatches(r, person, role) && utmOk(r,p) && inP(r.at,p));
   const s = showupStats(su, p);
   const k = kind => ev.filter(e=>e.kind===kind);
   return {...s, des:k("design"), dheld:k("dheld"), prop:k("prop"), diag:k("diag"), con:k("contract"), won:k("won"),
@@ -687,10 +694,10 @@ let lastOpen = null;
 function openList(person, role, metric, title, pOverride){
   lastOpen = {person, role, metric, title, pOverride};
   const p = pOverride || periodFor(state.kind, state.offset);
-  const allSu = effShowup().filter(r=>whoMatches(r, person, role));
+  const allSu = effShowup().filter(r=>whoMatches(r, person, role) && utmOk(r,p));
   const live = allSu.filter(r=>!r.dropped);
   const s = showupStats(live, p);
-  const ev = effEvents().filter(r=>whoMatches(r, person, role) && inP(r.at,p));
+  const ev = effEvents().filter(r=>whoMatches(r, person, role) && utmOk(r,p) && inP(r.at,p));
   const dropped = allSu.filter(r=>r.dropped && (inP(r.first_slot,p) || (r.due_ts||[]).some(t=>inP(t,p))));
   const groups = [];
   const evOf = k => ev.filter(e=>e.kind===k);
@@ -825,7 +832,7 @@ const TR_SOURCES = [
   {key:OTHER,             name:"AE-booked",   g:"other",   c:"var(--s6)"},
 ];
 const ALWAYS = new Set(["Brandon Cameron","Erich Roeder","Issa Hattar","Inbound"]);   // shown in legend/table even at zero
-const trend = {metric:"books", scale:"week", group:"all", range:"q3", from:null, to:null, table:false};
+const trend = {metric:"books", scale:"week", group:"all", pick:"", range:"q3", from:null, to:null, table:false};
 const trVal = (v,m) => m.money ? fmt(v,true) : fmt(v);
 const dOf = s => new Date(s+"T00:00:00");
 function trYesterday(){ const y=new Date(); y.setHours(0,0,0,0); y.setDate(y.getDate()-1); return y; }
@@ -859,7 +866,24 @@ function trendBuckets(scale){
   return {buckets:out, from, to};
 }
 function niceStep(raw){ if(raw<=0) return 1; const p=10**Math.floor(Math.log10(raw)), f=raw/p; return (f<=1?1:f<=2?2:f<=5?5:10)*p; }
-const trSources = () => TR_SOURCES.filter(s=> trend.group==="all" || s.g===trend.group);
+const trSources = () => TR_SOURCES.filter(s=> (trend.group==="all" || s.g===trend.group) && !(trend.group==="bdr" && trend.pick && s.key!==trend.pick));
+// first-touch UTM values among inbound-booked deals in the range, most common first
+function inboundUtms(from, to){
+  const P = {start:ymd(from), end:ymd(to)}, n = {};
+  const inb = r => !r.dropped && TR_SOURCES.some(s=>s.g==="inbound" && whoMatches(r, s.key, "bdr"));
+  effShowup().filter(r=>inb(r) && (inP(r.first_slot,P) || inP(r.run_at,P))).forEach(r=>{ n[utmOf(r)]=(n[utmOf(r)]||0)+1; });
+  effEvents().filter(r=>inb(r) && inP(r.at,P)).forEach(r=>{ n[utmOf(r)]=(n[utmOf(r)]||0)+0.001; });
+  return Object.keys(n).sort((a,b)=>(a===NO_UTM)-(b===NO_UTM) || n[b]-n[a] || a.localeCompare(b));
+}
+function trPickRender(from, to){
+  const wrap = document.getElementById("trPickWrap"), sel = document.getElementById("trPick");
+  wrap.hidden = trend.group==="all";
+  if(trend.group==="all") return;
+  let opts;
+  if(trend.group==="bdr"){ document.getElementById("trPickLbl").textContent = "BDR"; opts = [["","All BDRs"], ...TR_SOURCES.filter(s=>s.g==="bdr").map(s=>[s.key, s.name])]; }
+  else { document.getElementById("trPickLbl").textContent = "Source"; const u = inboundUtms(from, to); if(trend.pick && !u.includes(trend.pick)) u.push(trend.pick); opts = [["","All inbound"], ...u.map(x=>[x, utmName(x)])]; }
+  sel.innerHTML = opts.map(([v,l])=>`<option value="${esc(v)}"${v===trend.pick?" selected":""}>${esc(l)}</option>`).join("");
+}
 function renderTrends(){
   const el = document.getElementById("trend"); if(!el) return;
   const m = TR_METRICS.find(x=>x.id===trend.metric);
@@ -872,14 +896,18 @@ function renderTrends(){
   const fi = document.getElementById("trFrom"), ti = document.getElementById("trTo");
   fi.min = ti.min = DATA_FROM; fi.max = ti.max = ymd(trYesterday());
   if(trend.range==="custom"){ fi.value = ymd(from); ti.value = ymd(to); }
+  trPickRender(from, to);
+  const utmF = trend.group==="inbound" && trend.pick ? trend.pick : null;
+  if(utmF) buckets.forEach(b=>{ b.utm = utmF; });
   const srcs = trSources();
   const B = buckets.map(b=>{
     const v = {}; srcs.forEach(src=>{ v[src.key] = m.f(statsFor(src.key,"bdr",b)); });
     return {...b, v, total: srcs.reduce((a,src)=>a+v[src.key],0)};
   });
-  const used = srcs.filter(src=> ALWAYS.has(src.key) || B.some(b=>b.v[src.key]));
+  const used = srcs.filter(src=> ALWAYS.has(src.key) || srcs.length===1 || B.some(b=>b.v[src.key]));
   state.trendRows = B; state.trendUsed = used;
-  const grpName = {all:"all sources", bdr:"BDRs only", inbound:"Inbound only"}[trend.group];
+  const pickName = trend.group==="bdr" ? (TR_SOURCES.find(s=>s.key===trend.pick)||{}).name : utmF && "Inbound: "+utmName(utmF);
+  const grpName = pickName || {all:"all sources", bdr:"BDRs only", inbound:"Inbound only"}[trend.group];
   document.getElementById("trSub").textContent = `${m.label}, ${grpName}, ${MON[from.getMonth()]} ${from.getDate()} to ${MON[to.getMonth()]} ${to.getDate()}, ${to.getFullYear()} · total ${trVal(B.reduce((a,b)=>a+b.total,0),m)}`;
   document.getElementById("trLegend").innerHTML = used.map(s=>`<span><i style="background:${s.c}"></i>${esc(s.name)}</span>`).join("");
 
@@ -935,11 +963,12 @@ function trendTip(e){
 }
 function trendOpen(srcKey, i){
   const b = state.trendRows[i], m = TR_METRICS.find(x=>x.id===trend.metric), s = TR_SOURCES.find(x=>x.key===srcKey);
-  openList(srcKey, "bdr", m.list, `${s.name}: ${m.label}`, b);
+  openList(srcKey, "bdr", m.list, `${s.name}${b.utm?" ("+utmName(b.utm)+")":""}: ${m.label}`, b);
 }
 document.getElementById("trMetric").onclick = e=>{ const b=e.target.closest("button[data-tm]"); if(b){ trend.metric=b.dataset.tm; renderTrends(); } };
 document.getElementById("trScale").onclick = e=>{ const b=e.target.closest("button[data-s]"); if(b){ trend.scale=b.dataset.s; renderTrends(); } };
-document.getElementById("trGroup").onclick = e=>{ const b=e.target.closest("button[data-g]"); if(b){ trend.group=b.dataset.g; renderTrends(); } };
+document.getElementById("trGroup").onclick = e=>{ const b=e.target.closest("button[data-g]"); if(b && b.dataset.g!==trend.group){ trend.group=b.dataset.g; trend.pick=""; renderTrends(); } };
+document.getElementById("trPick").onchange = e=>{ trend.pick=e.target.value; renderTrends(); };
 document.getElementById("trRange").onchange = e=>{ trend.range=e.target.value; if(trend.range==="custom" && !trend.from){ trend.from=DATA_FROM; trend.to=ymd(trYesterday()); } renderTrends(); };
 document.getElementById("trFrom").onchange = e=>{ if(e.target.value){ trend.from=e.target.value; renderTrends(); } };
 document.getElementById("trTo").onchange = e=>{ if(e.target.value){ trend.to=e.target.value; renderTrends(); } };

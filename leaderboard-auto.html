@@ -1,0 +1,672 @@
+<!doctype html>
+<html lang="en">
+<head><script>window.JF_PAGE='leaderboard'</script><script src="config.js"></script><script src="sso.js"></script>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Sales Floor Leaderboard (Auto)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Barlow:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --paper:#EEF1F6; --panel:#FFFFFF; --ink:#14213D; --muted:#5B6782; --line:#D9DFE9;
+  --track:#E4E9F1; --fill:#2F5BEA; --fill-soft:#C9D6FB; --gold:#D99A1E; --pace:#14213D;
+  --ahead:#1F8A5B; --behind:#C2410C; --chip:#E4E9F1;
+  --display:"Barlow Condensed","Arial Narrow",Arial,sans-serif;
+  --body:"Barlow","Segoe UI",Helvetica,Arial,sans-serif;
+  box-sizing:border-box;
+  padding-top:env(safe-area-inset-top,0px); padding-bottom:env(safe-area-inset-bottom,0px);
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){
+    --paper:#0F1626; --panel:#172036; --ink:#E8ECF5; --muted:#97A3BD; --line:#26324D;
+    --track:#222D45; --fill:#6E8EFF; --fill-soft:#2E3D66; --gold:#F0B43A; --pace:#E8ECF5;
+    --ahead:#4CC38A; --behind:#F08A5D; --chip:#222D45;
+  }
+}
+:root[data-theme="dark"]{
+  --paper:#0F1626; --panel:#172036; --ink:#E8ECF5; --muted:#97A3BD; --line:#26324D;
+  --track:#222D45; --fill:#6E8EFF; --fill-soft:#2E3D66; --gold:#F0B43A; --pace:#E8ECF5;
+  --ahead:#4CC38A; --behind:#F08A5D; --chip:#222D45;
+}
+*,*::before,*::after{box-sizing:inherit}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+body{margin:0;background:var(--paper);color:var(--ink);font-family:var(--body);font-size:16px;line-height:1.45}
+button,select,input{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--fill);outline-offset:2px}
+.wrap{max-width:1080px;margin:0 auto;padding:24px 20px 64px}
+
+header.top{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:16px;margin-bottom:22px}
+h1{font-family:var(--display);font-weight:700;font-size:clamp(34px,5vw,52px);line-height:.95;margin:0;letter-spacing:-.01em}
+.live{display:inline-flex;align-items:center;gap:8px;color:var(--muted);font-size:14px;margin-top:8px}
+.dot{width:9px;height:9px;border-radius:50%;background:var(--muted)}
+.dot.on{background:var(--ahead);box-shadow:0 0 0 0 var(--ahead);animation:pulse 2.4s infinite}
+@keyframes pulse{0%{box-shadow:0 0 0 0 color-mix(in srgb,var(--ahead) 55%,transparent)}70%{box-shadow:0 0 0 8px transparent}100%{box-shadow:0 0 0 0 transparent}}
+@media (prefers-reduced-motion:reduce){.dot.on{animation:none}.bar-fill{transition:none!important}}
+.btn{border:0;border-radius:8px;padding:10px 16px;font-weight:600;cursor:pointer;background:var(--ink);color:var(--paper)}
+.btn.ghost{background:transparent;color:var(--ink);border:1px solid var(--line)}
+.btn:disabled{opacity:.5;cursor:not-allowed}
+
+.controls{display:flex;flex-wrap:wrap;align-items:center;gap:12px;justify-content:space-between;margin-bottom:28px}
+.seg{display:inline-flex;background:var(--chip);border-radius:10px;padding:4px}
+.seg button{border:0;background:transparent;padding:8px 16px;border-radius:7px;cursor:pointer;font-weight:600;color:var(--muted)}
+.seg button[aria-pressed="true"]{background:var(--panel);color:var(--ink);box-shadow:0 1px 2px rgba(20,33,61,.12)}
+.nav{display:flex;align-items:center;gap:6px}
+.nav button{width:36px;height:36px;border-radius:8px;border:1px solid var(--line);background:var(--panel);cursor:pointer;font-size:18px;line-height:1}
+.period{font-family:var(--display);font-weight:600;font-size:22px;min-width:200px;text-align:center}
+.pace-note{color:var(--muted);font-size:14px;width:100%}
+
+section{margin-bottom:40px}
+.sec-head{display:flex;flex-wrap:wrap;align-items:baseline;justify-content:space-between;gap:10px;margin-bottom:12px}
+h2{font-family:var(--display);font-weight:700;font-size:30px;margin:0}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chips button{border:1px solid var(--line);background:var(--panel);border-radius:999px;padding:5px 12px;font-size:14px;cursor:pointer;color:var(--muted)}
+.chips button[aria-pressed="true"]{background:var(--ink);color:var(--paper);border-color:var(--ink)}
+
+.lanes{background:var(--panel);border-radius:14px;border:1px solid var(--line);overflow:hidden}
+.lane{display:grid;grid-template-columns:56px minmax(120px,190px) 1fr 96px;align-items:center;gap:16px;padding:18px 20px;border-top:1px solid var(--line)}
+.lane:first-child{border-top:0}
+.rank{font-family:var(--display);font-weight:700;font-size:40px;line-height:1;color:var(--muted);text-align:center}
+.lane.lead .rank{color:var(--gold)}
+.who .name{font-weight:600;font-size:18px;line-height:1.2}
+.who .sub{color:var(--muted);font-size:13px;margin-top:2px}
+.score{font-family:var(--display);font-weight:700;font-size:44px;line-height:1;text-align:right;font-variant-numeric:tabular-nums}
+.score small{display:block;font-family:var(--body);font-weight:500;font-size:12px;color:var(--muted);margin-top:4px}
+.bar{position:relative;height:18px;background:var(--track);border-radius:4px}
+.bar-fill{position:absolute;inset:0 auto 0 0;background:var(--fill);border-radius:4px;transition:width .6s cubic-bezier(.2,.8,.2,1)}
+.lane.lead .bar-fill{background:var(--gold)}
+.bar-pace{position:absolute;top:-5px;bottom:-5px;width:2px;background:var(--pace);opacity:.75}
+.bar-goal{position:absolute;right:0;top:-5px;bottom:-5px;width:2px;background:var(--muted)}
+.bar-meta{display:flex;justify-content:space-between;font-size:13px;color:var(--muted);margin-top:6px;gap:8px}
+.ahead{color:var(--ahead);font-weight:600}.behind{color:var(--behind);font-weight:600}
+.stats{display:flex;flex-wrap:wrap;gap:4px 14px;font-size:13px;color:var(--muted);margin-top:8px}
+.stats b{color:var(--ink);font-weight:600;font-variant-numeric:tabular-nums}
+
+.table-wrap{overflow-x:auto;background:var(--panel);border:1px solid var(--line);border-radius:14px;margin-top:16px}
+table{border-collapse:collapse;width:100%;min-width:560px;font-variant-numeric:tabular-nums}
+th,td{padding:9px 14px;text-align:right;border-top:1px solid var(--line);font-size:14px;white-space:nowrap}
+thead th{border-top:0;font-weight:600;color:var(--muted)}
+th:first-child,td:first-child{text-align:left}
+td.goal{color:var(--muted)}
+tr.group td{font-weight:600;color:var(--muted);background:var(--paper);font-size:13px}
+details summary{cursor:pointer;color:var(--muted);font-size:14px;margin-top:14px;font-weight:600}
+
+.ae-card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:22px}
+.ae-hero{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:flex-end;gap:16px;padding-bottom:18px;border-bottom:1px solid var(--line);margin-bottom:18px}
+.ae-hero .big{font-family:var(--display);font-weight:700;font-size:clamp(48px,8vw,72px);line-height:.9;font-variant-numeric:tabular-nums}
+.ae-hero .lbl{color:var(--muted);font-size:14px;margin-top:6px}
+.ae-hero .bar{width:min(380px,100%)}
+.tiles{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:22px 28px}
+.tile .t-top{display:flex;justify-content:space-between;align-items:baseline;gap:8px}
+.tile .t-name{font-size:14px;color:var(--muted);font-weight:500}
+.tile .t-val{font-family:var(--display);font-weight:700;font-size:32px;font-variant-numeric:tabular-nums}
+.tile .t-val span{font-size:18px;color:var(--muted);font-weight:600}
+.tile .bar{height:10px;margin-top:4px}
+.tile .bar-meta{margin-top:4px}
+.ae-note{color:var(--muted);font-size:14px;margin-top:18px}
+
+.empty{padding:28px;color:var(--muted);text-align:center}
+.banner{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px 16px;margin-bottom:22px;color:var(--muted);font-size:14px}
+
+dialog{border:0;border-radius:14px;padding:0;width:min(520px,calc(100vw - 24px));background:var(--panel);color:var(--ink);box-shadow:0 20px 60px rgba(10,20,40,.35)}
+dialog::backdrop{background:rgba(10,18,35,.45)}
+.dlg-head{padding:18px 22px 10px}
+.dlg-head h3{font-family:var(--display);font-size:26px;margin:0}
+.dlg-head p{margin:4px 0 0;color:var(--muted);font-size:14px}
+.dlg-body{padding:8px 22px 4px;display:grid;grid-template-columns:1fr 1fr;gap:12px 14px;max-height:60vh;overflow:auto}
+.dlg-body label{display:flex;flex-direction:column;gap:4px;font-size:13px;color:var(--muted);font-weight:500}
+.dlg-body input,.dlg-body select{border:1px solid var(--line);background:var(--paper);border-radius:8px;padding:9px 10px;font-size:16px;color:var(--ink)}
+.dlg-body .full{grid-column:1 / -1}
+.dlg-foot{display:flex;justify-content:flex-end;gap:10px;padding:16px 22px 20px}
+.err{color:var(--behind);font-size:14px;padding:0 22px}
+.toast{position:fixed;left:50%;bottom:calc(24px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--ink);color:var(--paper);padding:10px 18px;border-radius:999px;font-weight:600;font-size:14px;opacity:0;pointer-events:none;transition:opacity .25s}
+.toast.show{opacity:1}
+
+@media (max-width:680px){
+  .lane{grid-template-columns:40px 1fr auto;grid-template-areas:"r w s" "b b b";row-gap:10px;padding:16px}
+  .lane .rank{grid-area:r;font-size:32px}.lane .who{grid-area:w}.lane .score{grid-area:s;font-size:36px}.lane .track{grid-area:b}
+  .period{min-width:0;font-size:19px}
+  .dlg-body{grid-template-columns:1fr}
+}
+</style>
+</head>
+<body>
+<style>
+.auto-tag{display:inline-block;font-size:12px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;background:var(--chip);color:var(--muted);border-radius:999px;padding:3px 10px;margin-left:10px;vertical-align:middle}
+.click{cursor:pointer;text-decoration:underline dotted;text-underline-offset:3px}
+.click:hover{color:var(--fill)}
+button.linkish{border:0;background:transparent;padding:0;color:var(--fill);font-weight:600;cursor:pointer}
+.lane .who .sub .linkish{font-size:13px}
+.deal-list{list-style:none;margin:0;padding:0 22px;max-height:62vh;overflow:auto}
+.deal{border-top:1px solid var(--line);padding:12px 0}
+.deal:first-child{border-top:0}
+.deal .top{display:flex;justify-content:space-between;gap:10px;align-items:baseline;flex-wrap:wrap}
+.deal .nm{font-weight:600}
+.deal .nm a{color:var(--ink)}
+.pill{font-size:12px;font-weight:600;border-radius:999px;padding:2px 9px;background:var(--chip);color:var(--muted);white-space:nowrap}
+.pill.good{background:color-mix(in srgb,var(--ahead) 18%,transparent);color:var(--ahead)}
+.pill.bad{background:color-mix(in srgb,var(--behind) 18%,transparent);color:var(--behind)}
+.deal .why{color:var(--muted);font-size:13px;margin-top:4px}
+.deal .fix{margin-top:6px;font-size:13px;display:flex;gap:12px;flex-wrap:wrap;align-items:center}
+.deal .corr{background:color-mix(in srgb,var(--gold) 16%,transparent);border-radius:8px;padding:6px 9px;font-size:13px;margin-top:6px}
+.grp{font-family:var(--display);font-weight:700;font-size:18px;color:var(--muted);padding:14px 22px 2px;margin:0}
+.fixbox{display:grid;gap:10px;padding:10px 0 4px}
+.fixbox label{display:flex;flex-direction:column;gap:4px;font-size:13px;color:var(--muted);font-weight:500}
+.fixbox select,.fixbox textarea{border:1px solid var(--line);background:var(--paper);border-radius:8px;padding:8px 10px;font:inherit;color:var(--ink)}
+.fixbox textarea{min-height:56px;resize:vertical}
+.fixbox .row{display:flex;gap:8px;justify-content:flex-end}
+.legend{color:var(--muted);font-size:13px;margin-top:10px}
+#reviewBar{display:flex;flex-wrap:wrap;gap:10px;margin:-8px 0 22px}
+.rv{display:flex;align-items:center;gap:12px;flex-wrap:wrap;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:12px 16px;font-size:15px}
+.rv.todo{border-color:var(--gold);background:color-mix(in srgb,var(--gold) 10%,var(--panel))}
+.rv .prog{color:var(--muted);font-size:13px}
+.tf{display:inline-flex;gap:6px}
+.tf button{border:1px solid var(--line);background:var(--panel);border-radius:8px;padding:4px 12px;font-weight:600;cursor:pointer}
+.tf button.t{color:var(--ahead);border-color:color-mix(in srgb,var(--ahead) 45%,var(--line))}
+.tf button.f{color:var(--behind);border-color:color-mix(in srgb,var(--behind) 45%,var(--line))}
+.ok{color:var(--ahead);font-weight:600}
+.deal .pend{background:color-mix(in srgb,var(--fill) 12%,transparent);border-radius:8px;padding:6px 9px;font-size:13px;margin-top:6px}
+</style>
+<div class="wrap">
+  <header class="top">
+    <div>
+      <h1>Sales floor leaderboard <span class="auto-tag">Auto</span></h1>
+      <div class="live"><span class="dot" id="liveDot"></span><span id="liveText">Loading</span></div>
+    </div>
+  </header>
+
+  <div class="banner" id="banner">Every number here comes straight from HubSpot and refreshes at 8 AM each day, covering everything up to the end of yesterday. Click any underlined number to see the deals behind it. Reps: go through your new deals and mark each one <b>True</b> or <b>False</b>. A "False" needs a short note and goes to Vianney or Max to approve before the numbers change.</div>
+  <div id="reviewBar"></div>
+
+  <div class="controls">
+    <div class="seg" role="group" aria-label="Period">
+      <button data-p="week" aria-pressed="true">Week</button>
+      <button data-p="month" aria-pressed="false">Month</button>
+      <button data-p="quarter" aria-pressed="false">Quarter</button>
+    </div>
+    <div class="nav">
+      <button id="prev" aria-label="Previous period">‹</button>
+      <div class="period" id="periodLabel"></div>
+      <button id="next" aria-label="Next period">›</button>
+      <button class="btn ghost" id="today" style="margin-left:6px">Current</button>
+    </div>
+    <div class="pace-note" id="paceNote"></div>
+  </div>
+
+  <section>
+    <div class="sec-head">
+      <h2>BDRs</h2>
+      <div class="chips" id="bdrChips" role="group" aria-label="Rank BDRs by"></div>
+    </div>
+    <div class="lanes" id="lanes"></div>
+    <div class="table-wrap" id="bdrTable"></div>
+    <div class="legend"><b>Books</b>: new bookings whose first slot falls in the period. <b>Runs due</b>: discovery calls whose slot arrived in the period. <b>Runs had</b>: due calls that were held. <b>Overall show</b> = runs had ÷ runs due. <b>1st-time show</b> = new books held at their first slot ÷ new books whose first slot came due. <b>Designs held</b>: Proposal Review meetings marked Completed in HubSpot.</div>
+  </section>
+
+  <section>
+    <div class="sec-head"><h2>AEs</h2></div>
+    <div id="ae"></div>
+  </section>
+</div>
+
+<dialog id="dlg">
+  <div class="dlg-head">
+    <h3 id="dlgTitle"></h3>
+    <p id="dlgSub"></p>
+  </div>
+  <div id="dlgList"></div>
+  <div class="dlg-foot"><button class="btn" type="button" id="closeBtn">Close</button></div>
+</dialog>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<script>
+const API = "https://ottvswkgqohurzilfafu.supabase.co/functions/v1/lb-auto";
+const PORTAL = "1905790";
+const TZ = "America/Toronto";
+
+/* ---------- roster and goals (weekly goals from Max's leaderboard / L10 scorecard) ---------- */
+const BDRS = [
+  {key:"Brandon Cameron", name:"Brandon Cameron"},
+  {key:"Erich Roeder",    name:"Erich Roeder"},
+  {key:"Issa Hattar",     name:"Issa Hattar"},
+];
+const AES = [{key:"Dipen Mistry", name:"Dipen Mistry"}];
+const MULT = {week:1, month:4, quarter:12};
+const BDR_RANK = [
+  {id:"had",   label:"Runs had",      goal:8,  fmt:"n"},
+  {id:"books", label:"Books (new)",   goal:12, fmt:"n"},
+  {id:"show",  label:"Overall show",  goal:null, fmt:"pct"},
+  {id:"first", label:"1st-time show", goal:null, fmt:"pct"},
+  {id:"des",   label:"Designs held",  goal:4,  fmt:"n"},
+];
+const LABEL = {
+  first_time_show:"Showed 1st time", moved_show:"Moved & showed", recovered_show:"Recovered (missed, then held)",
+  cst_show:"Showed → sent to CST", no_show:"No-show", cancelled_ahead:"Cancelled / DQ'd ahead",
+  closed_no_mtg:"Closed after slot, no meeting", cst_unverified:"CST at slot, unverified",
+  pending:"Upcoming", pending_recovery:"Missed, rebook upcoming", awaiting:"Call passed, card not moved",
+  awaiting_recovery:"Call passed, card not moved", not_a_booking:"Not a real booking",
+};
+const SHOWS = new Set(["first_time_show","moved_show","recovered_show","cst_show"]);
+const GOOD = SHOWS, BAD = new Set(["no_show","cst_unverified","closed_no_mtg","awaiting","awaiting_recovery"]);
+const EV_LABEL = {design:"Design held", prop:"Prop update held", diag:"Moved to Diagnosis", contract:"Contract sent", won:"Closed won"};
+
+/* ---------- date helpers ---------- */
+const pad = n => String(n).padStart(2,"0");
+const ymd = d => `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
+const torDayFmt = new Intl.DateTimeFormat("en-CA",{timeZone:TZ,year:"numeric",month:"2-digit",day:"2-digit"});
+const torDay = iso => iso ? torDayFmt.format(new Date(iso)) : null;
+const niceFmt = new Intl.DateTimeFormat("en-US",{timeZone:TZ,month:"short",day:"numeric",hour:"numeric",minute:"2-digit"});
+const nice = iso => iso ? niceFmt.format(new Date(iso)) : "–";
+const MON = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+const MONTHS = ["January","February","March","April","May","June","July","August","September","October","November","December"];
+function periodFor(kind, offset){
+  const now = new Date(); now.setHours(0,0,0,0);
+  let s, e, label;
+  if(kind==="week"){
+    s = new Date(now); const dow=(s.getDay()+6)%7; s.setDate(s.getDate()-dow+offset*7);
+    e = new Date(s); e.setDate(e.getDate()+6);
+    label = `${MON[s.getMonth()]} ${s.getDate()} to ${MON[e.getMonth()]} ${e.getDate()}, ${e.getFullYear()}`;
+  } else if(kind==="month"){
+    s = new Date(now.getFullYear(), now.getMonth()+offset, 1);
+    e = new Date(s.getFullYear(), s.getMonth()+1, 0);
+    label = `${MONTHS[s.getMonth()]} ${s.getFullYear()}`;
+  } else {
+    const q = Math.floor(now.getMonth()/3);
+    s = new Date(now.getFullYear(), q*3 + offset*3, 1);
+    e = new Date(s.getFullYear(), s.getMonth()+3, 0);
+    label = `Q${Math.floor(s.getMonth()/3)+1} ${s.getFullYear()}`;
+  }
+  // data runs through yesterday
+  const y = new Date(now); y.setDate(y.getDate()-1);
+  return {s, e, start:ymd(s), end:ymd(e), label, now:y};
+}
+function bizDays(a,b){ let n=0; const d=new Date(a); while(d<=b){ const w=d.getDay(); if(w!==0&&w!==6)n++; d.setDate(d.getDate()+1);} return n; }
+function paceFraction(p){
+  if(p.now >= p.e) return 1;
+  if(p.now < p.s) return 0;
+  const total = bizDays(p.s,p.e); if(!total) return 1;
+  return Math.min(1, bizDays(p.s,p.now)/total);
+}
+
+/* ---------- state ---------- */
+const state = { kind:"week", offset:0, rank:"had", me:null, showup:[], events:[], ov:new Map(), pend:new Map(), reviews:new Map(), lastRun:null };
+const REVIEW_SINCE = "2026-10-01";   // reps sign off on everything from here on
+const REPS = ["Brandon","Erich","Issa","Dipen"];
+
+/* ---------- corrections applied on top of the engine (approved only; pending ones are shown, not counted) ---------- */
+function effShowup(){
+  return state.showup.map(r=>{
+    const key = `su:${r.deal_id}:${r.seg}`;
+    const o = state.ov.get(key);
+    const e = {...r, key, engineCat:r.cat, engineBooker:r.booker, ov:o||null, pend:state.pend.get(key)||null};
+    if(o){
+      if(o.booker) e.booker = o.booker;
+      if(o.cat){
+        e.cat = o.cat;
+        if(SHOWS.has(o.cat) && !e.run_at){ const d=(e.due_ts||[]); e.run_at = d.length ? d[d.length-1] : e.first_slot; }
+        if(!SHOWS.has(o.cat)) e.run_at = null;
+        if(o.cat==="cst_show") e.cst = true;
+      }
+      if(o.exclude || o.cat==="not_a_booking") e.dropped = true;
+    }
+    return e;
+  });
+}
+function effEvents(){
+  return state.events.map(r=>{
+    const key = `ev:${r.id}`; const o = state.ov.get(key);
+    const e = {...r, key, engineBooker:r.booker, ov:o||null, pend:state.pend.get(key)||null};
+    if(o){ if(o.booker) e.booker = o.booker; if(o.exclude) e.dropped = true; }
+    return e;
+  });
+}
+
+/* ---------- rep sign-off ---------- */
+const firstName = s => String(s||"").split(" ")[0];
+const credited = (r, rep) => !!rep && [r.booker, r.ae].some(n=>firstName(n)===rep);
+const labelOf = r => r.kind ? r.kind : (r.dropped ? "not_a_booking" : r.cat);
+const happened = r => r.kind ? torDay(r.at) >= REVIEW_SINCE
+  : ((r.due_ts||[]).length>0 || !!r.run_at) && [r.first_slot, r.run_at, ...(r.due_ts||[])].some(t=>t && torDay(t) >= REVIEW_SINCE);
+function reviewState(r, rep){
+  const v = state.reviews.get(r.key+"|"+rep);
+  if(r.pend) return "waiting";                                   // someone proposed a change: nothing to sign until it is decided
+  if(!v) return "todo";
+  if(v.verdict==="true" && v.label_at_review===labelOf(r)) return "true";
+  if(v.verdict==="false" && r.ov) return "true";                 // their correction was approved and is applied
+  return "todo";                                                 // label changed since they confirmed it, or their "false" was rejected
+}
+function reviewables(rep){
+  return [...effShowup(), ...effEvents()].filter(r=>credited(r, rep) && happened(r));
+}
+const todoFor = rep => reviewables(rep).filter(r=>reviewState(r, rep)==="todo");
+
+/* ---------- aggregation ---------- */
+const inP = (iso,p) => { const d = torDay(iso); return !!d && d>=p.start && d<=p.end; };
+function showupStats(rows, p){
+  const books = rows.filter(r=>inP(r.first_slot,p));
+  const due = rows.filter(r=>(r.due_ts||[]).some(t=>inP(t,p)) || inP(r.run_at,p));
+  const had = due.filter(r=>inP(r.run_at,p));
+  const fdue = books.filter(r=>!r.pushed);
+  const f1 = fdue.filter(r=>r.cat==="first_time_show");
+  const notHad = due.filter(r=>!had.includes(r));
+  return { books, due, had, fdue, f1, notHad,
+    ns: notHad.filter(r=>r.cat==="no_show"||r.cat==="cst_unverified"||r.cat==="closed_no_mtg"||r.cat==="awaiting"||r.cat==="awaiting_recovery"),
+    ca: notHad.filter(r=>r.cat==="cancelled_ahead"),
+    show: due.length ? had.length/due.length : null,
+    first: fdue.length ? f1.length/fdue.length : null };
+}
+function statsFor(person, role, p){
+  const su = effShowup().filter(r=>!r.dropped && (role==="ae" ? r.ae===person : r.booker===person));
+  const ev = effEvents().filter(r=>!r.dropped && (role==="ae" ? r.ae===person : r.booker===person) && inP(r.at,p));
+  const s = showupStats(su, p);
+  const k = kind => ev.filter(e=>e.kind===kind);
+  return {...s, des:k("design"), prop:k("prop"), diag:k("diag"), con:k("contract"), won:k("won"),
+    cwd: k("won").reduce((a,e)=>a+(Number(e.amount)||0),0)};
+}
+const valOf = (t,id) => id==="had"?t.had.length : id==="books"?t.books.length : id==="des"?t.des.length : id==="show"?t.show : t.first;
+
+/* ---------- render helpers ---------- */
+const fmt = (v,money) => money ? "$"+Math.round(v).toLocaleString() : (Math.round(v*10)/10).toLocaleString();
+const pctS = v => v==null ? "–" : Math.round(v*100)+"%";
+const esc = s => String(s??"").replace(/[&<>"']/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+function barHTML(value, goal, pace, scaleMax){
+  const max = goal || scaleMax || 1;
+  const w = Math.max(0, Math.min(100, value/max*100));
+  let html = `<div class="bar"><div class="bar-fill" style="width:${w}%"></div>`;
+  if(goal){ html += `<div class="bar-pace" style="left:calc(${pace*100}% - 1px)" title="Where you should be by yesterday"></div>`; }
+  return html + `</div>`;
+}
+function paceText(value, goal, pace){
+  if(!goal) return "";
+  if(pace===0) return `<span>Goal ${fmt(goal)}</span>`;
+  const diff = value - goal*pace;
+  if(value >= goal) return `<span class="ahead">Goal hit</span>`;
+  return diff >= 0 ? `<span class="ahead">${fmt(diff)} ahead of pace</span>` : `<span class="behind">${fmt(-diff)} behind pace</span>`;
+}
+const num = (v, person, role, metric, title) => `<span class="click" data-person="${esc(person)}" data-role="${role}" data-metric="${metric}" data-title="${esc(title)}">${v}</span>`;
+
+/* ---------- render ---------- */
+function render(){
+  const p = periodFor(state.kind, state.offset);
+  const pace = paceFraction(p);
+  const mult = MULT[state.kind];
+  document.getElementById("periodLabel").textContent = p.label;
+  document.getElementById("paceNote").textContent =
+    pace===1 ? "Period complete. Bars show final results against goal."
+    : pace===0 ? "This period hasn't started yet (data runs through yesterday)."
+    : `${Math.round(pace*100)}% of selling days done through yesterday. The dark tick on each bar marks where you need to be.`;
+  document.querySelectorAll(".seg button").forEach(b=>b.setAttribute("aria-pressed", b.dataset.p===state.kind));
+  document.getElementById("bdrChips").innerHTML = BDR_RANK.map(r=>`<button data-r="${r.id}" aria-pressed="${r.id===state.rank}">${r.label}</button>`).join("");
+
+  // BDR lanes
+  const metric = BDR_RANK.find(r=>r.id===state.rank);
+  const isPct = metric.fmt==="pct";
+  const goal = metric.goal ? metric.goal*mult : null;
+  const bdrs = BDRS.map(b=>{ const t=statsFor(b.key,"bdr",p); return {...b, t, v:valOf(t,metric.id)}; })
+    .sort((a,b)=>((b.v??-1)-(a.v??-1)) || a.name.localeCompare(b.name));
+  const topV = Math.max(...bdrs.map(b=>b.v||0), 0);
+  let rank=0, prev=null;
+  document.getElementById("lanes").innerHTML = bdrs.map((b,i)=>{
+    if(b.v!==prev){ rank=i+1; prev=b.v; }
+    const lead = rank===1 && (b.v||0)>0;
+    const t = b.t;
+    const shown = isPct ? pctS(b.v) : fmt(b.v||0);
+    const metricKey = {had:"had",books:"books",des:"des",show:"due",first:"fdue"}[metric.id];
+    return `<div class="lane${lead?" lead":""}">
+      <div class="rank">${rank}</div>
+      <div class="who"><div class="name">${esc(b.name)}</div>
+        <div class="sub"><button class="linkish" data-person="${esc(b.key)}" data-role="bdr" data-metric="all" data-title="${esc(b.name)}: all deals">See deals</button></div></div>
+      <div class="track">${isPct ? barHTML((b.v||0)*100, null, pace, 100) : barHTML(b.v||0, goal, pace, topV)}
+        <div class="bar-meta">${isPct ? `<span>${t.had.length} of ${t.due.length} due held · 1st-time ${t.f1.length} of ${t.fdue.length}</span>` : (goal?`<span>Goal ${fmt(goal)}</span>${paceText(b.v||0, goal, pace)}`:"")}</div>
+        <div class="stats"><span>Books <b>${t.books.length}</b></span><span>Due <b>${t.due.length}</b></span><span>Had <b>${t.had.length}</b></span><span>Show <b>${pctS(t.show)}</b></span><span>1st-time <b>${pctS(t.first)}</b></span><span>Designs <b>${t.des.length}</b></span></div>
+      </div>
+      <div class="score">${num(shown, b.key, "bdr", metricKey, `${b.name}: ${metric.label}`)}<small>${metric.label.toLowerCase()}</small></div>
+    </div>`;
+  }).join("");
+
+  // BDR scorecard
+  const rows = [
+    ["Books (new)", t=>t.books.length, "books", 12],
+    ["Runs due", t=>t.due.length, "due", null],
+    ["Runs had", t=>t.had.length, "had", 8],
+    ["Overall show", t=>pctS(t.show), "due", null],
+    ["1st-time show", t=>pctS(t.first), "fdue", null],
+    ["No-shows", t=>t.ns.length, "ns", null],
+    ["Cancelled / DQ'd ahead", t=>t.ca.length, "ca", null],
+    ["Designs held", t=>t.des.length, "des", 4],
+    ["Closed won", t=>t.won.length, "won", null],
+  ];
+  const team = BDRS.map(b=>({...b, t:statsFor(b.key,"bdr",p)}));
+  const inb = statsFor("Inbound","bdr",p);
+  document.getElementById("bdrTable").innerHTML = `<table><thead><tr><th>Metric</th>${team.map(b=>`<th>${esc(b.name.split(" ")[0])}</th>`).join("")}<th>Inbound</th><th>Goal</th></tr></thead><tbody>
+    ${rows.map(([lbl,f,m,g])=>`<tr><td>${lbl}</td>${team.map(b=>`<td>${num(f(b.t), b.key, "bdr", m, `${b.name}: ${lbl}`)}</td>`).join("")}<td>${num(f(inb),"Inbound","bdr",m,`Inbound: ${lbl}`)}</td><td class="goal">${g?fmt(g*mult):"–"}</td></tr>`).join("")}
+  </tbody></table>`;
+
+  // AE board
+  document.getElementById("ae").innerHTML = AES.map(a=>{
+    const t = statsFor(a.key,"ae",p); const g = 10750*mult;
+    const tile = (lbl, v, metric, goalWk, raw) => {
+      const fg = goalWk ? goalWk*mult : null;
+      return `<div class="tile"><div class="t-top"><span class="t-name">${lbl}</span><span class="t-val">${num(v, a.key, "ae", metric, `${a.name}: ${lbl}`)}${fg?` <span>/ ${fmt(fg)}</span>`:""}</span></div>
+        ${fg?barHTML(raw, fg, pace):""}${fg?`<div class="bar-meta">${paceText(raw, fg, pace)}</div>`:""}</div>`;
+    };
+    const tiles = [
+      tile("Discos run (runs had)", t.had.length, "had", 20, t.had.length),
+      tile("Runs due", t.due.length, "due", null, 0),
+      tile("Disco no-shows", t.ns.length, "ns", null, 0),
+      tile("Overall show", pctS(t.show), "due", null, 0),
+      tile("1st-time show", pctS(t.first), "fdue", null, 0),
+      tile("Moved to Diagnosis", t.diag.length, "diag", null, 0),
+      tile("Designs held", t.des.length, "des", 5, t.des.length),
+      tile("Prop updates held", t.prop.length, "prop", 8, t.prop.length),
+      tile("Contracts sent", t.con.length, "con", 4, t.con.length),
+      tile("Closed won (#)", t.won.length, "won", 2, t.won.length),
+    ].join("");
+    return `<div class="ae-card" style="margin-bottom:16px">
+      <div class="ae-hero">
+        <div><div class="who"><div class="name">${esc(a.name)}</div></div>
+          <div class="big">${num(fmt(t.cwd,true), a.key, "ae", "won", `${a.name}: closed won`)}</div>
+          <div class="lbl">Closed won revenue (USD, by close date) against ${fmt(g,true)} goal</div></div>
+        <div class="track" style="width:min(380px,100%)">${barHTML(t.cwd, g, pace)}
+          <div class="bar-meta"><span>${g?Math.round(t.cwd/g*100):0}% of goal</span>${paceText(Math.round(t.cwd), g, pace).replace(/([\d,.]+) (ahead|behind)/, (m,n,w)=>"$"+Math.round(Number(n.replace(/,/g,""))).toLocaleString()+" "+w)}</div></div>
+      </div>
+      <div class="tiles">${tiles}</div>
+    </div>`;
+  }).join("");
+  updateLive();
+  renderReviewBar();
+}
+
+function renderReviewBar(){
+  const me = state.me, el = document.getElementById("reviewBar");
+  if(!me){ el.innerHTML = ""; return; }
+  const parts = [];
+  if(me.rep && REPS.includes(me.rep)){
+    const all = reviewables(me.rep), todo = all.filter(r=>reviewState(r, me.rep)==="todo"), done = all.filter(r=>reviewState(r, me.rep)==="true");
+    parts.push(todo.length
+      ? `<div class="rv todo"><b>${todo.length} new deal${todo.length>1?"s":""} to confirm</b><span class="prog">${done.length} of ${all.length} confirmed since Oct 1</span><button class="btn" data-queue="${esc(me.rep)}">Review now</button></div>`
+      : `<div class="rv"><span class="ok">You're all caught up.</span><span class="prog">${all.length} deal${all.length===1?"":"s"} confirmed since Oct 1</span></div>`);
+  }
+  if(me.approver){
+    const n = state.pend.size;
+    parts.push(`<div class="rv${n?" todo":""}"><b>${n} correction${n===1?"":"s"} waiting for approval</b>${n?`<button class="btn" data-approvals="1">Review</button>`:""}</div>`);
+    parts.push(`<div class="rv"><span class="prog">Rep sign-off since Oct 1:</span>${REPS.map(rep=>{const a=reviewables(rep), d=a.filter(r=>reviewState(r,rep)==="true"); return `<button class="linkish" data-queue="${rep}">${rep} ${d.length}/${a.length}</button>`;}).join("")}</div>`);
+  }
+  el.innerHTML = parts.join("");
+}
+
+function updateLive(){
+  const dot=document.getElementById("liveDot"), txt=document.getElementById("liveText");
+  const r = state.lastRun;
+  if(!r){ dot.classList.remove("on"); txt.textContent = "No refresh has run yet"; return; }
+  const through = new Date(new Date(r.window_end).getTime()-1);
+  dot.classList.add("on");
+  txt.textContent = `Data through ${torDayFmt.format(through)} · refreshed ${nice(r.ran_at)} ET`;
+}
+
+/* ---------- deal list + corrections ---------- */
+function canFix(rec){
+  const me = state.me; if(!me || me.role==="view") return false;
+  return !!me.approver || credited(rec, me.rep);
+}
+function whyShowup(r){
+  const bits = [];
+  bits.push(`First slot ${nice(r.first_slot)}`);
+  if(r.run_at) bits.push(`held ${nice(r.run_at)}`);
+  const due = (r.due_ts||[]).filter(t=>!r.run_at || Math.abs(Date.parse(t)-Date.parse(r.run_at))>3*3600e3);
+  if(due.length && !r.run_at) bits.push(`slot${due.length>1?"s":""} that came due: ${due.map(nice).join(", ")}`);
+  if(r.pushed) bits.push("first slot was moved before it happened");
+  if(r.flags) bits.push(r.flags);
+  if(r.dq) bits.push("deal went to DQ");
+  return bits.join(" · ");
+}
+function dealHTML(r, isEv){
+  const link = `https://app.hubspot.com/contacts/${PORTAL}/record/0-3/${r.deal_id}`;
+  const lbl = isEv ? EV_LABEL[r.kind] : (LABEL[r.cat]||r.cat);
+  const cls = isEv ? "good" : (GOOD.has(r.cat)?"good":(BAD.has(r.cat)?"bad":""));
+  const why = isEv ? `${nice(r.at)}${r.title?" · "+esc(r.title):""}${r.amount?" · $"+Math.round(r.amount).toLocaleString():""} · AE ${esc(r.ae||"–")} · booked by ${esc(r.booker)}`
+                   : `${esc(whyShowup(r))} · booked by ${esc(r.booker)}${r.ae?" · AE "+esc(r.ae):""}`;
+  const what = o => `${o.cat?` to <b>${esc(LABEL[o.cat]||o.cat)}</b> (engine said ${esc(LABEL[r.engineCat]||r.engineCat)})`:""}${o.booker?`, credit to <b>${esc(o.booker)}</b>`:""}${o.exclude?", <b>not counted</b>":""}: “${esc(o.note)}”`;
+  const corr = (r.ov ? `<div class="corr">Corrected by ${esc(r.ov.by_email)}${what(r.ov)}${r.ov.decided_by&&r.ov.decided_by!==r.ov.by_email?` · approved by ${esc(r.ov.decided_by)}`:""}</div>` : "")
+             + (r.pend ? `<div class="pend">Proposed by ${esc(r.pend.by_email)}${what(r.pend)} · <b>waiting for Vianney or Max to approve</b></div>` : "");
+  const me = state.me || {};
+  const acts = [];
+  if(me.rep && credited(r, me.rep) && happened(r)){
+    const st = reviewState(r, me.rep);
+    if(st==="true") acts.push(`<span class="ok">✓ You confirmed this</span>`);
+    else if(st==="todo") acts.push(`<span class="tf"><button class="t" data-true="${esc(r.key)}" data-label="${esc(labelOf(r))}">True</button><button class="f" data-fix="${esc(r.key)}" data-ev="${isEv?1:0}">False</button></span>`);
+  }
+  if(me.approver && r.pend) acts.push(`<span class="tf"><button class="t" data-approve="${esc(r.key)}">Approve</button><button class="f" data-reject="${esc(r.key)}">Reject</button></span>`);
+  if(me.approver) acts.push(`<button class="linkish" data-fix="${esc(r.key)}" data-ev="${isEv?1:0}">${r.ov?"Change correction":"Correct"}</button>`);
+  if((me.approver && r.ov) || (r.pend && r.pend.by_email===me.email)) acts.push(`<button class="linkish" data-undo="${esc(r.key)}">${r.pend&&!me.approver?"Withdraw my correction":"Undo correction"}</button>`);
+  if(!me.approver && me.rep && credited(r, me.rep) && reviewState(r, me.rep)==="true") acts.push(`<button class="linkish" data-fix="${esc(r.key)}" data-ev="${isEv?1:0}">Actually, this is wrong</button>`);
+  const fix = acts.length ? `<div class="fix">${acts.join("")}</div><div class="fixslot" id="fix-${esc(r.key)}"></div>` : "";
+  return `<li class="deal${r.dropped?" dropped":""}"><div class="top"><span class="nm"><a href="${link}" target="_blank" rel="noopener">${esc(r.deal_name)}</a></span><span class="pill ${cls}">${esc(lbl)}${r.dropped?" · not counted":""}</span></div>
+    <div class="why">${why}</div>${corr}${fix}</li>`;
+}
+let lastOpen = null;
+function openList(person, role, metric, title){
+  lastOpen = {person, role, metric, title};
+  const p = periodFor(state.kind, state.offset);
+  const allSu = effShowup().filter(r=>(role==="ae" ? r.ae===person : r.booker===person));
+  const live = allSu.filter(r=>!r.dropped);
+  const s = showupStats(live, p);
+  const ev = effEvents().filter(r=>(role==="ae" ? r.ae===person : r.booker===person) && inP(r.at,p));
+  const dropped = allSu.filter(r=>r.dropped && (inP(r.first_slot,p) || (r.due_ts||[]).some(t=>inP(t,p))));
+  const groups = [];
+  const evOf = k => ev.filter(e=>e.kind===k);
+  if(metric==="books") groups.push(["New books (first slot in period)", s.books]);
+  else if(metric==="had") groups.push(["Runs had", s.had]);
+  else if(metric==="due") groups.push(["Held", s.had], ["Due but not held", s.notHad]);
+  else if(metric==="fdue") groups.push(["Held at first slot", s.f1], ["First slot came due, not held there", s.fdue.filter(r=>!s.f1.includes(r))]);
+  else if(metric==="ns") groups.push(["No-shows", s.ns]);
+  else if(metric==="ca") groups.push(["Cancelled / DQ'd ahead", s.ca]);
+  else if(["des","prop","diag","con","won"].includes(metric)) groups.push([null, evOf({des:"design",prop:"prop",diag:"diag",con:"contract",won:"won"}[metric])]);
+  else {
+    groups.push(["Held", s.had], ["Due but not held", s.notHad], ["Booked, not due yet", s.books.filter(r=>!s.due.includes(r))]);
+    if(ev.length) groups.push(["Pipeline", ev]);
+  }
+  if(dropped.length && ["all","books","due","fdue"].includes(metric)) groups.push(["Not counted (corrected out)", dropped]);
+  showDialog(title, `${p.label}. Click a deal name to open it in HubSpot.`, groups);
+}
+function openQueue(rep){
+  lastOpen = {queue:rep};
+  const all = reviewables(rep);
+  const todo = all.filter(r=>reviewState(r,rep)==="todo"), wait = all.filter(r=>reviewState(r,rep)==="waiting"), done = all.filter(r=>reviewState(r,rep)==="true");
+  const mine = state.me && state.me.rep===rep;
+  showDialog(mine ? "Your deals to confirm" : `${rep}: sign-off`, "Everything credited to "+(mine?"you":rep)+" since Oct 1 that has happened. True = the label is right. False = tell us what really happened (goes to Vianney or Max to approve).",
+    [["To confirm", todo], ["Waiting for approval", wait], ["Confirmed", done]].filter(g=>g[1].length || g[0]==="To confirm"));
+}
+function openApprovals(){
+  lastOpen = {approvals:true};
+  const all = [...effShowup(), ...effEvents()].filter(r=>r.pend);
+  showDialog("Corrections waiting for approval", "Approve to apply the rep's correction to the numbers. Reject to keep the engine's label (the deal goes back to the rep's queue).", [[null, all]]);
+}
+function showDialog(title, sub, groups){
+  document.getElementById("dlgTitle").textContent = title;
+  document.getElementById("dlgSub").textContent = sub;
+  const html = groups.map(([g, list])=>`${g?`<h4 class="grp">${esc(g)} (${list.length})</h4>`:""}<ul class="deal-list">${list.length?list.map(r=>dealHTML(r, !!r.kind)).join(""):`<li class="deal empty">None</li>`}</ul>`).join("");
+  document.getElementById("dlgList").innerHTML = html;
+  const d = document.getElementById("dlg"); if(!d.open) d.showModal();
+}
+function fixForm(key, isEv){
+  const slot = document.getElementById("fix-"+key); if(!slot) return;
+  const rec = (isEv?effEvents():effShowup()).find(r=>r.key===key);
+  const approver = !!(state.me && state.me.approver);
+  const cats = ["first_time_show","moved_show","recovered_show","cst_show","no_show","cancelled_ahead","closed_no_mtg","pending","not_a_booking"];
+  const prev = rec.pend || rec.ov;
+  slot.innerHTML = `<div class="fixbox">
+    ${isEv ? `<label><span><input type="checkbox" id="fx-ex" checked> This should not count</span></label>`
+           : `<label>What actually happened<select id="fx-cat">${cats.map(c=>`<option value="${c}" ${(rec.cat===c)?"selected":""}>${LABEL[c]}</option>`).join("")}</select></label>`}
+    <label>Credit to<select id="fx-bk">${["Inbound","Brandon Cameron","Erich Roeder","Issa Hattar"].map(n=>`<option ${rec.booker===n?"selected":""}>${n}</option>`).join("")}</select></label>
+    <label>Why (required, e.g. "prospect joined late, Fathom missed it")<textarea id="fx-note">${esc(prev?prev.note:"")}</textarea></label>
+    <div class="err" id="fx-err" style="padding:0"></div>
+    <div class="row"><button class="btn ghost" type="button" data-cancel="1">Cancel</button><button class="btn" type="button" id="fx-save">${approver?"Save correction":"Send for approval"}</button></div></div>`;
+  slot.querySelector("[data-cancel]").onclick = ()=>{ slot.innerHTML=""; };
+  slot.querySelector("#fx-save").onclick = async ()=>{
+    const body = {key, note: slot.querySelector("#fx-note").value, label: labelOf(rec)};
+    if(isEv) body.exclude = slot.querySelector("#fx-ex").checked;
+    else { const c = slot.querySelector("#fx-cat").value; if(c!==rec.engineCat) body.cat = c; if(c==="not_a_booking"){ body.exclude = true; } }
+    const bk = slot.querySelector("#fx-bk"); if(bk && bk.value!==rec.engineBooker) body.booker = bk.value;
+    if(!body.cat && !body.booker && !body.exclude){ slot.querySelector("#fx-err").textContent = "That is what it already says. If it is right, use True instead."; return; }
+    const r = await call("/correct", body);
+    if(r.ok){ toast(approver?"Correction saved":"Sent to Vianney / Max for approval"); await refresh(); reopen(); }
+    else slot.querySelector("#fx-err").textContent = r.error || "Could not save";
+  };
+}
+async function act(path, body, msg){
+  const r = await call(path, body);
+  if(r.ok){ toast(msg); await refresh(); reopen(); } else toast(r.error||"Something went wrong");
+}
+const undo = key => act("/correct", {key, clear:true}, "Correction removed");
+function reopen(){
+  if(!lastOpen || !document.getElementById("dlg").open) return;
+  if(lastOpen.queue) openQueue(lastOpen.queue);
+  else if(lastOpen.approvals) openApprovals();
+  else openList(lastOpen.person,lastOpen.role,lastOpen.metric,lastOpen.title);
+}
+
+/* ---------- data ---------- */
+function token(){ try { return localStorage.getItem("jf_token"); } catch(e){ return null; } }
+async function call(path, body){
+  try{
+    const res = await fetch(API+path, body ? {method:"POST", headers:{"Content-Type":"application/json", Authorization:"Bearer "+token()}, body:JSON.stringify(body)}
+                                           : {headers:{Authorization:"Bearer "+token()}, cache:"no-store"});
+    if(res.status===401){ location.replace("index.html"); return {ok:false}; }
+    const j = await res.json().catch(()=>({}));
+    return res.ok ? {ok:true, ...j} : {ok:false, ...j};
+  }catch(e){ return {ok:false, error:"Network error"}; }
+}
+async function refresh(){
+  const r = await call("/state?since=2026-06-01");
+  if(!r.ok){ document.getElementById("liveText").textContent = r.error || "Could not load numbers"; return; }
+  state.me = r.me; state.showup = r.showup||[]; state.events = r.events||[]; state.lastRun = r.lastRun;
+  state.ov = new Map((r.overrides||[]).filter(o=>o.status==="approved").map(o=>[o.key,o]));
+  state.pend = new Map((r.overrides||[]).filter(o=>o.status==="pending").map(o=>[o.key,o]));
+  state.reviews = new Map((r.reviews||[]).map(v=>[v.key+"|"+v.rep, v]));
+  render();
+}
+function toast(msg){ const t=document.getElementById("toast"); t.textContent=msg; t.classList.add("show"); setTimeout(()=>t.classList.remove("show"),2200); }
+
+/* ---------- events ---------- */
+document.querySelectorAll(".seg button").forEach(b=>b.onclick=()=>{state.kind=b.dataset.p; state.offset=0; render();});
+document.getElementById("prev").onclick=()=>{state.offset--; render();};
+document.getElementById("next").onclick=()=>{state.offset++; render();};
+document.getElementById("today").onclick=()=>{state.offset=0; render();};
+document.getElementById("bdrChips").onclick=e=>{const b=e.target.closest("button[data-r]"); if(b){state.rank=b.dataset.r; render();}};
+document.addEventListener("click", e=>{
+  const n = e.target.closest("[data-metric]");
+  if(n){ openList(n.dataset.person, n.dataset.role, n.dataset.metric, n.dataset.title); return; }
+  const f = e.target.closest("[data-fix]"); if(f){ fixForm(f.dataset.fix, f.dataset.ev==="1"); return; }
+  const u = e.target.closest("[data-undo]"); if(u){ undo(u.dataset.undo); return; }
+  const t = e.target.closest("[data-true]"); if(t){ act("/review", {key:t.dataset.true, label:t.dataset.label}, "Confirmed"); return; }
+  const ap = e.target.closest("[data-approve]"); if(ap){ act("/decide", {key:ap.dataset.approve, approve:true}, "Approved, numbers updated"); return; }
+  const rj = e.target.closest("[data-reject]"); if(rj){ act("/decide", {key:rj.dataset.reject, approve:false}, "Rejected, back to the rep"); return; }
+  const q = e.target.closest("[data-queue]"); if(q){ openQueue(q.dataset.queue); return; }
+  const aq = e.target.closest("[data-approvals]"); if(aq){ openApprovals(); return; }
+});
+document.getElementById("closeBtn").onclick=()=>document.getElementById("dlg").close();
+render(); refresh();
+</script>
+</body>
+</html>

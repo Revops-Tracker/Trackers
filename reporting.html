@@ -204,6 +204,39 @@ html.view-reporting .lb-only{display:none!important}
 .tr-custom{display:inline-flex;align-items:center;gap:6px;font-size:14px;color:var(--muted)}
 .tr-custom[hidden]{display:none}
 .tr-sub{font-size:13px;color:var(--muted);margin-bottom:8px}
+/* Connect rate dashboard + Nooks CSV drop zone */
+.cr-drop{border:2px dashed var(--line);border-radius:14px;background:var(--panel);padding:22px 18px;text-align:center;color:var(--muted);cursor:pointer;transition:border-color .15s,background .15s}
+.cr-drop:hover,.cr-drop.over,.cr-drop:focus-visible{border-color:var(--fill);background:color-mix(in srgb,var(--fill) 7%,var(--panel))}
+.cr-drop b{color:var(--ink);font-size:18px}
+.cr-drop .hint{font-size:13px;margin-top:4px}
+.cr-weekpick{display:flex;flex-wrap:wrap;gap:8px 12px;align-items:center;margin:12px 0 4px;color:var(--muted);font-size:14px}
+.cr-weekpick input{border:1px solid var(--line);background:var(--panel);color:var(--ink);border-radius:8px;padding:7px 10px;font:inherit;font-size:14px}
+.cr-weekpick .wk{color:var(--ink);font-weight:600}
+.cr-prev{background:var(--panel);border:1px solid var(--gold);border-radius:14px;padding:16px 18px;margin:14px 0}
+.cr-prev h3{font-family:var(--display);font-size:24px;margin:0 0 4px}
+.cr-prev .sub{color:var(--muted);font-size:14px;margin-bottom:10px}
+.cr-prev .table-wrap{margin-top:8px}
+.cr-prev .row{display:flex;gap:10px;justify-content:flex-end;margin-top:12px;flex-wrap:wrap}
+.cr-warn{background:color-mix(in srgb,var(--gold) 16%,transparent);border-radius:8px;padding:8px 12px;font-size:14px;margin:10px 0}
+.cr-bad{background:color-mix(in srgb,var(--behind) 14%,transparent);border-radius:8px;padding:8px 12px;font-size:14px;margin:10px 0;color:var(--behind)}
+.cr-tiles{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:12px;margin:18px 0 6px}
+.cr-tile{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:12px 14px}
+.cr-tile .k{font-size:13px;color:var(--muted)}
+.cr-tile .v{font-family:var(--display);font-weight:700;font-size:32px;line-height:1.1;font-variant-numeric:tabular-nums}
+.cr-tile .s{font-size:12px;color:var(--muted)}
+.cr-tbl{min-width:640px}
+.cr-tbl tr.team td{font-weight:700;border-top:2px solid var(--line)}
+.cr-tbl tr.bdr td{font-weight:600;background:var(--paper)}
+.cr-tbl tr.tier td:first-child{padding-left:30px}
+.cr-tbl tr.list td{color:var(--muted)}
+.cr-tbl tr.list td:first-child{padding-left:52px}
+.cr-tbl tr.pick{cursor:pointer}
+.cr-tbl tr.pick:hover td{background:var(--chip)}
+.cr-tgl{border:0;background:transparent;cursor:pointer;color:inherit;font:inherit;font-weight:inherit;text-align:left;padding:0;display:inline-flex;gap:8px;align-items:center}
+.cr-tgl i{font-style:normal;display:inline-block;width:12px;color:var(--muted);transition:transform .15s}
+.cr-tgl[aria-expanded="true"] i{transform:rotate(90deg)}
+.cr-none{color:var(--muted);font-weight:400}
+.cr-root details{margin-top:14px}
 </style>
 <div class="wrap">
   <header class="top">
@@ -257,6 +290,39 @@ html.view-reporting .lb-only{display:none!important}
       <div class="table-wrap" id="aeTable"></div>
       <div class="legend"><b>Discos run</b>: discovery calls held. <b>Designs held</b>: deals moved from Design to a later stage. <b>Closed won revenue</b>: monthly retainer (USD) by close date. Goals are weekly × the number of weeks in the period.</div>
     </div>
+  </section>
+
+  <section class="cr-root" id="crSec" aria-labelledby="crTitle">
+    <div class="sec-head">
+      <h2 id="crTitle">Connect rate</h2>
+      <div class="nav">
+        <button type="button" id="crPrev" aria-label="Previous week">‹</button>
+        <div class="period" id="crWeekLabel" aria-live="polite"></div>
+        <button type="button" id="crNext" aria-label="Next week">›</button>
+        <button class="btn ghost" type="button" id="crLatest" style="margin-left:6px">Latest</button>
+      </div>
+    </div>
+
+    <div class="cr-drop" id="crDrop" tabindex="0" role="button" aria-describedby="crDropHint">
+      <b>Drop the Nooks CSV here</b> or click to choose the file
+      <div class="hint" id="crDropHint">Use the Sequence performance export from Nooks. It replaces the connect rate for the week you pick below. You get a preview first.</div>
+      <input type="file" id="crFile" accept=".csv,text/csv" hidden>
+    </div>
+    <div class="cr-weekpick">
+      <label for="crSunday">The file is for the week starting (Sunday)</label>
+      <input type="date" id="crSunday">
+      <span class="wk" id="crWeekLbl"></span>
+    </div>
+    <div id="crPreview"></div>
+
+    <div class="cr-tiles" id="crTiles"></div>
+    <div class="table-wrap"><table class="cr-tbl" id="crTable"></table></div>
+    <div class="legend" id="crLegend"></div>
+    <details>
+      <summary>Recent weeks</summary>
+      <div class="table-wrap" id="crTrend"></div>
+    </details>
+    <div class="legend" id="crFoot"></div>
   </section>
 
   <section class="tr-root">
@@ -1045,6 +1111,294 @@ document.getElementById("dlgX").onclick=()=>document.getElementById("dlg").close
 // clicking the dark area outside the box also closes it
 document.getElementById("dlg").addEventListener("click", e=>{ if(e.target.id==="dlg") e.target.close(); });
 render(); refresh();
+</script>
+<script>
+/* ---------- Connect rate dashboard + Nooks CSV drop (admins) ---------- */
+(function(){
+"use strict";
+const API = ((window.JF_CONFIG||{}).API_BASE||"").replace(/\/jf-sso$/, "/bdr-report");
+const $ = id => document.getElementById(id);
+const h = s => String(s??"").replace(/[&<>"']/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const MON = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+const ORDER = ["Brandon","Issa","Erich","Jules"];
+const TIERS = ["Tier 1","Tier 2","Tier 3","None"];
+const S = { data:null, week:null, open:{}, parsed:null, file:"", saving:false };
+
+const token = () => { try{ return localStorage.getItem("jf_token"); }catch(e){ return null; } };
+async function call(path, opts){
+  opts = opts || {};
+  opts.headers = Object.assign({ Authorization: "Bearer " + token() }, opts.headers || {});
+  const r = await fetch(API + path, opts);
+  const j = await r.json().catch(()=>({}));
+  if(!r.ok || j.ok === false) throw new Error(j.error || ("Request failed (" + r.status + ")"));
+  return j;
+}
+const say = m => { if(typeof toast === "function") toast(m); };
+
+/* dates are plain YYYY-MM-DD strings handled in UTC so time zones never shift a week */
+const d2s = d => d.getUTCFullYear()+"-"+String(d.getUTCMonth()+1).padStart(2,"0")+"-"+String(d.getUTCDate()).padStart(2,"0");
+const s2d = s => { const p = s.split("-"); return new Date(Date.UTC(+p[0], +p[1]-1, +p[2])); };
+const add = (s,n) => { const d = s2d(s); d.setUTCDate(d.getUTCDate()+n); return d2s(d); };
+const lbl = s => { const d = s2d(s); return MON[d.getUTCMonth()] + " " + d.getUTCDate(); };
+const weekLabel = end => "Mon " + lbl(add(end,-5)) + " – Sat " + lbl(end);
+const sundayOnOrBefore = s => add(s, -s2d(s).getUTCDay());
+const todayStr = () => { const n = new Date(); return d2s(new Date(Date.UTC(n.getFullYear(), n.getMonth(), n.getDate()))); };
+const num = x => Number(x||0).toLocaleString("en-US");
+const pct = (a,b) => b ? (100*a/b).toFixed(1)+"%" : "–";
+const target = () => parseFloat((S.data && S.data.config && S.data.config.connect_rate_target) || "0.03");
+const rateCell = (c,d) => d ? '<span class="'+((c/d)>=target()?"ahead":"behind")+'">'+pct(c,d)+'</span>' : "–";
+
+/* ---------- week data ---------- */
+function weekList(){
+  const set = new Set(); (S.data.connectRate||[]).forEach(r=>set.add(r.week_ending));
+  return Array.from(set).sort().reverse();
+}
+function buildWeek(w){
+  const D = S.data, by = {};
+  const mk = bdr => by[bdr] || (by[bdr] = { bdr, tiers:{}, d:0, c:0, v:0, books:0, inb:0, leads:0 });
+  const tier = (b,t) => b.tiers[t] || (b.tiers[t] = { tier:t, d:0, c:0, v:0, books:0, lists:{} });
+  (D.connectRate||[]).filter(r=>r.week_ending===w).forEach(r=>{
+    const b = mk(r.bdr), t = tier(b, r.tier);
+    t.d += r.dials; t.c += r.connects; t.v += r.meaningful_dispositions;
+    b.d += r.dials; b.c += r.connects; b.v += r.meaningful_dispositions;
+  });
+  (D.byList||[]).filter(r=>r.week_ending===w).forEach(r=>{
+    const t = tier(mk(r.bdr), r.tier);
+    const l = t.lists[r.list_name] || (t.lists[r.list_name] = { name:r.list_name, d:0, c:0, v:0, books:0 });
+    l.d += r.dials; l.c += r.connects; l.v += r.meaningful_dispositions;
+  });
+  (D.discos||[]).filter(r=>r.week_ending===w).forEach(r=>{ if(r.discos_booked || by[r.bdr]) mk(r.bdr).books = r.discos_booked; });
+  (D.books||[]).filter(r=>r.week_ending===w).forEach(r=>{
+    const t = tier(mk(r.bdr), r.tier);
+    t.books += r.outbound_books;
+    const l = t.lists[r.list_name] || (t.lists[r.list_name] = { name:r.list_name, d:0, c:0, v:0, books:0 });
+    l.books += r.outbound_books;
+  });
+  (D.inbound||[]).filter(r=>r.week_ending===w).forEach(r=>{ if(r.inbound_books || by[r.bdr]) mk(r.bdr).inb = r.inbound_books; });
+  (D.leads||[]).filter(r=>r.week_ending===w).forEach(r=>{ if(r.leads_delivered || by[r.bdr]) mk(r.bdr).leads = r.leads_delivered; });
+  const list = Object.values(by).sort((a,b)=>{
+    const ia = ORDER.indexOf(a.bdr), ib = ORDER.indexOf(b.bdr);
+    return (ia<0?99:ia) - (ib<0?99:ib) || a.bdr.localeCompare(b.bdr);
+  });
+  const team = list.reduce((a,b)=>({ d:a.d+b.d, c:a.c+b.c, v:a.v+b.v, books:a.books+b.books, inb:a.inb+b.inb, leads:a.leads+b.leads }), { d:0, c:0, v:0, books:0, inb:0, leads:0 });
+  return { bdrs:list, team };
+}
+
+/* ---------- dashboard ---------- */
+function render(){
+  const D = S.data;
+  if(!D){ return; }
+  const weeks = weekList();
+  if(!S.week || weeks.indexOf(S.week) < 0) S.week = weeks[0] || null;
+  const i = weeks.indexOf(S.week);
+  $("crPrev").disabled = i < 0 || i >= weeks.length-1;
+  $("crNext").disabled = i <= 0;
+  $("crLatest").disabled = i <= 0;
+  if(!S.week){
+    $("crWeekLabel").textContent = "No data yet";
+    $("crTiles").innerHTML = ""; $("crTable").innerHTML = '<tbody><tr><td class="empty">Drop a Nooks CSV above to add the first week.</td></tr></tbody>';
+    $("crTrend").innerHTML = ""; return;
+  }
+  $("crWeekLabel").textContent = weekLabel(S.week);
+  const W = buildWeek(S.week);
+  const T = W.team;
+  $("crTiles").innerHTML =
+    tile("Team connect rate", T.d ? '<span class="'+((T.c/T.d)>=target()?"ahead":"behind")+'">'+pct(T.c,T.d)+'</span>' : "–", "target "+(target()*100).toFixed(1)+"%") +
+    tile("Dials", num(T.d), "") + tile("Connects", num(T.c), "") + tile("Conversations", num(T.v), "") +
+    tile("Outbound books", num(T.books), "") + tile("Inbound books", num(T.inb), "") + tile("Leads delivered", num(T.leads), "");
+
+  let rows = '<thead><tr><th></th><th>Dials</th><th>Connects</th><th>Connect rate</th><th>Conversations</th><th>Outbound books</th></tr></thead><tbody>';
+  rows += '<tr class="team"><td>Team</td><td>'+num(T.d)+'</td><td>'+num(T.c)+'</td><td>'+rateCell(T.c,T.d)+'</td><td>'+num(T.v)+'</td><td>'+num(T.books)+'</td></tr>';
+  W.bdrs.forEach(b=>{
+    const kb = "b:"+b.bdr, ob = !!S.open[kb];
+    rows += '<tr class="bdr"><td><button type="button" class="cr-tgl" data-k="'+h(kb)+'" aria-expanded="'+ob+'"><i>▸</i>'+h(b.bdr)+'</button></td><td>'+num(b.d)+'</td><td>'+num(b.c)+'</td><td>'+rateCell(b.c,b.d)+'</td><td>'+num(b.v)+'</td><td>'+num(b.books)+'</td></tr>';
+    if(!ob) return;
+    TIERS.forEach(tn=>{
+      const t = b.tiers[tn]; if(!t) return;
+      const kt = "t:"+b.bdr+":"+tn, ot = !!S.open[kt];
+      const name = tn === "None" ? '<span class="cr-none">Books not tied to a tier list</span>' : h(tn);
+      rows += '<tr class="tier"><td><button type="button" class="cr-tgl" data-k="'+h(kt)+'" aria-expanded="'+ot+'"><i>▸</i>'+name+'</button></td><td>'+(tn==="None"?"":num(t.d))+'</td><td>'+(tn==="None"?"":num(t.c))+'</td><td>'+(tn==="None"?"":rateCell(t.c,t.d))+'</td><td>'+(tn==="None"?"":num(t.v))+'</td><td>'+num(t.books)+'</td></tr>';
+      if(!ot) return;
+      Object.values(t.lists).sort((x,y)=>y.d-x.d || y.books-x.books || x.name.localeCompare(y.name)).forEach(l=>{
+        rows += '<tr class="list"><td>'+h(l.name)+'</td><td>'+num(l.d)+'</td><td>'+num(l.c)+'</td><td>'+rateCell(l.c,l.d)+'</td><td>'+num(l.v)+'</td><td>'+num(l.books)+'</td></tr>';
+      });
+    });
+  });
+  rows += '</tbody>';
+  $("crTable").innerHTML = rows;
+
+  $("crLegend").innerHTML = '<b>Connect rate</b> = connects ÷ dials, green at or above the '+(target()*100).toFixed(1)+'% target. Click a BDR to see tiers, then a tier to see its lists. <b>Conversations</b> are the Nooks "meaningful" dispositions. Weeks run Monday to Saturday. Outbound books count a Discovery Booked call, or a Meeting Rebook 30+ days after the last Discovery Booked, in the week of the call.';
+  renderTrend(weeks);
+  const up = (D.uploads||[])[0];
+  const synced = D.booksSyncedAt ? new Date(D.booksSyncedAt).toLocaleString("en-US",{month:"short",day:"numeric",hour:"numeric",minute:"2-digit"}) : null;
+  $("crFoot").innerHTML = (up ? 'Last Nooks upload: week ending '+h(up.week_ending)+', by '+h(up.uploaded_by)+' on '+h(new Date(up.uploaded_at).toLocaleDateString("en-US",{month:"short",day:"numeric"}))+'. ' : '') +
+    'Books, inbound books and leads delivered come from the Weekly BDR Report sheet'+(synced ? ' (last synced '+h(synced)+')' : '')+'.';
+}
+const tile = (k,v,s) => '<div class="cr-tile"><div class="k">'+h(k)+'</div><div class="v">'+v+'</div>'+(s?'<div class="s">'+h(s)+'</div>':'')+'</div>';
+
+function renderTrend(weeks){
+  const D = S.data, names = [];
+  (D.connectRate||[]).forEach(r=>{ if(names.indexOf(r.bdr)<0) names.push(r.bdr); });
+  names.sort((a,b)=>{ const ia=ORDER.indexOf(a), ib=ORDER.indexOf(b); return (ia<0?99:ia)-(ib<0?99:ib); });
+  let t = '<table><thead><tr><th>Week</th><th>Team rate</th><th>Dials</th><th>Connects</th>'+names.map(n=>'<th>'+h(n)+'</th>').join("")+'</tr></thead><tbody>';
+  weeks.slice(0,10).forEach(w=>{
+    const rs = (D.connectRate||[]).filter(r=>r.week_ending===w);
+    const td = rs.reduce((a,r)=>a+r.dials,0), tc = rs.reduce((a,r)=>a+r.connects,0);
+    t += '<tr class="pick" data-w="'+h(w)+'"'+(w===S.week?' style="background:var(--chip)"':'')+'><td>'+h(weekLabel(w))+'</td><td>'+rateCell(tc,td)+'</td><td>'+num(td)+'</td><td>'+num(tc)+'</td>'+
+      names.map(n=>{ const x = rs.filter(r=>r.bdr===n); const d = x.reduce((a,r)=>a+r.dials,0), c = x.reduce((a,r)=>a+r.connects,0); return '<td>'+(d?rateCell(c,d):"–")+'</td>'; }).join("")+'</tr>';
+  });
+  $("crTrend").innerHTML = t + '</tbody></table>';
+}
+
+/* ---------- Nooks CSV: parse, map to tiers, preview, save ---------- */
+function parseCSV(text){
+  text = text.replace(/^﻿/, "");
+  const rows = []; let row = [], f = "", q = false;
+  for(let i=0; i<text.length; i++){
+    const c = text[i];
+    if(q){ if(c === '"'){ if(text[i+1] === '"'){ f += '"'; i++; } else q = false; } else f += c; }
+    else if(c === '"') q = true;
+    else if(c === ","){ row.push(f); f = ""; }
+    else if(c === "\n" || c === "\r"){ if(c === "\r" && text[i+1] === "\n") i++; row.push(f); f = ""; if(row.length > 1 || row[0] !== "") rows.push(row); row = []; }
+    else f += c;
+  }
+  if(f !== "" || row.length){ row.push(f); rows.push(row); }
+  return rows;
+}
+function canonList(raw){
+  let s = String(raw).replace(/\s+/g, " ").trim();
+  if(/do not use|direct dial|\(cloned\)/i.test(s)) return null;      // never counted
+  s = s.replace(/\s*-\s*temporary$/i, "").replace(/^7\s*day\b/i, "7 Day");
+  const low = s.toLowerCase();
+  return (S.data.tierLists||[]).find(t=>t.list_name.toLowerCase() === low) || null;
+}
+function mapCsv(rows){
+  const head = rows[0].map(x=>String(x).trim().toLowerCase());
+  const ix = n => head.indexOf(n);
+  const iN = ix("sequence name"), iD = ix("dials"), iC = ix("connects"), iV = ix("conversations");
+  if(iN < 0 || iD < 0 || iC < 0 || iV < 0) throw new Error("This does not look like the Nooks Sequence performance export (it needs Sequence Name, Dials, Connects and Conversations columns).");
+  const roster = {}; (S.data.bdrs||[]).forEach(b=>{ roster[b.bdr.toLowerCase()] = b.bdr; });
+  const agg = {}, skipped = [];
+  let srcDials = 0, usedDials = 0, lines = 0;
+  rows.slice(1).forEach(r=>{
+    const name = String(r[iN]||"").trim(); if(!name) return;
+    const dials = parseInt(r[iD],10)||0, conn = parseInt(r[iC],10)||0, conv = parseInt(r[iV],10)||0;
+    lines++; srcDials += dials;
+    const first = name.split(/\s+/)[0], rest = name.slice(first.length).trim();
+    const bdr = roster[first.toLowerCase()];
+    if(!bdr){ skipped.push({ name, dials, why:"not on the BDR roster" }); return; }
+    const hit = canonList(rest);
+    if(!hit){ skipped.push({ name, dials, why:"list is not in the tier scheme" }); return; }
+    const k = bdr+"|"+hit.tier+"|"+hit.list_name;
+    const a = agg[k] || (agg[k] = { bdr, tier:hit.tier, list:hit.list_name, dials:0, connects:0, conversations:0, from:[] });
+    a.dials += dials; a.connects += conn; a.conversations += conv; a.from.push(name);
+    usedDials += dials;
+  });
+  const out = Object.values(agg);
+  if(!out.length) throw new Error("No rows matched a BDR and a tier list, so nothing would be saved. Check that this is the right file.");
+  return { rows:out, skipped, srcDials, usedDials, lines };
+}
+function sundayValue(){
+  const v = $("crSunday").value; if(!v) return null;
+  return sundayOnOrBefore(v);
+}
+function updateWeekLbl(){
+  const sun = sundayValue();
+  const raw = $("crSunday").value;
+  $("crWeekLbl").textContent = sun ? ("Sun " + lbl(sun) + " to Sat " + lbl(add(sun,6)) + (raw && raw !== sun ? "  (moved back to that Sunday)" : "")) : "";
+}
+function renderPreview(){
+  const box = $("crPreview");
+  if(!S.parsed){ box.innerHTML = ""; return; }
+  const sun = sundayValue();
+  if(!sun){ box.innerHTML = '<div class="cr-warn">Pick the week this file is for.</div>'; return; }
+  const end = add(sun, 6), P = S.parsed;
+  const cur = (S.data.connectRate||[]).filter(r=>r.week_ending===end);
+  const curBy = {}; cur.forEach(r=>{ const b = curBy[r.bdr] || (curBy[r.bdr] = { d:0, c:0 }); b.d += r.dials; b.c += r.connects; });
+  const newBy = {}; P.rows.forEach(r=>{ const b = newBy[r.bdr] || (newBy[r.bdr] = { d:0, c:0, v:0 }); b.d += r.dials; b.c += r.connects; b.v += r.conversations; });
+  const names = Array.from(new Set(Object.keys(newBy).concat(Object.keys(curBy)))).sort((a,b)=>{ const ia=ORDER.indexOf(a), ib=ORDER.indexOf(b); return (ia<0?99:ia)-(ib<0?99:ib); });
+  const nd = P.rows.reduce((a,r)=>a+r.dials,0), nc = P.rows.reduce((a,r)=>a+r.connects,0);
+  const cd = cur.reduce((a,r)=>a+r.dials,0), cc = cur.reduce((a,r)=>a+r.connects,0);
+  let tb = '<table><thead><tr><th>BDR</th><th>New dials</th><th>New connects</th><th>New rate</th><th>Saved dials</th><th>Saved rate</th></tr></thead><tbody>';
+  names.forEach(n=>{
+    const a = newBy[n], c = curBy[n];
+    tb += '<tr><td>'+h(n)+'</td><td>'+(a?num(a.d):"–")+'</td><td>'+(a?num(a.c):"–")+'</td><td>'+(a?rateCell(a.c,a.d):"–")+'</td><td>'+(c?num(c.d):"–")+'</td><td>'+(c?rateCell(c.c,c.d):"–")+'</td></tr>';
+  });
+  tb += '<tr class="team"><td>Team</td><td>'+num(nd)+'</td><td>'+num(nc)+'</td><td>'+rateCell(nc,nd)+'</td><td>'+(cd?num(cd):"–")+'</td><td>'+(cd?rateCell(cc,cd):"–")+'</td></tr></tbody></table>';
+  let warn = "";
+  if(cd && nd < cd) warn += '<div class="cr-warn"><b>Heads up:</b> this file has fewer dials ('+num(nd)+') than what is already saved for this week ('+num(cd)+'). It may be an older export or the wrong week. Check the dates before you save.</div>';
+  else if(cd) warn += '<div class="cr-warn">This week already has data. Saving replaces it with this file.</div>';
+  const skipDials = P.skipped.reduce((a,r)=>a+r.dials,0);
+  const skip = P.skipped.length ? '<details><summary>'+P.skipped.length+' rows left out ('+num(skipDials)+' dials): not on the roster or not in the tier scheme</summary><div class="table-wrap"><table><thead><tr><th>Sequence</th><th>Dials</th><th>Why</th></tr></thead><tbody>'+
+    P.skipped.slice().sort((a,b)=>b.dials-a.dials).map(r=>'<tr><td>'+h(r.name)+'</td><td>'+num(r.dials)+'</td><td>'+h(r.why)+'</td></tr>').join("")+'</tbody></table></div></details>' : "";
+  box.innerHTML = '<div class="cr-prev"><h3>Ready to save week ending Sat '+h(lbl(end))+'</h3>'+
+    '<div class="sub">'+h(S.file)+' · '+P.rows.length+' lists across '+Object.keys(newBy).length+' BDRs · '+num(P.usedDials)+' of '+num(P.srcDials)+' dials counted</div>'+
+    warn + '<div class="table-wrap">'+tb+'</div>'+skip+
+    '<div class="row"><button class="btn ghost" type="button" id="crCancel">Cancel</button><button class="btn" type="button" id="crSave"'+(S.saving?" disabled":"")+'>'+(cd ? "Replace this week" : "Save this week")+'</button></div></div>';
+  $("crCancel").onclick = () => { S.parsed = null; S.file = ""; $("crFile").value = ""; renderPreview(); };
+  $("crSave").onclick = save;
+}
+async function save(){
+  const sun = sundayValue(); if(!sun || !S.parsed || S.saving) return;
+  const end = add(sun, 6);
+  S.saving = true; renderPreview();
+  try{
+    const P = S.parsed;
+    const r = await call("/nooks", { method:"POST", headers:{ "Content-Type":"application/json" }, body: JSON.stringify({
+      weekEnding: end, filename: S.file, sourceRows: P.lines,
+      rows: P.rows.map(x=>({ bdr:x.bdr, tier:x.tier, list:x.list, dials:x.dials, connects:x.connects, conversations:x.conversations })),
+      excluded: P.skipped.map(x=>({ name:x.name, dials:x.dials, why:x.why }))
+    }) });
+    S.parsed = null; S.file = ""; $("crFile").value = "";
+    await load(); S.week = end; render(); renderPreview();
+    say("Connect rate updated for week ending "+lbl(end)+" ("+num(r.dials)+" dials)");
+    $("crSec").scrollIntoView({ behavior:"smooth", block:"start" });
+  }catch(e){
+    $("crPreview").insertAdjacentHTML("afterbegin", '<div class="cr-bad">Could not save: '+h(e.message)+'</div>');
+  }finally{ S.saving = false; if(S.parsed) renderPreview(); }
+}
+function onFile(f){
+  if(!f) return;
+  if(!/\.csv$/i.test(f.name) && !/csv/i.test(f.type)){ say("Choose the CSV file from Nooks"); return; }
+  if(f.size > 2_000_000){ say("That file is too big to be the Nooks export"); return; }
+  if(!S.data){ say("Still loading, try again in a second"); return; }
+  const rd = new FileReader();
+  rd.onload = () => {
+    try{ S.parsed = mapCsv(parseCSV(String(rd.result))); S.file = f.name; renderPreview(); $("crPreview").scrollIntoView({ behavior:"smooth", block:"nearest" }); }
+    catch(e){ S.parsed = null; $("crPreview").innerHTML = '<div class="cr-bad">'+h(e.message)+'</div>'; }
+  };
+  rd.readAsText(f);
+}
+
+async function load(){
+  const j = await call("/state");
+  S.data = j;
+}
+function wire(){
+  const drop = $("crDrop"), file = $("crFile");
+  drop.onclick = () => file.click();
+  drop.onkeydown = e => { if(e.key === "Enter" || e.key === " "){ e.preventDefault(); file.click(); } };
+  file.onchange = () => onFile(file.files[0]);
+  ["dragenter","dragover"].forEach(ev=>drop.addEventListener(ev, e=>{ e.preventDefault(); drop.classList.add("over"); }));
+  ["dragleave","drop"].forEach(ev=>drop.addEventListener(ev, e=>{ e.preventDefault(); drop.classList.remove("over"); }));
+  drop.addEventListener("drop", e=>{ const f = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0]; onFile(f); });
+  $("crSunday").onchange = () => { updateWeekLbl(); renderPreview(); };
+  $("crSunday").value = sundayOnOrBefore(todayStr()); updateWeekLbl();
+  $("crPrev").onclick = () => { const w = weekList(), i = w.indexOf(S.week); if(i >= 0 && i < w.length-1){ S.week = w[i+1]; render(); } };
+  $("crNext").onclick = () => { const w = weekList(), i = w.indexOf(S.week); if(i > 0){ S.week = w[i-1]; render(); } };
+  $("crLatest").onclick = () => { S.week = weekList()[0] || null; render(); };
+  $("crTable").addEventListener("click", e=>{ const b = e.target.closest("[data-k]"); if(!b) return; const k = b.getAttribute("data-k"); S.open[k] = !S.open[k]; render(); });
+  $("crTrend").addEventListener("click", e=>{ const r = e.target.closest("tr[data-w]"); if(!r) return; S.week = r.getAttribute("data-w"); render(); });
+  // the page also lets people drop a file anywhere on this section
+  const sec = $("crSec");
+  sec.addEventListener("dragover", e=>{ e.preventDefault(); });
+  sec.addEventListener("drop", e=>{ if(e.target.closest("#crDrop")) return; e.preventDefault(); const f = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0]; onFile(f); });
+}
+wire();
+load().then(()=>{ render(); }).catch(e=>{
+  $("crTable").innerHTML = '<tbody><tr><td class="empty">Could not load the connect rate data: '+h(e.message)+'</td></tr></tbody>';
+});
+})();
 </script>
 </body>
 </html>

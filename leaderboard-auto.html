@@ -171,6 +171,27 @@ button.linkish{border:0;background:transparent;padding:0;color:var(--fill);font-
 .nav button:disabled{opacity:.35;cursor:not-allowed}
 .nav button.btn{width:auto;padding:0 14px;font-size:15px;white-space:nowrap}
 .deal .pend{background:color-mix(in srgb,var(--fill) 12%,transparent);border-radius:8px;padding:6px 9px;font-size:13px;margin-top:6px}
+.tr-root{--s1:#2a78d6;--s2:#eb6834;--s3:#1baf7a;--s4:#eda100;--s5:#e87ba4;--s6:#008300}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]) .tr-root{--s1:#3987e5;--s2:#d95926;--s3:#199e70;--s4:#c98500;--s5:#d55181;--s6:#008300}}
+:root[data-theme="dark"] .tr-root{--s1:#3987e5;--s2:#d95926;--s3:#199e70;--s4:#c98500;--s5:#d55181;--s6:#008300}
+.tr-bar{display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:space-between;margin:0 0 12px}
+.tr-card{position:relative;background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:14px 16px 8px}
+.tr-legend{display:flex;flex-wrap:wrap;gap:14px;font-size:13px;color:var(--muted);margin-bottom:6px}
+.tr-legend span{display:inline-flex;align-items:center;gap:6px}
+.tr-legend i{width:10px;height:10px;border-radius:3px;display:inline-block}
+.tr-plot svg{display:block;width:100%;height:auto;overflow:visible}
+.tr-plot text{font-family:var(--body);fill:var(--muted);font-size:12px}
+.tr-plot .tot{fill:var(--ink);font-weight:600}
+.tr-plot .grid{stroke:var(--line);stroke-width:1}
+.tr-plot .seg-r{cursor:pointer}
+.tr-plot .col:hover .hit{fill:var(--chip)}
+.tr-tip{position:absolute;pointer-events:none;background:var(--panel);border:1px solid var(--line);border-radius:10px;box-shadow:0 8px 24px rgba(10,20,40,.18);padding:8px 10px;font-size:13px;min-width:150px;display:none;z-index:2}
+.tr-tip .h{font-weight:600;margin-bottom:4px}
+.tr-tip .r{display:flex;justify-content:space-between;gap:14px}
+.tr-tip .r span{display:inline-flex;align-items:center;gap:6px;color:var(--muted)}
+.tr-tip .r i{width:8px;height:8px;border-radius:2px;display:inline-block}
+.tr-tip .t{border-top:1px solid var(--line);margin-top:4px;padding-top:4px;font-weight:600}
+#trTableWrap{margin-top:12px}
 </style>
 <div class="wrap">
   <header class="top">
@@ -209,6 +230,27 @@ button.linkish{border:0;background:transparent;padding:0;color:var(--fill);font-
     <div class="legend"><b>Books</b>: new bookings whose first slot falls in the period. <b>Runs due</b>: discovery calls whose slot arrived in the period. <b>Runs had</b>: due calls that were held. <b>Overall show</b> = runs had ÷ runs due. <b>1st-time show</b> = new books held at their first slot ÷ new books whose first slot came due. <b>MRR generated</b>: monthly retainer (USD) of deals closed won in the period, credited to the rep who booked them. <b>Designs</b> (designs created): deals moved into the Design/Prop Review stage in HubSpot. <b>Designs held</b>: deals moved from Design on to a later stage (Prop Update or beyond).</div>
   </section>
 
+  <section class="tr-root">
+    <div class="sec-head">
+      <h2>Team trends since Jul 1</h2>
+      <div class="chips" id="trMetric" role="group" aria-label="Trend metric"></div>
+    </div>
+    <div class="tr-bar">
+      <div class="seg" id="trScale" role="group" aria-label="Group by">
+        <button data-s="week" aria-pressed="true">Weekly</button>
+        <button data-s="month" aria-pressed="false">Monthly</button>
+      </div>
+      <button class="btn ghost" type="button" id="trTableBtn">Show table</button>
+    </div>
+    <div class="tr-card">
+      <div class="tr-legend" id="trLegend"></div>
+      <div class="tr-plot" id="trend"></div>
+      <div class="tr-tip" id="trTip"></div>
+    </div>
+    <div class="table-wrap" id="trTableWrap" hidden></div>
+    <div class="legend">Each bar is split by source: who booked the deal (Inbound = no BDR). The number on top is the total. Closes and MRR are by close date. Click a coloured block to see the deals. The last bar is the period so far.</div>
+  </section>
+
   <section>
     <div class="sec-head"><h2>AEs</h2></div>
     <div id="ae"></div>
@@ -241,10 +283,11 @@ const AES = [{key:"Dipen Mistry", name:"Dipen Mistry"}];
 const DATA_FROM = "2026-07-01";   // history is backfilled from the start of Q3
 const NOT_A_BDR = new Set(["Inbound","CloseBot AI"]);
 // Reps who have left (e.g. Jules, Hannah, Armin in Q3) are not shown by name: their numbers roll up into one "Former reps" bucket.
-const FORMER = "Former reps";
+const FORMER = "Former reps", OTHER = "Other";
 const CUR_BDR = new Set(BDRS.map(b=>b.key)), CUR_AE = new Set(AES.map(a=>a.key));
 function whoMatches(r, person, role){
   const v = role==="ae" ? r.ae : r.booker;
+  if(person===OTHER) return role==="bdr" && !!v && (NOT_A_BDR.has(v) && v!=="Inbound" || CUR_AE.has(v));
   if(person!==FORMER) return v===person;
   if(!v) return false;
   return role==="ae" ? !CUR_AE.has(v) : !CUR_BDR.has(v) && !CUR_AE.has(v) && !NOT_A_BDR.has(v);
@@ -504,6 +547,7 @@ function render(){
   updateLive();
   renderReviewBar();
   document.getElementById("refreshBtn").hidden = !(state.me && state.me.approver);
+  renderTrends();
 }
 
 function renderReviewBar(){
@@ -574,9 +618,9 @@ function dealHTML(r, isEv){
     <div class="why">${why}</div>${corr}${fix}</li>`;
 }
 let lastOpen = null;
-function openList(person, role, metric, title){
-  lastOpen = {person, role, metric, title};
-  const p = periodFor(state.kind, state.offset);
+function openList(person, role, metric, title, pOverride){
+  lastOpen = {person, role, metric, title, pOverride};
+  const p = pOverride || periodFor(state.kind, state.offset);
   const allSu = effShowup().filter(r=>whoMatches(r, person, role));
   const live = allSu.filter(r=>!r.dropped);
   const s = showupStats(live, p);
@@ -652,7 +696,7 @@ function reopen(){
   if(!lastOpen || !document.getElementById("dlg").open) return;
   if(lastOpen.queue) openQueue(lastOpen.queue);
   else if(lastOpen.approvals) openApprovals();
-  else openList(lastOpen.person,lastOpen.role,lastOpen.metric,lastOpen.title);
+  else openList(lastOpen.person,lastOpen.role,lastOpen.metric,lastOpen.title,lastOpen.pOverride);
 }
 
 /* ---------- data ---------- */
@@ -694,6 +738,118 @@ document.addEventListener("click", e=>{
   const q = e.target.closest("[data-queue]"); if(q){ openQueue(q.dataset.queue); return; }
   const aq = e.target.closest("[data-approvals]"); if(aq){ openApprovals(); return; }
 });
+/* ---------- trends since Jul 1: stacked bars by source ---------- */
+const TR_METRICS = [
+  {id:"books", label:"Books",           f:t=>t.books.length, list:"books"},
+  {id:"had",   label:"Runs had",        f:t=>t.had.length,   list:"had"},
+  {id:"des",   label:"Designs created", f:t=>t.des.length,   list:"des"},
+  {id:"dheld", label:"Designs held",    f:t=>t.dheld.length, list:"dheld"},
+  {id:"won",   label:"Closes",          f:t=>t.won.length,   list:"won"},
+  {id:"mrr",   label:"MRR generated",   f:t=>t.cwd,          list:"won", money:true},
+];
+// fixed colour per source (never by rank); Other only appears when it has numbers
+const TR_SOURCES = [
+  ...BDRS.map((b,i)=>({key:b.key, name:b.name.split(" ")[0], c:`var(--s${i+1})`})),
+  {key:"Inbound", name:"Inbound",     c:"var(--s4)"},
+  {key:FORMER,    name:"Former reps", c:"var(--s5)"},
+  {key:OTHER,     name:"Other (CloseBot, AE-booked)", c:"var(--s6)"},
+];
+const trend = {metric:"books", scale:"week", table:false};
+const trVal = (v,m) => m.money ? fmt(v,true) : fmt(v);
+function trendBuckets(scale){
+  const y = new Date(); y.setHours(0,0,0,0); y.setDate(y.getDate()-1);
+  const from = new Date(DATA_FROM+"T00:00:00");
+  let s = new Date(from);
+  if(scale==="week"){ const dow=(s.getDay()+6)%7; s.setDate(s.getDate()-dow); }
+  const out = [];
+  while(s<=y){
+    const e = new Date(s); if(scale==="week") e.setDate(e.getDate()+6); else e.setMonth(e.getMonth()+1,0);
+    const s2 = s<from ? from : s;
+    out.push({start:ymd(s2), end:ymd(e), partial:e>y,
+      short: scale==="week" ? `${MON[s2.getMonth()]} ${s2.getDate()}` : MON[s2.getMonth()],
+      label: scale==="week" ? `Week of ${MON[s2.getMonth()]} ${s2.getDate()}` : `${MONTHS[s2.getMonth()]} ${s2.getFullYear()}`});
+    s = new Date(e); s.setDate(s.getDate()+1);
+  }
+  return out;
+}
+function niceStep(raw){ if(raw<=0) return 1; const p=10**Math.floor(Math.log10(raw)), f=raw/p; return (f<=1?1:f<=2?2:f<=5?5:10)*p; }
+function renderTrends(){
+  const el = document.getElementById("trend"); if(!el) return;
+  const m = TR_METRICS.find(x=>x.id===trend.metric);
+  document.getElementById("trMetric").innerHTML = TR_METRICS.map(x=>`<button data-tm="${x.id}" aria-pressed="${x.id===trend.metric}">${x.label}</button>`).join("");
+  document.querySelectorAll("#trScale button").forEach(b=>b.setAttribute("aria-pressed", b.dataset.s===trend.scale));
+  const B = trendBuckets(trend.scale).map(b=>{
+    const v = {}; TR_SOURCES.forEach(src=>{ v[src.key] = m.f(statsFor(src.key,"bdr",b)); });
+    return {...b, v, total: TR_SOURCES.reduce((a,src)=>a+v[src.key],0)};
+  });
+  const used = TR_SOURCES.filter((src,i)=> i<=BDRS.length || B.some(b=>b.v[src.key]));
+  state.trendRows = B;
+  document.getElementById("trLegend").innerHTML = used.map(s=>`<span><i style="background:${s.c}"></i>${esc(s.name)}</span>`).join("");
+
+  // geometry
+  const W = Math.max(320, el.clientWidth || 800), H = 280, L = m.money ? 64 : 36, R = 6, T = 22, Bm = 30;
+  const max = Math.max(0, ...B.map(b=>b.total));
+  const step = niceStep(max/4 || 1), ymax = Math.max(step, Math.ceil(max/step)*step);
+  const y = v => T + (H-T-Bm) * (1 - v/ymax);
+  const band = (W-L-R)/Math.max(1,B.length), bw = Math.min(56, band*0.62);
+  const everyN = Math.ceil(B.length / Math.max(1, Math.floor((W-L-R)/58)));   // thin axis labels on small screens
+  let svg = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc(m.label)} by ${trend.scale}, stacked by source">`;
+  for(let v=0; v<=ymax+1e-9; v+=step){
+    svg += `<line class="grid" x1="${L}" x2="${W-R}" y1="${y(v)}" y2="${y(v)}"${v===0?' style="stroke:var(--muted)"':""}/><text x="${L-6}" y="${y(v)+4}" text-anchor="end">${trVal(v,m)}</text>`;
+  }
+  B.forEach((b,i)=>{
+    const cx = L + band*i + band/2, x = cx - bw/2;
+    svg += `<g class="col" data-i="${i}"><rect class="hit" x="${L+band*i}" y="${T}" width="${band}" height="${H-T-Bm}" fill="transparent" rx="6"/>`;
+    let acc = 0; const segs = used.filter(s=>b.v[s.key]>0);
+    segs.forEach((s,k)=>{
+      const y0 = y(acc), y1 = y(acc + b.v[s.key]); acc += b.v[s.key];
+      const top = k===segs.length-1, gap = k>0 ? 2 : 0;          // 2px surface gap between stacked fills
+      const h = Math.max(1, y0 - y1 - gap), yy = y1, r = top ? Math.min(4, h, bw/2) : 0;
+      const d = `M${x},${yy+h} V${yy+r} Q${x},${yy} ${x+r},${yy} H${x+bw-r} Q${x+bw},${yy} ${x+bw},${yy+r} V${yy+h} Z`;
+      svg += `<path class="seg-r" d="${d}" fill="${s.c}" opacity="${b.partial?0.55:1}" data-src="${esc(s.key)}" data-i="${i}"/>`;
+    });
+    if(b.total>0 && band>=34) svg += `<text class="tot" x="${cx}" y="${y(b.total)-6}" text-anchor="middle">${trVal(b.total,m)}</text>`;
+    if((B.length-1-i) % everyN === 0) svg += `<text x="${cx}" y="${H-Bm+16}" text-anchor="middle">${b.short}${b.partial?"*":""}</text>`;
+    svg += `</g>`;
+  });
+  el.innerHTML = svg + `</svg>`;
+
+  // table view (also the accessible / exact-number view)
+  const tw = document.getElementById("trTableWrap");
+  tw.hidden = !trend.table;
+  document.getElementById("trTableBtn").textContent = trend.table ? "Hide table" : "Show table";
+  if(trend.table){
+    tw.innerHTML = `<table><thead><tr><th>${esc(m.label)}</th>${B.map(b=>`<th>${b.short}${b.partial?"*":""}</th>`).join("")}<th>Total</th></tr></thead><tbody>
+      ${used.map(s=>`<tr><td>${esc(s.name)}</td>${B.map((b,i)=>`<td>${b.v[s.key]?`<span class="click" data-trsrc="${esc(s.key)}" data-tri="${i}">${trVal(b.v[s.key],m)}</span>`:"0"}</td>`).join("")}<td><b>${trVal(B.reduce((a,b)=>a+b.v[s.key],0),m)}</b></td></tr>`).join("")}
+      <tr><td><b>Total</b></td>${B.map(b=>`<td><b>${trVal(b.total,m)}</b></td>`).join("")}<td><b>${trVal(B.reduce((a,b)=>a+b.total,0),m)}</b></td></tr></tbody></table>`;
+  }
+}
+function trendTip(e){
+  const tip = document.getElementById("trTip"), g = e.target.closest && e.target.closest(".col");
+  if(!g || !state.trendRows){ tip.style.display="none"; return; }
+  const b = state.trendRows[+g.dataset.i], m = TR_METRICS.find(x=>x.id===trend.metric);
+  const used = TR_SOURCES.filter((src,i)=> i<=BDRS.length || state.trendRows.some(r=>r.v[src.key]));
+  tip.innerHTML = `<div class="h">${esc(b.label)}${b.partial?" (so far)":""}</div>` +
+    [...used].reverse().map(s=>`<div class="r"><span><i style="background:${s.c}"></i>${esc(s.name)}</span><b>${trVal(b.v[s.key],m)}</b></div>`).join("") +
+    `<div class="r t"><span>Total</span><b>${trVal(b.total,m)}</b></div>`;
+  const card = tip.parentElement.getBoundingClientRect();
+  tip.style.display = "block";
+  let left = e.clientX - card.left + 14; if(left + tip.offsetWidth > card.width) left = e.clientX - card.left - tip.offsetWidth - 14;
+  tip.style.left = Math.max(4,left)+"px"; tip.style.top = Math.max(4, e.clientY - card.top - tip.offsetHeight/2)+"px";
+}
+function trendOpen(srcKey, i){
+  const b = state.trendRows[i], m = TR_METRICS.find(x=>x.id===trend.metric), s = TR_SOURCES.find(x=>x.key===srcKey);
+  openList(srcKey, "bdr", m.list, `${s.name}: ${m.label}`, b);
+}
+document.getElementById("trMetric").onclick = e=>{ const b=e.target.closest("button[data-tm]"); if(b){ trend.metric=b.dataset.tm; renderTrends(); } };
+document.getElementById("trScale").onclick = e=>{ const b=e.target.closest("button[data-s]"); if(b){ trend.scale=b.dataset.s; renderTrends(); } };
+document.getElementById("trTableBtn").onclick = ()=>{ trend.table=!trend.table; renderTrends(); };
+const trPlot = document.getElementById("trend");
+trPlot.addEventListener("mousemove", trendTip);
+trPlot.addEventListener("mouseleave", ()=>{ document.getElementById("trTip").style.display="none"; });
+trPlot.addEventListener("click", e=>{ const p=e.target.closest("[data-src]"); if(p) trendOpen(p.dataset.src, +p.dataset.i); });
+document.getElementById("trTableWrap").addEventListener("click", e=>{ const c=e.target.closest("[data-trsrc]"); if(c){ e.stopPropagation(); trendOpen(c.dataset.trsrc, +c.dataset.tri); } });
+let trResize; window.addEventListener("resize", ()=>{ clearTimeout(trResize); trResize=setTimeout(renderTrends,150); });
 // admin-only: re-run the HubSpot pull now, then reload once the new run lands
 document.getElementById("refreshBtn").onclick = async ()=>{
   const btn = document.getElementById("refreshBtn");

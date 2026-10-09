@@ -175,7 +175,7 @@ button.linkish{border:0;background:transparent;padding:0;color:var(--fill);font-
     </div>
   </header>
 
-  <div class="banner" id="banner">Every number here comes straight from HubSpot and refreshes at 8 AM each day, covering everything up to the end of yesterday. Click any underlined number to see the deals behind it. Reps: go through your new deals and mark each one <b>True</b> or <b>False</b>. A "False" needs a short note and goes to Vianney or Max to approve before the numbers change.</div>
+  <div class="banner" id="banner">Every number here comes straight from HubSpot and refreshes at 8 AM each day, covering everything up to the end of yesterday. Click any underlined number to see the deals behind it. Reps: each morning, go through your new deals and mark each one <b>True</b> or <b>False</b> (Oct 1 to 8 is already confirmed). A "False" needs a short note and goes to Vianney or Max to approve before the numbers change.</div>
   <div id="reviewBar"></div>
 
   <div class="controls">
@@ -324,6 +324,9 @@ function effEvents(){
 /* ---------- rep sign-off ---------- */
 const firstName = s => String(s||"").split(" ")[0];
 const credited = (r, rep) => !!rep && [r.booker, r.ae].some(n=>firstName(n)===rep);
+// one reviewer per record: the BDR who booked it; deals with no BDR (inbound, CloseBot) go to the AE
+const BDR_NAMES = BDRS.map(b=>b.key);
+const reviewOwner = r => BDR_NAMES.includes(r.booker) ? firstName(r.booker) : firstName(r.ae);
 const labelOf = r => r.kind ? r.kind : (r.dropped ? "not_a_booking" : r.cat);
 const happened = r => r.kind ? torDay(r.at) >= REVIEW_SINCE
   : ((r.due_ts||[]).length>0 || !!r.run_at) && [r.first_slot, r.run_at, ...(r.due_ts||[])].some(t=>t && torDay(t) >= REVIEW_SINCE);
@@ -336,7 +339,7 @@ function reviewState(r, rep){
   return "todo";                                                 // label changed since they confirmed it, or their "false" was rejected
 }
 function reviewables(rep){
-  return [...effShowup(), ...effEvents()].filter(r=>credited(r, rep) && happened(r));
+  return [...effShowup(), ...effEvents()].filter(r=>reviewOwner(r)===rep && happened(r));
 }
 const todoFor = rep => reviewables(rep).filter(r=>reviewState(r, rep)==="todo");
 
@@ -531,7 +534,7 @@ function dealHTML(r, isEv){
              + (r.pend ? `<div class="pend">Proposed by ${esc(r.pend.by_email)}${what(r.pend)} · <b>waiting for Vianney or Max to approve</b></div>` : "");
   const me = state.me || {};
   const acts = [];
-  if(me.rep && credited(r, me.rep) && happened(r)){
+  if(me.rep && reviewOwner(r)===me.rep && happened(r)){
     const st = reviewState(r, me.rep);
     if(st==="true") acts.push(`<span class="ok">✓ You confirmed this</span>`);
     else if(st==="todo") acts.push(`<span class="tf"><button class="t" data-true="${esc(r.key)}" data-label="${esc(labelOf(r))}">True</button><button class="f" data-fix="${esc(r.key)}" data-ev="${isEv?1:0}">False</button></span>`);
@@ -539,7 +542,7 @@ function dealHTML(r, isEv){
   if(me.approver && r.pend) acts.push(`<span class="tf"><button class="t" data-approve="${esc(r.key)}">Approve</button><button class="f" data-reject="${esc(r.key)}">Reject</button></span>`);
   if(me.approver) acts.push(`<button class="linkish" data-fix="${esc(r.key)}" data-ev="${isEv?1:0}">${r.ov?"Change correction":"Correct"}</button>`);
   if((me.approver && r.ov) || (r.pend && r.pend.by_email===me.email)) acts.push(`<button class="linkish" data-undo="${esc(r.key)}">${r.pend&&!me.approver?"Withdraw my correction":"Undo correction"}</button>`);
-  if(!me.approver && me.rep && credited(r, me.rep) && reviewState(r, me.rep)==="true") acts.push(`<button class="linkish" data-fix="${esc(r.key)}" data-ev="${isEv?1:0}">Actually, this is wrong</button>`);
+  if(!me.approver && me.rep && reviewOwner(r)===me.rep && reviewState(r, me.rep)==="true") acts.push(`<button class="linkish" data-fix="${esc(r.key)}" data-ev="${isEv?1:0}">Actually, this is wrong</button>`);
   const fix = acts.length ? `<div class="fix">${acts.join("")}</div><div class="fixslot" id="fix-${esc(r.key)}"></div>` : "";
   return `<li class="deal${r.dropped?" dropped":""}"><div class="top"><span class="nm"><a href="${link}" target="_blank" rel="noopener">${esc(r.deal_name)}</a></span><span class="pill ${cls}">${esc(lbl)}${r.dropped?" · not counted":""}</span></div>
     <div class="why">${why}</div>${corr}${fix}</li>`;
@@ -574,7 +577,7 @@ function openQueue(rep){
   const all = reviewables(rep);
   const todo = all.filter(r=>reviewState(r,rep)==="todo"), wait = all.filter(r=>reviewState(r,rep)==="waiting"), done = all.filter(r=>reviewState(r,rep)==="true");
   const mine = state.me && state.me.rep===rep;
-  showDialog(mine ? "Your deals to confirm" : `${rep}: sign-off`, "Everything credited to "+(mine?"you":rep)+" since Oct 1 that has happened. True = the label is right. False = tell us what really happened (goes to Vianney or Max to approve).",
+  showDialog(mine ? "Your deals to confirm" : `${rep}: sign-off`, (mine?"Deals you need to confirm":"Deals "+rep+" needs to confirm")+" (BDRs: deals they booked. Dipen: deals with no BDR, like inbound). Oct 1 to 8 was confirmed by RevOps, so only newer deals, or deals whose label has changed since, show up here. True = the label is right. False = tell us what really happened (goes to Vianney or Max to approve).",
     [["To confirm", todo], ["Waiting for approval", wait], ["Confirmed", done]].filter(g=>g[1].length || g[0]==="To confirm"));
 }
 function openApprovals(){

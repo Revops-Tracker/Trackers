@@ -328,6 +328,12 @@ section[hidden]{display:none}
           <summary>Recent weeks</summary>
           <div class="table-wrap" id="crTrend"></div>
         </details>
+        <details id="q3Box" open>
+          <summary>Q3 leads and 7 Day TVL Parallel</summary>
+          <div class="table-wrap" id="q3Leads"></div>
+          <div class="table-wrap" id="q3Par"></div>
+          <div class="legend" id="q3Note"></div>
+        </details>
         <div class="legend" id="crFoot"></div>
       </div>
 
@@ -1252,12 +1258,46 @@ function render(){
 
   $("crLegend").innerHTML = '<b>Connect rate</b> = connects ÷ dials, green at or above the '+(target()*100).toFixed(1)+'% target. Click a BDR to see tiers, then a tier to see its lists. <b>Conversations</b> are the Nooks "meaningful" dispositions. Weeks run Monday to Saturday. Outbound books count a Discovery Booked call, or a Meeting Rebook 30+ days after the last Discovery Booked, in the week of the call.';
   renderTrend(weeks);
+  try{ renderQ3(); }catch(e){ console.error('Q3 section', e); }
   const up = (D.uploads||[])[0];
   const synced = D.booksSyncedAt ? new Date(D.booksSyncedAt).toLocaleString("en-US",{month:"short",day:"numeric",hour:"numeric",minute:"2-digit"}) : null;
   $("crFoot").innerHTML = (up ? 'Last Nooks upload: week ending '+h(up.week_ending)+', by '+h(up.uploaded_by)+' on '+h(new Date(up.uploaded_at).toLocaleDateString("en-US",{month:"short",day:"numeric"}))+'. ' : '') +
     'Books, inbound books and leads delivered come from the Weekly BDR Report sheet'+(synced ? ' (last synced '+h(synced)+')' : '')+'.';
 }
 const tile = (k,v,s) => '<div class="cr-tile"><div class="k">'+h(k)+'</div><div class="v">'+v+'</div>'+(s?'<div class="s">'+h(s)+'</div>':'')+'</div>';
+
+/* ---------- Q3: leads delivered per BDR and the 7 Day TVL Parallel history ---------- */
+const FORMER = ["Jules"];                       // left out of this view
+const Q3_FIRST = "2026-07-04", Q3_LAST = "2026-09-26";   // week-ending Saturdays inside Q3 (13 weeks)
+function renderQ3(){
+  const D = S.data, weeks = [];
+  for(let w = Q3_FIRST; w <= Q3_LAST; w = add(w,7)) weeks.push(w);
+  const names = ORDER.filter(n => FORMER.indexOf(n) < 0);
+  const leads = (b,w) => { const r = (D.leads||[]).filter(x=>x.bdr===b && x.week_ending===w)[0]; return r ? r.leads_delivered : null; };
+  const th = '<th>Week</th>' + names.map(n=>'<th>'+h(n)+'</th>').join("");
+
+  let a = '<table class="cr-tbl"><thead><tr>'+th+'</tr></thead><tbody>';
+  weeks.forEach(w=>{ a += '<tr><td>'+h(weekLabel(w))+'</td>'+names.map(n=>{ const v = leads(n,w); return '<td>'+(v==null ? "–" : num(v))+'</td>'; }).join("")+'</tr>'; });
+  a += '<tr class="team"><td>Average leads per week</td>'+names.map(n=>{
+    const vs = weeks.map(w=>leads(n,w)).filter(v=>v!=null);
+    return '<td>'+(vs.length ? num(Math.round(vs.reduce((x,y)=>x+y,0)/vs.length)) : "–")+'<div style="font-size:12px;font-weight:400;color:var(--muted)">'+vs.length+' of '+weeks.length+' weeks</div></td>';
+  }).join("")+'</tr></tbody></table>';
+  $("q3Leads").innerHTML = '<div class="legend" style="margin:8px 0 4px"><b>Leads delivered per week</b>, by BDR</div>' + a;
+
+  const par = (b,w) => {
+    const rs = (D.byList||[]).filter(r=>r.bdr===b && r.week_ending===w && /^7 day tvl parallel/i.test(r.list_name));
+    return rs.length ? { d: rs.reduce((x,r)=>x+r.dials,0), c: rs.reduce((x,r)=>x+r.connects,0) } : null;
+  };
+  let p = '<table class="cr-tbl"><thead><tr>'+th+'</tr></thead><tbody>';
+  weeks.forEach(w=>{ p += '<tr><td>'+h(weekLabel(w))+'</td>'+names.map(n=>{ const x = par(n,w); return '<td>'+(x ? num(x.d)+' dials · '+num(x.c)+' connects' : "–")+'</td>'; }).join("")+'</tr>'; });
+  p += '<tr class="team"><td>Q3 total</td>'+names.map(n=>{
+    const xs = weeks.map(w=>par(n,w)).filter(Boolean), d = xs.reduce((s,x)=>s+x.d,0), c = xs.reduce((s,x)=>s+x.c,0);
+    return '<td>'+(xs.length ? num(d)+' dials · '+num(c)+' connects<div style="font-size:12px;font-weight:400;color:var(--muted)">'+xs.length+' of '+weeks.length+' weeks dialed</div>' : "–")+'</td>';
+  }).join("")+'</tr></tbody></table>';
+  $("q3Par").innerHTML = '<div class="legend" style="margin:14px 0 4px"><b>7 Day TVL Parallel Leads</b>, weekly history by BDR</div>' + p;
+
+  $("q3Note").innerHTML = 'Q3 is the 13 weeks ending Saturday Jul 4 through Sep 26. Leads delivered only exist for the weeks the Slack distribution posts cover (they start in September), so the average is over the weeks with data, shown under each figure. The week ending Sep 12 was a one-off Closed Lost list. Jules is not included.';
+}
 
 function renderTrend(weeks){
   const D = S.data, names = [];

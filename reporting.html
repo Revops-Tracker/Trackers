@@ -1266,7 +1266,7 @@ function render(){
 const tile = (k,v,s) => '<div class="cr-tile"><div class="k">'+h(k)+'</div><div class="v">'+v+'</div>'+(s?'<div class="s">'+h(s)+'</div>':'')+'</div>';
 
 /* ---------- Q3: 7 Day TVL leads per BDR (HubSpot segments: parallel + power) ---------- */
-const SKIP_BDRS = ["Jules"];                    // left out of this view
+const SKIP_BDRS = [];                           // nobody left out; Jules has rows only for the weeks she was a BDR
 const Q3_FIRST = "2026-07-11", Q3_LAST = "2026-10-03";   // week-ending Saturdays of the 13 Mon-Sun weeks that start in Q3
 function renderQ3(){
   const D = S.data, seg = D.segments || [];
@@ -1274,7 +1274,7 @@ function renderQ3(){
   const names = ORDER.filter(n => SKIP_BDRS.indexOf(n) < 0 && seg.some(r=>r.bdr===n));
   const get = (n,w) => seg.filter(r=>r.bdr===n && r.week_ending===w)[0] || null;
   const sm = 'font-size:12px;font-weight:400;color:var(--muted)';
-  let t = '<table class="cr-tbl"><thead><tr><th>Week</th>'+names.map(n=>'<th>'+h(n)+'</th>').join("")+'</tr></thead><tbody>';
+  let t = '<table class="cr-tbl"><thead><tr><th>Week</th>'+names.map(n=>'<th>'+h(n)+(n==="Jules" ? ' (estimate)' : '')+'</th>').join("")+'</tr></thead><tbody>';
   weeks.forEach(w=>{
     t += '<tr><td>'+h(weekLabel(w))+'</td>'+names.map(n=>{
       const r = get(n,w);
@@ -1282,14 +1282,14 @@ function renderQ3(){
       return '<td>'+(r ? num(r.parallel_leads+r.power_leads+o)+'<div style="'+sm+'">'+(o ? num(o)+' Closed Lost (manual list)' : num(r.parallel_leads)+' parallel + '+num(r.power_leads)+' power')+'</div>' : "–")+'</td>';
     }).join("")+'</tr>';
   });
-  t += '<tr class="team"><td>Average per week<div style="'+sm+'">over '+weeks.length+' weeks</div></td>'+names.map(n=>{
+  t += '<tr class="team"><td>Average per week<div style="'+sm+'">over the weeks each BDR was on the list</div></td>'+names.map(n=>{
     const rs = weeks.map(w=>get(n,w)).filter(Boolean);
     if(!rs.length) return '<td>–</td>';
     const ap = rs.reduce((a,r)=>a+r.parallel_leads,0)/rs.length, aw = rs.reduce((a,r)=>a+r.power_leads,0)/rs.length, ao = rs.reduce((a,r)=>a+(r.other_leads||0),0)/rs.length;
-    return '<td>'+num(Math.round(ap+aw+ao))+'<div style="'+sm+'">'+num(Math.round(ap))+' parallel + '+num(Math.round(aw))+' power'+(ao ? ' + '+num(Math.round(ao))+' Closed Lost' : '')+'</div></td>';
+    return '<td>'+num(Math.round(ap+aw+ao))+'<div style="'+sm+'">'+num(Math.round(ap))+' parallel + '+num(Math.round(aw))+' power'+(ao ? ' + '+num(Math.round(ao))+' Closed Lost' : '')+' · '+rs.length+' wks</div></td>';
   }).join("")+'</tr></tbody></table>';
   $("q3Leads").innerHTML = t;
-  $("q3Note").innerHTML = "Each figure is the highest size a BDR 7 DAY TVL Parallel Leads and 7 DAY TVL Power Leads HubSpot segment reached in that Monday to Sunday week, which is the full count before it is worked down. The week of Sep 7 had nothing in either segment because the BDRs were given the Closed Lost TVL list manually that week (Slack, Sep 9), so that list's count is used for it. The average adds the parallel, power and Closed Lost averages across the 13 weeks. Jules is not included.";
+  $("q3Note").innerHTML = "Each figure is the highest size a BDR 7 DAY TVL Parallel Leads and 7 DAY TVL Power Leads HubSpot segment reached in that Monday to Sunday week, which is the full count before it is worked down. The week of Sep 7 had nothing in either segment because the BDRs were given the Closed Lost TVL list manually that week (Slack, Sep 9), so that list's count is used for it. Jules is shown for the weeks she was a BDR, through Aug 31; her segments were deleted and the history did not come back with them, so her figures are an estimate (the master 7 DAY segment minus Brandon, Erich and Issa), which can include leads owned by others, and her Sep 7 week is not known. Blank after that is because she left. The average adds the parallel, power and Closed Lost averages over the weeks each BDR has a figure.";
 }
 
 function renderTrend(weeks){

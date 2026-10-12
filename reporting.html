@@ -1202,7 +1202,7 @@ function buildWeek(w){
     l.books += r.outbound_books;
   });
   (D.inbound||[]).filter(r=>r.week_ending===w).forEach(r=>{ if(r.inbound_books || by[r.bdr]) mk(r.bdr).inb = r.inbound_books; });
-  (D.segments||[]).filter(r=>r.week_ending===w).forEach(r=>{ if(SKIP_BDRS.indexOf(r.bdr) < 0 && (r.parallel_leads + r.power_leads || by[r.bdr])) mk(r.bdr).leads = r.parallel_leads + r.power_leads; });
+  (D.segments||[]).filter(r=>r.week_ending===w).forEach(r=>{ if(SKIP_BDRS.indexOf(r.bdr) < 0 && (r.parallel_leads + r.power_leads + (r.other_leads||0) || by[r.bdr])) mk(r.bdr).leads = r.parallel_leads + r.power_leads + (r.other_leads||0); });
   const list = Object.values(by).sort((a,b)=>{
     const ia = ORDER.indexOf(a.bdr), ib = ORDER.indexOf(b.bdr);
     return (ia<0?99:ia) - (ib<0?99:ib) || a.bdr.localeCompare(b.bdr);
@@ -1278,17 +1278,18 @@ function renderQ3(){
   weeks.forEach(w=>{
     t += '<tr><td>'+h(weekLabel(w))+'</td>'+names.map(n=>{
       const r = get(n,w);
-      return '<td>'+(r ? num(r.parallel_leads+r.power_leads)+'<div style="'+sm+'">'+num(r.parallel_leads)+' parallel + '+num(r.power_leads)+' power</div>' : "–")+'</td>';
+      const o = r ? (r.other_leads||0) : 0;
+      return '<td>'+(r ? num(r.parallel_leads+r.power_leads+o)+'<div style="'+sm+'">'+(o ? num(o)+' Closed Lost (manual list)' : num(r.parallel_leads)+' parallel + '+num(r.power_leads)+' power')+'</div>' : "–")+'</td>';
     }).join("")+'</tr>';
   });
   t += '<tr class="team"><td>Average per week<div style="'+sm+'">over '+weeks.length+' weeks</div></td>'+names.map(n=>{
     const rs = weeks.map(w=>get(n,w)).filter(Boolean);
     if(!rs.length) return '<td>–</td>';
-    const ap = rs.reduce((a,r)=>a+r.parallel_leads,0)/rs.length, aw = rs.reduce((a,r)=>a+r.power_leads,0)/rs.length;
-    return '<td>'+num(Math.round(ap)+Math.round(aw))+'<div style="'+sm+'">'+num(Math.round(ap))+' parallel + '+num(Math.round(aw))+' power</div></td>';
+    const ap = rs.reduce((a,r)=>a+r.parallel_leads,0)/rs.length, aw = rs.reduce((a,r)=>a+r.power_leads,0)/rs.length, ao = rs.reduce((a,r)=>a+(r.other_leads||0),0)/rs.length;
+    return '<td>'+num(Math.round(ap+aw+ao))+'<div style="'+sm+'">'+num(Math.round(ap))+' parallel + '+num(Math.round(aw))+' power'+(ao ? ' + '+num(Math.round(ao))+' Closed Lost' : '')+'</div></td>';
   }).join("")+'</tr></tbody></table>';
   $("q3Leads").innerHTML = t;
-  $("q3Note").innerHTML = "Each figure is the highest size a BDR 7 DAY TVL Parallel Leads and 7 DAY TVL Power Leads HubSpot segment reached in that Monday to Sunday week, which is the full count before it is worked down. The average adds the parallel average and the power average across the 13 weeks. The week of Sep 7 had no leads in either segment and is counted as zero. Jules is not included.";
+  $("q3Note").innerHTML = "Each figure is the highest size a BDR 7 DAY TVL Parallel Leads and 7 DAY TVL Power Leads HubSpot segment reached in that Monday to Sunday week, which is the full count before it is worked down. The week of Sep 7 had nothing in either segment because the BDRs were given the Closed Lost TVL list manually that week (Slack, Sep 9), so that list's count is used for it. The average adds the parallel, power and Closed Lost averages across the 13 weeks. Jules is not included.";
 }
 
 function renderTrend(weeks){

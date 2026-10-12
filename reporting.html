@@ -1221,7 +1221,7 @@ function render(){
   if(!S.week){
     $("crWeekLabel").textContent = "No data yet";
     $("crTiles").innerHTML = ""; $("crTable").innerHTML = '<tbody><tr><td class="empty">Drop a Nooks CSV above to add the first week.</td></tr></tbody>';
-    $("crTrend").innerHTML = ""; return;
+    return;
   }
   $("crWeekLabel").textContent = weekLabel(S.week);
   const W = buildWeek(S.week);
@@ -1287,19 +1287,6 @@ function renderQ3(){
   $("q3Note").innerHTML = "Each figure is the highest size a BDR 7 DAY TVL Parallel Leads and 7 DAY TVL Power Leads HubSpot segment reached in that Monday to Sunday week, which is the full count before it is worked down. The week of Sep 7 had nothing in either segment because the BDRs were given the Closed Lost TVL list manually that week (Slack, Sep 9), so that list's count is used for it. Jules is shown for the weeks she was a BDR, through Aug 31; her segments were deleted and the history did not come back with them, so her figures are an estimate (the master 7 DAY segment minus Brandon, Erich and Issa), which can include leads owned by others, and her Sep 7 week is not known. Blank after that is because she left. The average adds the parallel, power and Closed Lost averages over the weeks each BDR has a figure.";
 }
 
-function renderTrend(weeks){
-  const D = S.data, names = [];
-  (D.connectRate||[]).forEach(r=>{ if(names.indexOf(r.bdr)<0) names.push(r.bdr); });
-  names.sort((a,b)=>{ const ia=ORDER.indexOf(a), ib=ORDER.indexOf(b); return (ia<0?99:ia)-(ib<0?99:ib); });
-  let t = '<table><thead><tr><th>Week</th><th>Team rate</th><th>Dials</th><th>Connects</th>'+names.map(n=>'<th>'+h(n)+'</th>').join("")+'</tr></thead><tbody>';
-  weeks.slice(0,10).forEach(w=>{
-    const rs = (D.connectRate||[]).filter(r=>r.week_ending===w);
-    const td = rs.reduce((a,r)=>a+r.dials,0), tc = rs.reduce((a,r)=>a+r.connects,0);
-    t += '<tr class="pick" data-w="'+h(w)+'"'+(w===S.week?' style="background:var(--chip)"':'')+'><td>'+h(weekLabel(w))+'</td><td>'+rateCell(tc,td)+'</td><td>'+num(td)+'</td><td>'+num(tc)+'</td>'+
-      names.map(n=>{ const x = rs.filter(r=>r.bdr===n); const d = x.reduce((a,r)=>a+r.dials,0), c = x.reduce((a,r)=>a+r.connects,0); return '<td>'+(d?rateCell(c,d):"–")+'</td>'; }).join("")+'</tr>';
-  });
-  $("crTrend").innerHTML = t + '</tbody></table>';
-}
 
 /* ---------- Nooks CSV: parse, map to tiers, preview, save ---------- */
 function parseCSV(text){
@@ -1439,7 +1426,6 @@ function wire(){
   $("crNext").onclick = () => { const w = weekList(), i = w.indexOf(S.week); if(i > 0){ S.week = w[i-1]; render(); } };
   $("crLatest").onclick = () => { S.week = weekList()[0] || null; render(); };
   $("crTable").addEventListener("click", e=>{ const b = e.target.closest("[data-k]"); if(!b) return; const k = b.getAttribute("data-k"); S.open[k] = !S.open[k]; render(); });
-  $("crTrend").addEventListener("click", e=>{ const r = e.target.closest("tr[data-w]"); if(!r) return; S.week = r.getAttribute("data-w"); render(); });
   // the page also lets people drop a file anywhere on this section
   const sec = $("crSec");
   sec.addEventListener("dragover", e=>{ e.preventDefault(); });

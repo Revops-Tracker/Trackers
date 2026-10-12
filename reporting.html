@@ -1288,7 +1288,7 @@ function renderQ3(){
     return '<td>'+num(Math.round(ap)+Math.round(aw))+'<div style="'+sm+'">'+num(Math.round(ap))+' parallel + '+num(Math.round(aw))+' power</div></td>';
   }).join("")+'</tr></tbody></table>';
   $("q3Leads").innerHTML = t;
-  $("q3Note").innerHTML = "Each figure is the size of a BDR 7 DAY TVL Parallel Leads and 7 DAY TVL Power Leads HubSpot segment on the Monday of that week, which is the count before any of it has been worked. The average adds the parallel average and the power average across the 13 Mondays. The Monday of Sep 7 had no leads in either segment and is counted as zero. Jules is not included.";
+  $("q3Note").innerHTML = "Each figure is the highest size a BDR 7 DAY TVL Parallel Leads and 7 DAY TVL Power Leads HubSpot segment reached in that Monday to Sunday week, which is the full count before it is worked down. The average adds the parallel average and the power average across the 13 weeks. The week of Sep 7 had no leads in either segment and is counted as zero. Jules is not included.";
 }
 
 function renderTrend(weeks){

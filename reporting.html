@@ -329,9 +329,8 @@ section[hidden]{display:none}
           <div class="table-wrap" id="crTrend"></div>
         </details>
         <details id="q3Box" open>
-          <summary>Q3 leads and 7 Day TVL Parallel</summary>
+          <summary>7 Day TVL leads per week, Q3</summary>
           <div class="table-wrap" id="q3Leads"></div>
-          <div class="table-wrap" id="q3Par"></div>
           <div class="legend" id="q3Note"></div>
         </details>
         <div class="legend" id="crFoot"></div>
@@ -1203,7 +1202,7 @@ function buildWeek(w){
     l.books += r.outbound_books;
   });
   (D.inbound||[]).filter(r=>r.week_ending===w).forEach(r=>{ if(r.inbound_books || by[r.bdr]) mk(r.bdr).inb = r.inbound_books; });
-  (D.leads||[]).filter(r=>r.week_ending===w).forEach(r=>{ if(r.leads_delivered || by[r.bdr]) mk(r.bdr).leads = r.leads_delivered; });
+  (D.segments||[]).filter(r=>r.week_ending===w).forEach(r=>{ if(SKIP_BDRS.indexOf(r.bdr) < 0 && (r.parallel_leads + r.power_leads || by[r.bdr])) mk(r.bdr).leads = r.parallel_leads + r.power_leads; });
   const list = Object.values(by).sort((a,b)=>{
     const ia = ORDER.indexOf(a.bdr), ib = ORDER.indexOf(b.bdr);
     return (ia<0?99:ia) - (ib<0?99:ib) || a.bdr.localeCompare(b.bdr);
@@ -1234,7 +1233,7 @@ function render(){
   $("crTiles").innerHTML =
     tile("Team connect rate", T.d ? '<span class="'+((T.c/T.d)>=target()?"ahead":"behind")+'">'+pct(T.c,T.d)+'</span>' : "–", "target "+(target()*100).toFixed(1)+"%") +
     tile("Dials", num(T.d), "") + tile("Connects", num(T.c), "") + tile("Conversations", num(T.v), "") +
-    tile("Outbound books", num(T.books), "") + tile("Inbound books", num(T.inb), "") + tile("Avg leads per BDR", T.leadN ? num(Math.round(T.leads/T.leadN)) : "–", T.leadN ? "across "+T.leadN+" BDRs" : "");
+    tile("Outbound books", num(T.books), "") + tile("Inbound books", num(T.inb), "") + tile("7 Day TVL", T.leadN ? num(Math.round(T.leads/T.leadN)) : "–", T.leadN ? "avg leads per BDR (parallel + power), across "+T.leadN+" BDRs" : "");
 
   let rows = '<thead><tr><th></th><th>Dials</th><th>Connects</th><th>Connect rate</th><th>Conversations</th><th>Outbound books</th></tr></thead><tbody>';
   rows += '<tr class="team"><td>Team</td><td>'+num(T.d)+'</td><td>'+num(T.c)+'</td><td>'+rateCell(T.c,T.d)+'</td><td>'+num(T.v)+'</td><td>'+num(T.books)+'</td></tr>';
@@ -1266,37 +1265,30 @@ function render(){
 }
 const tile = (k,v,s) => '<div class="cr-tile"><div class="k">'+h(k)+'</div><div class="v">'+v+'</div>'+(s?'<div class="s">'+h(s)+'</div>':'')+'</div>';
 
-/* ---------- Q3: leads delivered per BDR and the 7 Day TVL Parallel history ---------- */
-const FORMER = ["Jules"];                       // left out of this view
-const Q3_FIRST = "2026-07-04", Q3_LAST = "2026-09-26";   // week-ending Saturdays inside Q3 (13 weeks)
+/* ---------- Q3: 7 Day TVL leads per BDR (HubSpot segments: parallel + power) ---------- */
+const SKIP_BDRS = ["Jules"];                    // left out of this view
+const Q3_FIRST = "2026-07-11", Q3_LAST = "2026-10-03";   // week-ending Saturdays of the 13 Mon-Sun weeks that start in Q3
 function renderQ3(){
-  const D = S.data, weeks = [];
-  for(let w = Q3_FIRST; w <= Q3_LAST; w = add(w,7)) weeks.push(w);
-  const names = ORDER.filter(n => FORMER.indexOf(n) < 0);
-  const leads = (b,w) => { const r = (D.leads||[]).filter(x=>x.bdr===b && x.week_ending===w)[0]; return r ? r.leads_delivered : null; };
-  const th = '<th>Week</th>' + names.map(n=>'<th>'+h(n)+'</th>').join("");
-
-  let a = '<table class="cr-tbl"><thead><tr>'+th+'</tr></thead><tbody>';
-  weeks.forEach(w=>{ a += '<tr><td>'+h(weekLabel(w))+'</td>'+names.map(n=>{ const v = leads(n,w); return '<td>'+(v==null ? "–" : num(v))+'</td>'; }).join("")+'</tr>'; });
-  a += '<tr class="team"><td>Average leads per week</td>'+names.map(n=>{
-    const vs = weeks.map(w=>leads(n,w)).filter(v=>v!=null);
-    return '<td>'+(vs.length ? num(Math.round(vs.reduce((x,y)=>x+y,0)/vs.length)) : "–")+'<div style="font-size:12px;font-weight:400;color:var(--muted)">'+vs.length+' of '+weeks.length+' weeks</div></td>';
+  const D = S.data, seg = D.segments || [];
+  const weeks = Array.from(new Set(seg.map(r=>r.week_ending))).filter(w=>w>=Q3_FIRST && w<=Q3_LAST).sort();
+  const names = ORDER.filter(n => SKIP_BDRS.indexOf(n) < 0 && seg.some(r=>r.bdr===n));
+  const get = (n,w) => seg.filter(r=>r.bdr===n && r.week_ending===w)[0] || null;
+  const sm = 'font-size:12px;font-weight:400;color:var(--muted)';
+  let t = '<table class="cr-tbl"><thead><tr><th>Week</th>'+names.map(n=>'<th>'+h(n)+'</th>').join("")+'</tr></thead><tbody>';
+  weeks.forEach(w=>{
+    t += '<tr><td>'+h(weekLabel(w))+'</td>'+names.map(n=>{
+      const r = get(n,w);
+      return '<td>'+(r ? num(r.parallel_leads+r.power_leads)+'<div style="'+sm+'">'+num(r.parallel_leads)+' parallel + '+num(r.power_leads)+' power</div>' : "–")+'</td>';
+    }).join("")+'</tr>';
+  });
+  t += '<tr class="team"><td>Average per week<div style="'+sm+'">over '+weeks.length+' weeks</div></td>'+names.map(n=>{
+    const rs = weeks.map(w=>get(n,w)).filter(Boolean);
+    if(!rs.length) return '<td>–</td>';
+    const ap = rs.reduce((a,r)=>a+r.parallel_leads,0)/rs.length, aw = rs.reduce((a,r)=>a+r.power_leads,0)/rs.length;
+    return '<td>'+num(Math.round(ap)+Math.round(aw))+'<div style="'+sm+'">'+num(Math.round(ap))+' parallel + '+num(Math.round(aw))+' power</div></td>';
   }).join("")+'</tr></tbody></table>';
-  $("q3Leads").innerHTML = '<div class="legend" style="margin:8px 0 4px"><b>Leads delivered per week</b>, by BDR</div>' + a;
-
-  const par = (b,w) => {
-    const rs = (D.byList||[]).filter(r=>r.bdr===b && r.week_ending===w && /^7 day tvl parallel/i.test(r.list_name));
-    return rs.length ? { d: rs.reduce((x,r)=>x+r.dials,0), c: rs.reduce((x,r)=>x+r.connects,0) } : null;
-  };
-  let p = '<table class="cr-tbl"><thead><tr>'+th+'</tr></thead><tbody>';
-  weeks.forEach(w=>{ p += '<tr><td>'+h(weekLabel(w))+'</td>'+names.map(n=>{ const x = par(n,w); return '<td>'+(x ? num(x.d)+' dials · '+num(x.c)+' connects' : "–")+'</td>'; }).join("")+'</tr>'; });
-  p += '<tr class="team"><td>Q3 total</td>'+names.map(n=>{
-    const xs = weeks.map(w=>par(n,w)).filter(Boolean), d = xs.reduce((s,x)=>s+x.d,0), c = xs.reduce((s,x)=>s+x.c,0);
-    return '<td>'+(xs.length ? num(d)+' dials · '+num(c)+' connects<div style="font-size:12px;font-weight:400;color:var(--muted)">'+xs.length+' of '+weeks.length+' weeks dialed</div>' : "–")+'</td>';
-  }).join("")+'</tr></tbody></table>';
-  $("q3Par").innerHTML = '<div class="legend" style="margin:14px 0 4px"><b>7 Day TVL Parallel Leads</b>, weekly history by BDR</div>' + p;
-
-  $("q3Note").innerHTML = 'Q3 is the 13 weeks ending Saturday Jul 4 through Sep 26. Leads delivered only exist for the weeks the Slack distribution posts cover (they start in September), so the average is over the weeks with data, shown under each figure. The week ending Sep 12 was a one-off Closed Lost list. Jules is not included.';
+  $("q3Leads").innerHTML = t;
+  $("q3Note").innerHTML = 'Each figure is the size of the BDR's <b>7 DAY TVL Parallel Leads</b> and <b>7 DAY TVL Power Leads</b> HubSpot segments at their weekly fill: the largest size each reached that Monday to Sunday week, taken from the segment's daily size history. The average adds the parallel average and the power average. The week of Sep 7 had no leads in either segment and is included as zero. Jules is not included.';
 }
 
 function renderTrend(weeks){

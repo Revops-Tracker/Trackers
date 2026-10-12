@@ -324,10 +324,6 @@ section[hidden]{display:none}
         <div class="cr-tiles" id="crTiles"></div>
         <div class="table-wrap"><table class="cr-tbl" id="crTable"></table></div>
         <div class="legend" id="crLegend"></div>
-        <details>
-          <summary>Recent weeks</summary>
-          <div class="table-wrap" id="crTrend"></div>
-        </details>
         <details id="q3Box" open>
           <summary>7 Day TVL leads per week, Q3</summary>
           <div class="table-wrap" id="q3Leads"></div>
@@ -1256,7 +1252,6 @@ function render(){
   $("crTable").innerHTML = rows;
 
   $("crLegend").innerHTML = '<b>Connect rate</b> = connects ÷ dials, green at or above the '+(target()*100).toFixed(1)+'% target. Click a BDR to see tiers, then a tier to see its lists. <b>Conversations</b> are the Nooks "meaningful" dispositions. Weeks run Monday to Saturday. Outbound books count a Discovery Booked call, or a Meeting Rebook 30+ days after the last Discovery Booked, in the week of the call.';
-  renderTrend(weeks);
   try{ renderQ3(); }catch(e){ console.error('Q3 section', e); }
   const up = (D.uploads||[])[0];
   const synced = D.booksSyncedAt ? new Date(D.booksSyncedAt).toLocaleString("en-US",{month:"short",day:"numeric",hour:"numeric",minute:"2-digit"}) : null;

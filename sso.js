@@ -4,15 +4,17 @@
    - Sends people to a page they're allowed on, and adds the small "signed in as" bar. */
 (function () {
   var C = window.JF_CONFIG, KEY = 'jf_token';
-  var PAGES = { bdr: ['bdr.html', 'BDR tracker'], ae: ['ae.html', 'AE tracker'], cst: ['cst.html', 'CST tracker'], leaderboard: ['leaderboard-auto.html', 'Leaderboard'], reporting: ['reporting.html', 'Sales L10'] }; // auto leaderboard (HubSpot-driven, daily); Max's leaderboard.html still reachable by URL
-  var ORDER = ['bdr', 'ae', 'cst', 'leaderboard', 'reporting']; // reporting = admins only (granted by jf-sso)
+  var PAGES = { bdr: ['bdr.html', 'BDR tracker'], ae: ['ae.html', 'AE tracker'], cst: ['cst.html', 'CST tracker'], leaderboard: ['leaderboard-auto.html', 'Leaderboard'], reporting: ['reporting.html', 'Sales L10'], revops: ['revops.html', 'RevOps L10'] }; // auto leaderboard (HubSpot-driven, daily); Max's leaderboard.html still reachable by URL
+  var ORDER = ['bdr', 'ae', 'cst', 'leaderboard', 'reporting', 'revops']; // reporting = admins only (granted by jf-sso)
+  var NEEDS = { revops: 'reporting' }; // pages that ride on another page's access (RevOps L10 = same admins as Sales L10)
+  function can(u, k) { return u.access.indexOf(NEEDS[k] || k) !== -1; }
 
   function get() { try { return localStorage.getItem(KEY); } catch (e) { return null; } }
   function set(t) { try { localStorage.setItem(KEY, t); } catch (e) {} }
   function clear() { try { localStorage.removeItem(KEY); } catch (e) {} }
   function goLogin() { location.replace('index.html'); }
   function firstAllowed(u) {
-    for (var i = 0; i < ORDER.length; i++) if (u.access.indexOf(ORDER[i]) !== -1) return PAGES[ORDER[i]][0];
+    for (var i = 0; i < ORDER.length; i++) if (can(u, ORDER[i])) return PAGES[ORDER[i]][0];
     return null;
   }
 
@@ -53,7 +55,7 @@
       '@media (max-width:1000px){.jfnav-email{display:none}}' +
       '@media (max-width:720px){.jfnav{gap:10px;padding:0 12px}.jfnav-brand{display:none}}';
     document.head.appendChild(css);
-    var tabs = ORDER.filter(function (k) { return u.access.indexOf(k) !== -1; })
+    var tabs = ORDER.filter(function (k) { return can(u, k); })
       .map(function (k) { return '<a href="' + PAGES[k][0] + '"' + (k === window.JF_PAGE ? ' aria-current="page"' : '') + '>' + PAGES[k][1] + '</a>'; }).join('');
     var d = document.createElement('nav');
     d.className = 'jfnav';
@@ -84,7 +86,7 @@
     .then(function (r) { return r.ok ? r.json() : null; })
     .then(function (u) {
       if (!u || !u.ok) { clear(); goLogin(); return; }
-      if (u.access.indexOf(window.JF_PAGE) === -1) {
+      if (!can(u, window.JF_PAGE)) {
         var p = firstAllowed(u);
         if (p) location.replace(p);
         else document.body.innerHTML = '<p style="font-family:sans-serif;padding:40px">You do not have access to any pages. Ask RevOps.</p>', hide.remove();

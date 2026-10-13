@@ -219,6 +219,10 @@ section[hidden]{display:none}
 .ib-tbl td small{display:block;font-size:11px;color:var(--muted)}
 .ib-tbl tr.tot td{font-weight:700;border-top:2px solid var(--line)}
 .ib-tbl tr.bench td{color:var(--muted);font-style:italic}
+.ib-tbl tr.sel td{background:color-mix(in srgb,var(--fill) 7%,transparent)}
+.ib-pick{display:inline-flex;align-items:center;gap:8px;font-size:14px;color:var(--muted);font-weight:500}
+.ib-pick select{border:1px solid var(--line);background:var(--panel);color:var(--ink);border-radius:8px;padding:7px 10px;font:inherit;font-size:14px}
+.l10-sec{margin-top:8px}
 </style>
 <div class="wrap">
   <header class="top">
@@ -322,11 +326,41 @@ section[hidden]{display:none}
     <div class="legend">Each bar is split by who booked the deal. <b>BDRs only</b> = Brandon, Erich, Issa and former BDRs. <b>Inbound</b> = calls with no BDR (booked by the lead) plus CloseBot; under Inbound the bars are split by the deal's first-touch UTM source (pick one to see it alone, split into lead-booked vs CloseBot). Sources outside the main six are grouped as Other sources (hover the legend to see them). AE-booked calls only show under All sources. The number on top is the total. Closes and MRR are by close date. Click a coloured block to see the deals. * = period not finished or cut by the range.</div>
   </section>
 
-  <section id="ibSec">
+  <section id="bdSec" class="l10-sec">
+    <div class="sec-head">
+      <h2>BDRs</h2>
+      <div class="ib-ctl">
+        <div class="seg" id="bdKind" role="group" aria-label="Period">
+          <button data-k="week" aria-pressed="false">Week</button>
+          <button data-k="month" aria-pressed="true">Month</button>
+          <button data-k="quarter" aria-pressed="false">Quarter</button>
+        </div>
+        <div class="nav">
+          <button type="button" id="bdPrev" aria-label="Previous period">‹</button>
+          <div class="period" id="bdPeriod" aria-live="polite"></div>
+          <button type="button" id="bdNext" aria-label="Next period">›</button>
+        </div>
+      </div>
+    </div>
+    <div class="ib-tiles" id="bdTiles"></div>
+    <div class="ib-h">By rep</div>
+    <div class="table-wrap" id="bdByRep"></div>
+    <div class="sec-head" style="margin:22px 0 8px"><div class="ib-h" style="margin:0">By lead source (first touch)</div>
+      <label class="ib-pick">Rep <select id="bdRep"></select></label></div>
+    <div class="table-wrap" id="bdBySource"></div>
+    <div class="legend">Every call a BDR booked (current BDRs and former BDRs), whatever the lead source. <b>Lead source</b> = the deal's first-touch UTM: cold call, RTB hit, or an inbound channel (an inbound lead a BDR converted). Pick a rep to see their sources. Inbound leads a BDR booked also appear in the Inbound section below, under "Booked by BDRs". Click any number to see the deals.</div>
+  </section>
+
+  <section id="ibSec" class="l10-sec">
     <div class="sec-head">
       <h2>Inbound</h2>
       <div class="ib-ctl">
-        <div class="seg" id="ibKind" role="group" aria-label="Inbound period">
+        <div class="seg" id="ibWho" role="group" aria-label="Booked by">
+          <button data-w="all" aria-pressed="true">All inbound leads</button>
+          <button data-w="self" aria-pressed="false">Lead / CloseBot</button>
+          <button data-w="bdr" aria-pressed="false">Booked by BDRs</button>
+        </div>
+        <div class="seg" id="ibKind" role="group" aria-label="Period">
           <button data-k="week" aria-pressed="false">Week</button>
           <button data-k="month" aria-pressed="true">Month</button>
           <button data-k="quarter" aria-pressed="false">Quarter</button>
@@ -341,9 +375,9 @@ section[hidden]{display:none}
     <div class="ib-tiles" id="ibTiles"></div>
     <div class="ib-h">By channel (first-touch UTM)</div>
     <div class="table-wrap" id="ibByChannel"></div>
-    <div class="ib-h">By how the call was booked</div>
+    <div class="ib-h">By who booked the call</div>
     <div class="table-wrap" id="ibByPath"></div>
-    <div class="legend"><b>Inbound</b> = calls the lead booked themselves plus CloseBot bookings. <b>By channel</b> splits them by the deal's first-touch UTM source. <b>BDR team</b> (grey) is there for comparison: every call a BDR booked. <b>Inbound leads booked by a BDR</b> = a BDR booked the call, but the deal's first touch is inbound; these count under the BDR, not in the Inbound total. Same definitions as everywhere: <b>Books</b> = new calls counted on the day they were booked; <b>Runs due</b> = calls whose slot came up; <b>Overall show</b> = had ÷ due; <b>1st-time show</b> = held at the first slot ÷ first slots that came due (small numbers underneath). Closes and MRR are by close date. Click any number to see the deals.</div>
+    <div class="legend"><b>Inbound lead</b> = the deal's first touch is an inbound channel (form, ad, chat, organic…), or the lead booked the call themselves / through CloseBot. This includes inbound leads a BDR booked. An <b>RTB hit</b> first touch counts as outbound (it is an intent signal, not the lead reaching out). Use <b>Booked by</b> to split self-booked / CloseBot from BDR-booked. <b>Outbound calls</b> (grey) are there for comparison: cold-call and RTB leads a BDR booked. Same definitions everywhere: <b>Books</b> = new calls counted on the day they were booked; <b>Runs due</b> = calls whose slot came up; <b>Overall show</b> = had ÷ due; <b>1st-time show</b> = held at the first slot ÷ first slots that came due (counts underneath). Closes and MRR are by close date. Click any number to see the deals.</div>
   </section>
 </div>
 
@@ -384,13 +418,13 @@ const AE_RANK = [
 const DATA_FROM = "2026-07-01";   // history is backfilled from the start of Q3
 const NOT_A_BDR = new Set(["Inbound","CloseBot AI"]);
 // Reps who have left (e.g. Jules, Hannah, Armin in Q3) are not shown by name: their numbers roll up into one "Former reps" bucket.
-const FORMER = "Former reps", OTHER = "Other", INB_ALL = "All inbound", BDR_ALL = "BDR team", INB_BDR = "Inbound leads booked by a BDR";
+const FORMER = "Former reps", OTHER = "Other", INB_ALL = "All inbound";
+const PRED = new Map();   // Sales L10 breakdown rows: person key -> predicate on a record
 const CUR_BDR = new Set(BDRS.map(b=>b.key)), CUR_AE = new Set(AES.map(a=>a.key));
 function whoMatches(r, person, role){
   const v = role==="ae" ? r.ae : r.booker;
   if(person===INB_ALL) return role==="bdr" && NOT_A_BDR.has(v);
-  if(person===BDR_ALL) return role==="bdr" && !!v && !NOT_A_BDR.has(v) && !CUR_AE.has(v);   // every call a BDR (current or former) booked
-  if(person===INB_BDR) return role==="bdr" && !!v && !NOT_A_BDR.has(v) && !CUR_AE.has(v) && /^Inbound - /.test(r.utm||"");   // inbound lead, BDR booked the call
+  if(PRED.has(person)) return role==="bdr" && PRED.get(person)(r);   // Sales L10 breakdown rows
   if(person===OTHER) return role==="bdr" && !!v && CUR_AE.has(v);   // calls an AE booked themselves
   if(person!==FORMER) return v===person;
   if(!v) return false;
@@ -670,7 +704,7 @@ function render(){
   renderReviewBar();
   document.getElementById("refreshBtn").hidden = !(state.me && state.me.approver);
   renderTrends();
-  renderInbound();
+  renderL10();
 }
 
 function renderReviewBar(){
@@ -1095,9 +1129,13 @@ document.getElementById("closeBtn").onclick=()=>document.getElementById("dlg").c
 document.getElementById("dlgX").onclick=()=>document.getElementById("dlg").close();
 // clicking the dark area outside the box also closes it
 document.getElementById("dlg").addEventListener("click", e=>{ if(e.target.id==="dlg") e.target.close(); });
-/* ---------- Sales L10: inbound deep dive ---------- */
-const ib = {kind:"month", offset:0, rows:{}};
-const IB_COLS = [
+/* ---------- Sales L10: BDR + Inbound breakdowns (same table engine) ---------- */
+const RTB_UTM = "Inbound - RTB Hit";
+const isBdrBooked = r => !!r.booker && !NOT_A_BDR.has(r.booker) && !CUR_AE.has(r.booker);
+const isInbLead = r => NOT_A_BDR.has(r.booker) || (/^Inbound - /.test(r.utm||"") && r.utm!==RTB_UTM);   // RTB hit = outbound
+const repOf = r => CUR_BDR.has(r.booker) ? r.booker : FORMER;
+const srcName = u => u===NO_UTM ? "No UTM" : u.replace(/^(Inbound|Outbound) - /,"");
+const BK_COLS = [
   {label:"Books",           f:t=>t.books.length, list:"books"},
   {label:"Runs due",        f:t=>t.due.length,   list:"due"},
   {label:"Runs had",        f:t=>t.had.length,   list:"had"},
@@ -1109,57 +1147,103 @@ const IB_COLS = [
   {label:"Closes",          f:t=>t.won.length,   list:"won"},
   {label:"MRR",             f:t=>t.cwd, money:true, list:"won"},
 ];
-const ibShown = (c,v) => c.pct ? pctS(v) : c.money ? fmt(v||0,true) : fmt(v||0);
-function ibChannels(p){
+const bkShown = (c,v) => c.pct ? pctS(v) : c.money ? fmt(v||0,true) : fmt(v||0);
+const L10 = {
+  bd: {kind:"month", offset:0, rep:"all", rows:{}},
+  ib: {kind:"month", offset:0, who:"all", rows:{}},
+};
+// a breakdown row = {key, name, pred, cls}; its predicate is registered so statsFor / openList can use it like a person
+function bkRow(sec, key, name, pred, cls){ const pk = "l10:"+sec+":"+key; PRED.set(pk, pred); const r = {key, pk, name, cls}; L10[sec].rows[key] = r; return r; }
+const bkStats = (r, p) => statsFor(r.pk, "bdr", p);
+function bkTable(sec, rows, p){
+  return `<table class="ib-tbl"><thead><tr><th></th>${BK_COLS.map(c=>`<th>${c.label}</th>`).join("")}</tr></thead><tbody>${rows.map(r=>{
+    const t = bkStats(r, p);
+    return `<tr class="${r.cls||""}"><td>${esc(r.name)}</td>${BK_COLS.map((c,i)=>`<td><span class="click" data-bk="${sec}|${esc(r.key)}" data-bkc="${i}">${bkShown(c, c.f(t))}</span>${c.sub&&c.sub(t)?`<small>${c.sub(t)}</small>`:""}</td>`).join("")}</tr>`;
+  }).join("") || `<tr><td class="empty" colspan="${BK_COLS.length+1}">Nothing in this period.</td></tr>`}</tbody></table>`;
+}
+function bkTiles(sec, row, bench, benchName, p){
+  const a = bkStats(row, p), b = bkStats(bench, p);
+  const tile = (k,v,sub,ci) => `<div class="ib-tile"><div class="k">${k}</div><div class="v"><span class="click" data-bk="${sec}|${row.key}" data-bkc="${ci}">${v}</span></div><div class="s">${sub}</div></div>`;
+  return tile("Books (new)", fmt(a.books.length), benchName+" "+fmt(b.books.length), 0) +
+    tile("Runs had", fmt(a.had.length), "of "+a.due.length+" due", 2) +
+    tile("Overall show", pctS(a.show), benchName+" "+pctS(b.show), 3) +
+    tile("1st-time show", pctS(a.first), benchName+" "+pctS(b.first), 4) +
+    tile("Closes", fmt(a.won.length), benchName+" "+fmt(b.won.length), 8) +
+    tile("MRR", fmt(a.cwd,true), benchName+" "+fmt(b.cwd,true), 9);
+}
+// first-touch sources seen on records matching pred in the period, busiest first, "No UTM" last
+function bkSources(pred, p){
   const n = {}, add = r => { const u = utmOf(r); n[u] = (n[u]||0) + 1; };
-  effShowup().filter(r=>!r.dropped && whoMatches(r, INB_ALL, "bdr") && (inP(r.booked_at,p) || inP(r.first_slot,p) || inP(r.run_at,p) || (r.due_ts||[]).some(t=>inP(t,p)))).forEach(add);
-  effEvents().filter(r=>!r.dropped && whoMatches(r, INB_ALL, "bdr") && inP(r.at,p)).forEach(add);
+  effShowup().filter(r=>!r.dropped && pred(r) && (inP(r.booked_at,p) || inP(r.first_slot,p) || inP(r.run_at,p) || (r.due_ts||[]).some(t=>inP(t,p)))).forEach(add);
+  effEvents().filter(r=>!r.dropped && pred(r) && inP(r.at,p)).forEach(add);
   return Object.keys(n).sort((a,b)=>((a===NO_UTM)-(b===NO_UTM)) || (n[b]-n[a]) || a.localeCompare(b));
 }
-function ibTable(rows, p){
-  return `<table class="ib-tbl"><thead><tr><th></th>${IB_COLS.map(c=>`<th>${c.label}</th>`).join("")}</tr></thead><tbody>${rows.map(r=>{
-    ib.rows[r.key] = r;
-    const t = statsFor(r.person, "bdr", {...p, utm:r.utm});
-    return `<tr class="${r.cls||""}"><td>${esc(r.name)}</td>${IB_COLS.map((c,i)=>`<td><span class="click" data-ib="${esc(r.key)}" data-ibc="${i}">${ibShown(c, c.f(t))}</span>${c.sub&&c.sub(t)?`<small>${c.sub(t)}</small>`:""}</td>`).join("")}</tr>`;
-  }).join("") || `<tr><td class="empty" colspan="${IB_COLS.length+1}">No inbound calls in this period.</td></tr>`}</tbody></table>`;
+function bkPeriodUI(sec){
+  const st = L10[sec], p = periodFor(st.kind, st.offset);
+  document.getElementById(sec+"Period").textContent = p.label;
+  document.querySelectorAll("#"+sec+"Kind button").forEach(b=>b.setAttribute("aria-pressed", b.dataset.k===st.kind));
+  document.getElementById(sec+"Prev").disabled = p.start <= DATA_FROM;
+  document.getElementById(sec+"Next").disabled = st.offset >= 0;
+  return p;
 }
-function renderInbound(){
-  if(!document.getElementById("ibSec")) return;
-  const p = periodFor(ib.kind, ib.offset);
-  document.getElementById("ibPeriod").textContent = p.label;
-  document.querySelectorAll("#ibKind button").forEach(b=>b.setAttribute("aria-pressed", b.dataset.k===ib.kind));
-  document.getElementById("ibPrev").disabled = p.start <= DATA_FROM;
-  document.getElementById("ibNext").disabled = ib.offset >= 0;
-  ib.rows = {};
-  const a = statsFor(INB_ALL,"bdr",p), b = statsFor(BDR_ALL,"bdr",p);
-  const tile = (k,v,sub,key,ci) => `<div class="ib-tile"><div class="k">${k}</div><div class="v"><span class="click" data-ib="${key}" data-ibc="${ci}">${v}</span></div><div class="s">${sub}</div></div>`;
-  ib.rows.inb = {key:"inb", person:INB_ALL, name:"All inbound"};
-  document.getElementById("ibTiles").innerHTML =
-    tile("Books (new)", fmt(a.books.length), "BDR team "+fmt(b.books.length), "inb", 0) +
-    tile("Runs had", fmt(a.had.length), "of "+a.due.length+" due", "inb", 2) +
-    tile("Overall show", pctS(a.show), "BDR team "+pctS(b.show), "inb", 3) +
-    tile("1st-time show", pctS(a.first), "BDR team "+pctS(b.first), "inb", 4) +
-    tile("Closes", fmt(a.won.length), "BDR team "+fmt(b.won.length), "inb", 8) +
-    tile("MRR", fmt(a.cwd,true), "BDR team "+fmt(b.cwd,true), "inb", 9);
-  const ch = ibChannels(p).map(u=>({key:"ch:"+u, person:INB_ALL, utm:u, name:utmName(u)}));
-  document.getElementById("ibByChannel").innerHTML = ibTable(ch.length ? [...ch,
-    {key:"inb", person:INB_ALL, name:"All inbound", cls:"tot"},
-    {key:"bdr", person:BDR_ALL, name:"BDR team (for comparison)", cls:"bench"}] : [], p);
-  document.getElementById("ibByPath").innerHTML = ibTable([
-    {key:"self", person:"Inbound",     name:"Lead booked themselves"},
-    {key:"cb",   person:"CloseBot AI", name:"CloseBot"},
-    {key:"inb",  person:INB_ALL,       name:"All inbound", cls:"tot"},
-    {key:"ibdr", person:INB_BDR,       name:"Inbound leads booked by a BDR", cls:"bench"}], p);
+function renderBdrBreakdown(){
+  const st = L10.bd; st.rows = {};
+  const p = bkPeriodUI("bd");
+  const team = bkRow("bd", "team", "BDR team", isBdrBooked, "tot");
+  const reps = [...BDRS.map(b=>bkRow("bd", b.key, b.name, r=>isBdrBooked(r) && r.booker===b.key)),
+                bkRow("bd", "former", "Former BDRs", r=>isBdrBooked(r) && !CUR_BDR.has(r.booker))];
+  const shown = reps.filter(r=>r.key!=="former" || formerHasData(bkStats(r,p)));
+  const inb = bkRow("bd", "inb", "Inbound (lead / CloseBot)", r=>NOT_A_BDR.has(r.booker), "bench");
+  document.getElementById("bdTiles").innerHTML = bkTiles("bd", team, inb, "Inbound", p);
+  document.getElementById("bdByRep").innerHTML = bkTable("bd", [...shown, team, inb], p);
+  // rep picker (keeps the choice while it is still on the list)
+  const sel = document.getElementById("bdRep");
+  const opts = [["all","All BDRs"], ...shown.map(r=>[r.key, r.name])];
+  if(!opts.some(o=>o[0]===st.rep)) st.rep = "all";
+  sel.innerHTML = opts.map(([v,l])=>`<option value="${esc(v)}"${v===st.rep?" selected":""}>${esc(l)}</option>`).join("");
+  const base = st.rep==="all" ? team : reps.find(r=>r.key===st.rep);
+  const srcRows = bkSources(PRED.get(base.pk), p).map(u=>bkRow("bd", "src:"+u, srcName(u)+(/^Inbound - /.test(u)&&u!==RTB_UTM?" (inbound lead)":""), r=>PRED.get(base.pk)(r) && utmOf(r)===u));
+  const tot = bkRow("bd", "srctot", (st.rep==="all"?"All BDRs":base.name)+": all sources", PRED.get(base.pk), "tot");
+  document.getElementById("bdBySource").innerHTML = bkTable("bd", srcRows.length ? [...srcRows, tot] : [], p);
 }
-document.querySelectorAll("#ibKind button").forEach(b=>b.onclick=()=>{ ib.kind=b.dataset.k; ib.offset=0; renderInbound(); });
-document.getElementById("ibPrev").onclick = ()=>{ ib.offset--; renderInbound(); };
-document.getElementById("ibNext").onclick = ()=>{ if(ib.offset<0){ ib.offset++; renderInbound(); } };
-document.getElementById("ibSec").addEventListener("click", e=>{
-  const c = e.target.closest("[data-ib]"); if(!c) return;
-  const r = ib.rows[c.dataset.ib], col = IB_COLS[+c.dataset.ibc]; if(!r || !col) return;
-  const p = periodFor(ib.kind, ib.offset);
-  openList(r.person, "bdr", col.list, r.name+": "+col.label, {...p, utm:r.utm});
-});
+function renderInboundBreakdown(){
+  const st = L10.ib; st.rows = {};
+  const p = bkPeriodUI("ib");
+  document.querySelectorAll("#ibWho button").forEach(b=>b.setAttribute("aria-pressed", b.dataset.w===st.who));
+  const whoOk = st.who==="self" ? (r=>NOT_A_BDR.has(r.booker)) : st.who==="bdr" ? isBdrBooked : (r=>NOT_A_BDR.has(r.booker) || isBdrBooked(r));
+  const whoName = {all:"All inbound leads", self:"Inbound: lead / CloseBot", bdr:"Inbound leads booked by BDRs"}[st.who];
+  const base = r => isInbLead(r) && whoOk(r);
+  const all = bkRow("ib", "all", whoName, base, "tot");
+  const out = bkRow("ib", "out", "Outbound calls (for comparison)", r=>isBdrBooked(r) && !isInbLead(r), "bench");
+  document.getElementById("ibTiles").innerHTML = bkTiles("ib", all, out, "Outbound", p);
+  const ch = bkSources(base, p).map(u=>bkRow("ib", "ch:"+u, srcName(u), r=>base(r) && utmOf(r)===u));
+  document.getElementById("ibByChannel").innerHTML = bkTable("ib", ch.length ? [...ch, all, out] : [], p);
+  const paths = [bkRow("ib", "self", "Lead booked themselves", r=>isInbLead(r) && r.booker==="Inbound"),
+                 bkRow("ib", "cb", "CloseBot", r=>isInbLead(r) && r.booker==="CloseBot AI"),
+                 ...BDRS.map(b=>bkRow("ib", "p:"+b.key, "Booked by "+b.name.split(" ")[0], r=>isInbLead(r) && r.booker===b.key)),
+                 bkRow("ib", "p:former", "Booked by former BDRs", r=>isInbLead(r) && isBdrBooked(r) && !CUR_BDR.has(r.booker))]
+    .filter(r=>r.key!=="p:former" || formerHasData(bkStats(r,p)));
+  const allLeads = bkRow("ib", "allleads", "All inbound leads", r=>isInbLead(r) && (NOT_A_BDR.has(r.booker) || isBdrBooked(r)), "tot");
+  document.getElementById("ibByPath").innerHTML = bkTable("ib", [...paths, allLeads], p);
+}
+function renderL10(){
+  if(!document.getElementById("bdSec")) return;
+  for(const k of [...PRED.keys()]) if(k.startsWith("l10:")) PRED.delete(k);
+  renderBdrBreakdown(); renderInboundBreakdown();
+}
+for(const sec of ["bd","ib"]){
+  const st = L10[sec], draw = sec==="bd" ? renderBdrBreakdown : renderInboundBreakdown;
+  document.querySelectorAll("#"+sec+"Kind button").forEach(b=>b.onclick=()=>{ st.kind=b.dataset.k; st.offset=0; draw(); });
+  document.getElementById(sec+"Prev").onclick = ()=>{ st.offset--; draw(); };
+  document.getElementById(sec+"Next").onclick = ()=>{ if(st.offset<0){ st.offset++; draw(); } };
+  document.getElementById(sec+"Sec").addEventListener("click", e=>{
+    const c = e.target.closest("[data-bk]"); if(!c) return;
+    const [s2, key] = c.dataset.bk.split("|"); const r = L10[s2].rows[key], col = BK_COLS[+c.dataset.bkc]; if(!r || !col) return;
+    openList(r.pk, "bdr", col.list, r.name+": "+col.label, periodFor(L10[s2].kind, L10[s2].offset));
+  });
+}
+document.querySelectorAll("#ibWho button").forEach(b=>b.onclick=()=>{ L10.ib.who=b.dataset.w; renderInboundBreakdown(); });
+document.getElementById("bdRep").onchange = e=>{ L10.bd.rep = e.target.value; renderBdrBreakdown(); };
 render(); refresh();
 </script>
 </body>

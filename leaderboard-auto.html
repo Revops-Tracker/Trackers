@@ -686,6 +686,10 @@ function dealHTML(r, isEv){
     if(st==="true") acts.push(`<span class="ok">✓ You confirmed this</span>`);
     else if(st==="todo") acts.push(`<span class="tf"><button class="t" data-true="${esc(r.key)}" data-label="${esc(labelOf(r))}">True</button><button class="f" data-fix="${esc(r.key)}" data-ev="${isEv?1:0}">False</button></span>`);
   }
+  // approvers can sign off for the rep who owns the record (e.g. confirming a deal with them)
+  { const ow = reviewOwner(r); if(me.approver && ow && ow!==me.rep && REPS.includes(ow) && happened(r)){ const st = reviewState(r, ow);
+    if(st==="true") acts.push(`<span class="ok">✓ ${esc(ow)} confirmed</span>`);
+    else if(st==="todo") acts.push(`<span class="tf"><button class="t" data-true="${esc(r.key)}" data-label="${esc(labelOf(r))}" data-rep="${esc(ow)}">Confirm for ${esc(ow)}</button></span>`); } }
   if(me.approver && r.pend) acts.push(`<span class="tf"><button class="t" data-approve="${esc(r.key)}">Approve</button><button class="f" data-reject="${esc(r.key)}">Reject</button></span>`);
   if(me.approver) acts.push(`<button class="linkish" data-fix="${esc(r.key)}" data-ev="${isEv?1:0}">${r.ov?"Change correction":"Correct"}</button>`);
   if((me.approver && r.ov) || (r.pend && r.pend.by_email===me.email)) acts.push(`<button class="linkish" data-undo="${esc(r.key)}">${r.pend&&!me.approver?"Withdraw my correction":"Undo correction"}</button>`);
@@ -810,7 +814,7 @@ document.addEventListener("click", e=>{
   if(n){ openList(n.dataset.person, n.dataset.role, n.dataset.metric, n.dataset.title); return; }
   const f = e.target.closest("[data-fix]"); if(f){ fixForm(f.dataset.fix, f.dataset.ev==="1"); return; }
   const u = e.target.closest("[data-undo]"); if(u){ undo(u.dataset.undo); return; }
-  const t = e.target.closest("[data-true]"); if(t){ act("/review", {key:t.dataset.true, label:t.dataset.label}, "Confirmed"); return; }
+  const t = e.target.closest("[data-true]"); if(t){ act("/review", t.dataset.rep ? {key:t.dataset.true, label:t.dataset.label, rep:t.dataset.rep} : {key:t.dataset.true, label:t.dataset.label}, t.dataset.rep ? "Confirmed for "+t.dataset.rep : "Confirmed"); return; }
   const ap = e.target.closest("[data-approve]"); if(ap){ act("/decide", {key:ap.dataset.approve, approve:true}, "Approved, numbers updated"); return; }
   const rj = e.target.closest("[data-reject]"); if(rj){ act("/decide", {key:rj.dataset.reject, approve:false}, "Rejected, back to the rep"); return; }
   const q = e.target.closest("[data-queue]"); if(q){ openQueue(q.dataset.queue); return; }

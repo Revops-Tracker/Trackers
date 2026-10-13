@@ -438,7 +438,7 @@ function renderQ3(){
   const sm = 'font-size:12px;font-weight:400;color:var(--muted)';
   let t = '<table class="cr-tbl"><thead><tr><th>Week</th>'+names.map(n=>'<th>'+h(n)+''+'</th>').join("")+'</tr></thead><tbody>';
   weeks.forEach(w=>{
-    t += '<tr><td>'+h(weekLabel(w))+'</td>'+names.map(n=>{
+    t += '<tr><td>'+h(weekLabel(w))+(w<="2026-08-01" ? '<div style="'+sm+'">leads split across 5 BDRs</div>' : '')+'</td>'+names.map(n=>{
       const r = get(n,w);
       const o = r ? (r.other_leads||0) : 0;
       return '<td>'+(r ? num(r.parallel_leads+r.power_leads+o)+'<div style="'+sm+'">'+(o ? num(o)+' Closed Lost (manual list)' : num(r.parallel_leads)+' parallel + '+num(r.power_leads)+' power')+'</div>' : (OFF_WEEKS[n+"|"+w] ? 'Off<div style="'+sm+'">removed from round robin</div>' : "–"))+'</td>';

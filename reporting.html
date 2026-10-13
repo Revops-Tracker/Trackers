@@ -205,6 +205,20 @@ html.view-reporting .lb-only{display:none!important}
 .tr-custom[hidden]{display:none}
 .tr-sub{font-size:13px;color:var(--muted);margin-bottom:8px}
 section[hidden]{display:none}
+/* Inbound deep dive (Sales L10) */
+.ib-ctl{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+.ib-tiles{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:12px;margin:4px 0 18px}
+.ib-tile{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:12px 14px}
+.ib-tile .k{font-size:13px;color:var(--muted)}
+.ib-tile .v{font-family:var(--display);font-weight:700;font-size:32px;line-height:1.1;font-variant-numeric:tabular-nums}
+.ib-tile .s{font-size:12px;color:var(--muted)}
+.ib-h{font-family:var(--display);font-weight:600;font-size:22px;margin:22px 0 8px}
+.ib-tbl{min-width:720px}
+.ib-tbl th,.ib-tbl td{padding:8px 7px;font-size:14px}
+.ib-tbl th:first-child,.ib-tbl td:first-child{white-space:nowrap}
+.ib-tbl td small{display:block;font-size:11px;color:var(--muted)}
+.ib-tbl tr.tot td{font-weight:700;border-top:2px solid var(--line)}
+.ib-tbl tr.bench td{color:var(--muted);font-style:italic}
 </style>
 <div class="wrap">
   <header class="top">
@@ -307,6 +321,30 @@ section[hidden]{display:none}
     <div class="table-wrap" id="trTableWrap" hidden></div>
     <div class="legend">Each bar is split by who booked the deal. <b>BDRs only</b> = Brandon, Erich, Issa and former BDRs. <b>Inbound</b> = calls with no BDR (booked by the lead) plus CloseBot; under Inbound the bars are split by the deal's first-touch UTM source (pick one to see it alone, split into lead-booked vs CloseBot). Sources outside the main six are grouped as Other sources (hover the legend to see them). AE-booked calls only show under All sources. The number on top is the total. Closes and MRR are by close date. Click a coloured block to see the deals. * = period not finished or cut by the range.</div>
   </section>
+
+  <section id="ibSec">
+    <div class="sec-head">
+      <h2>Inbound</h2>
+      <div class="ib-ctl">
+        <div class="seg" id="ibKind" role="group" aria-label="Inbound period">
+          <button data-k="week" aria-pressed="false">Week</button>
+          <button data-k="month" aria-pressed="true">Month</button>
+          <button data-k="quarter" aria-pressed="false">Quarter</button>
+        </div>
+        <div class="nav">
+          <button type="button" id="ibPrev" aria-label="Previous period">‹</button>
+          <div class="period" id="ibPeriod" aria-live="polite"></div>
+          <button type="button" id="ibNext" aria-label="Next period">›</button>
+        </div>
+      </div>
+    </div>
+    <div class="ib-tiles" id="ibTiles"></div>
+    <div class="ib-h">By channel (first-touch UTM)</div>
+    <div class="table-wrap" id="ibByChannel"></div>
+    <div class="ib-h">By how the call was booked</div>
+    <div class="table-wrap" id="ibByPath"></div>
+    <div class="legend"><b>Inbound</b> = calls the lead booked themselves plus CloseBot bookings. <b>By channel</b> splits them by the deal's first-touch UTM source. <b>BDR team</b> (grey) is there for comparison: every call a BDR booked. <b>Inbound leads booked by a BDR</b> = a BDR booked the call, but the deal's first touch is inbound; these count under the BDR, not in the Inbound total. Same definitions as everywhere: <b>Books</b> = new calls counted on the day they were booked; <b>Runs due</b> = calls whose slot came up; <b>Overall show</b> = had ÷ due; <b>1st-time show</b> = held at the first slot ÷ first slots that came due (small numbers underneath). Closes and MRR are by close date. Click any number to see the deals.</div>
+  </section>
 </div>
 
 <dialog id="dlg">
@@ -346,11 +384,13 @@ const AE_RANK = [
 const DATA_FROM = "2026-07-01";   // history is backfilled from the start of Q3
 const NOT_A_BDR = new Set(["Inbound","CloseBot AI"]);
 // Reps who have left (e.g. Jules, Hannah, Armin in Q3) are not shown by name: their numbers roll up into one "Former reps" bucket.
-const FORMER = "Former reps", OTHER = "Other", INB_ALL = "All inbound";
+const FORMER = "Former reps", OTHER = "Other", INB_ALL = "All inbound", BDR_ALL = "BDR team", INB_BDR = "Inbound leads booked by a BDR";
 const CUR_BDR = new Set(BDRS.map(b=>b.key)), CUR_AE = new Set(AES.map(a=>a.key));
 function whoMatches(r, person, role){
   const v = role==="ae" ? r.ae : r.booker;
   if(person===INB_ALL) return role==="bdr" && NOT_A_BDR.has(v);
+  if(person===BDR_ALL) return role==="bdr" && !!v && !NOT_A_BDR.has(v) && !CUR_AE.has(v);   // every call a BDR (current or former) booked
+  if(person===INB_BDR) return role==="bdr" && !!v && !NOT_A_BDR.has(v) && !CUR_AE.has(v) && /^Inbound - /.test(r.utm||"");   // inbound lead, BDR booked the call
   if(person===OTHER) return role==="bdr" && !!v && CUR_AE.has(v);   // calls an AE booked themselves
   if(person!==FORMER) return v===person;
   if(!v) return false;
@@ -630,6 +670,7 @@ function render(){
   renderReviewBar();
   document.getElementById("refreshBtn").hidden = !(state.me && state.me.approver);
   renderTrends();
+  renderInbound();
 }
 
 function renderReviewBar(){
@@ -1054,6 +1095,71 @@ document.getElementById("closeBtn").onclick=()=>document.getElementById("dlg").c
 document.getElementById("dlgX").onclick=()=>document.getElementById("dlg").close();
 // clicking the dark area outside the box also closes it
 document.getElementById("dlg").addEventListener("click", e=>{ if(e.target.id==="dlg") e.target.close(); });
+/* ---------- Sales L10: inbound deep dive ---------- */
+const ib = {kind:"month", offset:0, rows:{}};
+const IB_COLS = [
+  {label:"Books",           f:t=>t.books.length, list:"books"},
+  {label:"Runs due",        f:t=>t.due.length,   list:"due"},
+  {label:"Runs had",        f:t=>t.had.length,   list:"had"},
+  {label:"Overall show",    f:t=>t.show,  pct:true, list:"due",  sub:t=>t.due.length?t.had.length+" of "+t.due.length:""},
+  {label:"1st-time show",   f:t=>t.first, pct:true, list:"fdue", sub:t=>t.fdue.length?t.f1.length+" of "+t.fdue.length:""},
+  {label:"No-shows",        f:t=>t.ns.length,    list:"ns"},
+  {label:"Cancelled ahead", f:t=>t.ca.length,    list:"ca"},
+  {label:"Designs",         f:t=>t.des.length,   list:"des"},
+  {label:"Closes",          f:t=>t.won.length,   list:"won"},
+  {label:"MRR",             f:t=>t.cwd, money:true, list:"won"},
+];
+const ibShown = (c,v) => c.pct ? pctS(v) : c.money ? fmt(v||0,true) : fmt(v||0);
+function ibChannels(p){
+  const n = {}, add = r => { const u = utmOf(r); n[u] = (n[u]||0) + 1; };
+  effShowup().filter(r=>!r.dropped && whoMatches(r, INB_ALL, "bdr") && (inP(r.booked_at,p) || inP(r.first_slot,p) || inP(r.run_at,p) || (r.due_ts||[]).some(t=>inP(t,p)))).forEach(add);
+  effEvents().filter(r=>!r.dropped && whoMatches(r, INB_ALL, "bdr") && inP(r.at,p)).forEach(add);
+  return Object.keys(n).sort((a,b)=>((a===NO_UTM)-(b===NO_UTM)) || (n[b]-n[a]) || a.localeCompare(b));
+}
+function ibTable(rows, p){
+  return `<table class="ib-tbl"><thead><tr><th></th>${IB_COLS.map(c=>`<th>${c.label}</th>`).join("")}</tr></thead><tbody>${rows.map(r=>{
+    ib.rows[r.key] = r;
+    const t = statsFor(r.person, "bdr", {...p, utm:r.utm});
+    return `<tr class="${r.cls||""}"><td>${esc(r.name)}</td>${IB_COLS.map((c,i)=>`<td><span class="click" data-ib="${esc(r.key)}" data-ibc="${i}">${ibShown(c, c.f(t))}</span>${c.sub&&c.sub(t)?`<small>${c.sub(t)}</small>`:""}</td>`).join("")}</tr>`;
+  }).join("") || `<tr><td class="empty" colspan="${IB_COLS.length+1}">No inbound calls in this period.</td></tr>`}</tbody></table>`;
+}
+function renderInbound(){
+  if(!document.getElementById("ibSec")) return;
+  const p = periodFor(ib.kind, ib.offset);
+  document.getElementById("ibPeriod").textContent = p.label;
+  document.querySelectorAll("#ibKind button").forEach(b=>b.setAttribute("aria-pressed", b.dataset.k===ib.kind));
+  document.getElementById("ibPrev").disabled = p.start <= DATA_FROM;
+  document.getElementById("ibNext").disabled = ib.offset >= 0;
+  ib.rows = {};
+  const a = statsFor(INB_ALL,"bdr",p), b = statsFor(BDR_ALL,"bdr",p);
+  const tile = (k,v,sub,key,ci) => `<div class="ib-tile"><div class="k">${k}</div><div class="v"><span class="click" data-ib="${key}" data-ibc="${ci}">${v}</span></div><div class="s">${sub}</div></div>`;
+  ib.rows.inb = {key:"inb", person:INB_ALL, name:"All inbound"};
+  document.getElementById("ibTiles").innerHTML =
+    tile("Books (new)", fmt(a.books.length), "BDR team "+fmt(b.books.length), "inb", 0) +
+    tile("Runs had", fmt(a.had.length), "of "+a.due.length+" due", "inb", 2) +
+    tile("Overall show", pctS(a.show), "BDR team "+pctS(b.show), "inb", 3) +
+    tile("1st-time show", pctS(a.first), "BDR team "+pctS(b.first), "inb", 4) +
+    tile("Closes", fmt(a.won.length), "BDR team "+fmt(b.won.length), "inb", 8) +
+    tile("MRR", fmt(a.cwd,true), "BDR team "+fmt(b.cwd,true), "inb", 9);
+  const ch = ibChannels(p).map(u=>({key:"ch:"+u, person:INB_ALL, utm:u, name:utmName(u)}));
+  document.getElementById("ibByChannel").innerHTML = ibTable(ch.length ? [...ch,
+    {key:"inb", person:INB_ALL, name:"All inbound", cls:"tot"},
+    {key:"bdr", person:BDR_ALL, name:"BDR team (for comparison)", cls:"bench"}] : [], p);
+  document.getElementById("ibByPath").innerHTML = ibTable([
+    {key:"self", person:"Inbound",     name:"Lead booked themselves"},
+    {key:"cb",   person:"CloseBot AI", name:"CloseBot"},
+    {key:"inb",  person:INB_ALL,       name:"All inbound", cls:"tot"},
+    {key:"ibdr", person:INB_BDR,       name:"Inbound leads booked by a BDR", cls:"bench"}], p);
+}
+document.querySelectorAll("#ibKind button").forEach(b=>b.onclick=()=>{ ib.kind=b.dataset.k; ib.offset=0; renderInbound(); });
+document.getElementById("ibPrev").onclick = ()=>{ ib.offset--; renderInbound(); };
+document.getElementById("ibNext").onclick = ()=>{ if(ib.offset<0){ ib.offset++; renderInbound(); } };
+document.getElementById("ibSec").addEventListener("click", e=>{
+  const c = e.target.closest("[data-ib]"); if(!c) return;
+  const r = ib.rows[c.dataset.ib], col = IB_COLS[+c.dataset.ibc]; if(!r || !col) return;
+  const p = periodFor(ib.kind, ib.offset);
+  openList(r.person, "bdr", col.list, r.name+": "+col.label, {...p, utm:r.utm});
+});
 render(); refresh();
 </script>
 </body>

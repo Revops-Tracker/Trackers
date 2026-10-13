@@ -241,7 +241,7 @@ html.view-reporting .lb-only{display:none!important}
     <div class="tbl-toggle"><button class="btn ghost" type="button" id="bdrTableBtn" aria-expanded="false" aria-controls="bdrMetrics">Show metrics table</button></div>
     <div id="bdrMetrics" hidden>
     <div class="table-wrap" id="bdrTable"></div>
-    <div class="legend"><b>Books</b>: new bookings whose first slot falls in the period. <b>Runs due</b>: discovery calls whose slot arrived in the period. <b>Runs had</b>: due calls that were held. <b>Overall show</b> = runs had ÷ runs due. <b>1st-time show</b> = new books held at their first slot ÷ new books whose first slot came due. <b>MRR generated</b>: monthly retainer (USD) of deals closed won in the period, credited to the rep who booked them. <b>Designs</b> (designs created): deals moved into the Design/Prop Review stage in HubSpot. <b>Designs held</b>: deals moved from Design on to a later stage (Prop Update or beyond).</div>
+    <div class="legend"><b>Books</b>: new calls booked in the period, counted on the day they were booked (a rebook only counts as new when it is booked more than 30 days after the deal's last slot). <b>Runs due</b>: discovery calls whose slot arrived in the period. <b>Runs had</b>: due calls that were held. <b>Overall show</b> = runs had ÷ runs due. <b>1st-time show</b> = new books held at their first slot ÷ new books whose first slot came due in the period. <b>MRR generated</b>: monthly retainer (USD) of deals closed won in the period, credited to the rep who booked them. <b>Designs</b> (designs created): deals moved into the Design/Prop Review stage in HubSpot. <b>Designs held</b>: deals moved from Design on to a later stage (Prop Update or beyond).</div>
     </div>
   </section>
 
@@ -470,14 +470,18 @@ const todoFor = rep => reviewables(rep).filter(r=>reviewState(r, rep)==="todo");
 
 /* ---------- aggregation ---------- */
 const inP = (iso,p) => { const d = torDay(iso); return !!d && d>=p.start && d<=p.end; };
+// a slot "passed" once it is before the end of the data (end of yesterday)
+const slotPassed = iso => !!iso && !!state.lastRun && Date.parse(iso) < Date.parse(state.lastRun.window_end);
 function showupStats(rows, p){
-  const books = rows.filter(r=>inP(r.first_slot,p));
+  // Books = NEW bookings counted on the day they were booked (a deal's first call, or one booked 30+ days after its last slot)
+  const books = rows.filter(r=>inP(r.booked_at||r.first_slot,p));
+  const firsts = rows.filter(r=>inP(r.first_slot,p));
   const due = rows.filter(r=>(r.due_ts||[]).some(t=>inP(t,p)) || inP(r.run_at,p));
   const had = due.filter(r=>inP(r.run_at,p));
-  const fdue = books.filter(r=>!r.pushed);
+  const fdue = firsts.filter(r=>!r.pushed && slotPassed(r.first_slot));
   const f1 = fdue.filter(r=>r.cat==="first_time_show");
   const notHad = due.filter(r=>!had.includes(r));
-  return { books, due, had, fdue, f1, notHad,
+  return { books, firsts, due, had, fdue, f1, notHad,
     ns: notHad.filter(r=>r.cat==="no_show"||r.cat==="cst_unverified"||r.cat==="closed_no_mtg"||r.cat==="awaiting"||r.cat==="awaiting_recovery"),
     ca: notHad.filter(r=>r.cat==="cancelled_ahead"),
     show: due.length ? had.length/due.length : null,
@@ -661,6 +665,7 @@ function canFix(rec){
 }
 function whyShowup(r){
   const bits = [];
+  if(r.booked_at) bits.push(`Booked ${nice(r.booked_at)}`);
   bits.push(`First slot ${nice(r.first_slot)}`);
   if(r.run_at) bits.push(`held ${nice(r.run_at)}`);
   const due = (r.due_ts||[]).filter(t=>!r.run_at || Math.abs(Date.parse(t)-Date.parse(r.run_at))>3*3600e3);
@@ -706,10 +711,10 @@ function openList(person, role, metric, title, pOverride){
   const live = allSu.filter(r=>!r.dropped);
   const s = showupStats(live, p);
   const ev = effEvents().filter(r=>whoMatches(r, person, role) && utmOk(r,p) && inP(r.at,p));
-  const dropped = allSu.filter(r=>r.dropped && (inP(r.first_slot,p) || (r.due_ts||[]).some(t=>inP(t,p))));
+  const dropped = allSu.filter(r=>r.dropped && (inP(r.booked_at,p) || inP(r.first_slot,p) || (r.due_ts||[]).some(t=>inP(t,p))));
   const groups = [];
   const evOf = k => ev.filter(e=>e.kind===k);
-  if(metric==="books") groups.push(["New books (first slot in period)", s.books]);
+  if(metric==="books") groups.push(["New books (booked in period)", s.books]);
   else if(metric==="had") groups.push(["Runs had", s.had]);
   else if(metric==="due") groups.push(["Held", s.had], ["Due but not held", s.notHad]);
   else if(metric==="fdue") groups.push(["Held at first slot", s.f1], ["First slot came due, not held there", s.fdue.filter(r=>!s.f1.includes(r))]);

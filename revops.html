@@ -437,7 +437,7 @@ function renderQ3(){
   const names = ORDER.filter(n => SKIP_BDRS.indexOf(n) < 0 && seg.some(r=>r.bdr===n));
   const get = (n,w) => OFF_WEEKS[n+"|"+w] ? null : (seg.filter(r=>r.bdr===n && r.week_ending===w)[0] || null);
   const sm = 'font-size:12px;font-weight:400;color:var(--muted)';
-  let t = '<table class="cr-tbl"><thead><tr><th>Week</th>'+names.map(n=>'<th>'+h(n)+(n==="Jules" ? ' (estimate)' : '')+'</th>').join("")+'</tr></thead><tbody>';
+  let t = '<table class="cr-tbl"><thead><tr><th>Week</th>'+names.map(n=>'<th>'+h(n)+''+'</th>').join("")+'</tr></thead><tbody>';
   weeks.forEach(w=>{
     t += '<tr><td>'+h(weekLabel(w))+'</td>'+names.map(n=>{
       const r = get(n,w);
@@ -452,7 +452,7 @@ function renderQ3(){
     return '<td>'+num(Math.round(ap+aw+ao))+'<div style="'+sm+'">'+num(Math.round(ap))+' parallel + '+num(Math.round(aw))+' power'+(ao ? ' + '+num(Math.round(ao))+' Closed Lost' : '')+' · '+rs.length+' wks</div></td>';
   }).join("")+'</tr></tbody></table>';
   $("q3Leads").innerHTML = t;
-  $("q3Note").innerHTML = "Each figure is the Monday size of a BDR 7 DAY TVL Parallel Leads and 7 DAY TVL Power Leads HubSpot segment, which is the full count before it is worked down. The week of Sep 7 had nothing in either segment because the BDRs were given the Closed Lost TVL list manually that week (Slack, Sep 9), so that list's count is used for it. Issa was off the round robin the week of Aug 10, so that week is left out of his average. Jules is shown for the weeks she was a BDR, through Aug 31; her segments were deleted and the history did not come back with them, so her figures are an estimate (the master 7 DAY segment minus Brandon, Erich and Issa), which can include leads owned by others, and her Sep 7 week is not known. Blank after that is because she left. The average adds the parallel, power and Closed Lost averages over the weeks each BDR has a figure.";
+  $("q3Note").innerHTML = "Each figure is the Monday size of a BDR 7 DAY TVL Parallel Leads and 7 DAY TVL Power Leads HubSpot segment, which is the full count before it is worked down. The week of Sep 7 had nothing in either segment because the BDRs were given the Closed Lost TVL list manually that week (Slack, Sep 9), so that list's count is used for it. Issa was off the round robin the week of Aug 10, so that week is left out of his average. Jules is shown for the weeks she was a BDR, through Aug 31, from her own segments; blank after that is because she left. The average adds the parallel, power and Closed Lost averages over the weeks each BDR has a figure.";
 }
 
 

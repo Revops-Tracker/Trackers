@@ -474,7 +474,7 @@ const inP = (iso,p) => { const d = torDay(iso); return !!d && d>=p.start && d<=p
 const slotPassed = iso => !!iso && !!state.lastRun && Date.parse(iso) < Date.parse(state.lastRun.window_end);
 function showupStats(rows, p){
   // Books = NEW bookings counted on the day they were booked (a deal's first call, or one booked 30+ days after its last slot)
-  const books = rows.filter(r=>inP(r.booked_at||r.first_slot,p));
+  const books = rows.filter(r=>inP(r.booked_at||r.first_slot,p) && slotPassed(r.booked_at||r.first_slot));   // through end of yesterday, like everything else
   const firsts = rows.filter(r=>inP(r.first_slot,p));
   const due = rows.filter(r=>(r.due_ts||[]).some(t=>inP(t,p)) || inP(r.run_at,p));
   const had = due.filter(r=>inP(r.run_at,p));

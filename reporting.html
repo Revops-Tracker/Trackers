@@ -304,7 +304,7 @@ details.how > div{margin-top:8px;line-height:1.5}
     <div class="tbl-toggle"><button class="btn ghost" type="button" id="bdrTableBtn" aria-expanded="false" aria-controls="bdrMetrics">Show metrics table</button></div>
     <div id="bdrMetrics" hidden>
     <div class="table-wrap" id="bdrTable"></div>
-    <div class="legend"><b>Books</b>: new calls booked in the period, counted on the day they were booked (a rebook only counts as new when it is booked more than 30 days after the deal's last slot). <b>Runs due</b>: discovery calls whose slot arrived in the period. <b>Runs had</b>: due calls that were held. <b>Overall show</b> = runs had ÷ runs due. <b>1st-time show</b> = new books held at their first slot ÷ new books whose first slot came due in the period. <b>MRR generated</b>: monthly retainer (USD) of deals closed won in the period, credited to the rep who booked them. <b>Designs</b> (designs created): deals moved into the Design/Prop Review stage in HubSpot. <b>Designs held</b>: deals moved from Design on to a later stage (Prop Update or beyond).</div>
+    <div class="legend"><b>Books</b>: new calls booked in the period, counted on the day they were booked (a rebook only counts as new when it is booked more than 30 days after the deal's last slot). <b>Runs due</b>: discovery calls whose slot arrived in the period, counted per call (a deal that no-shows and is rebooked into the same period = 2 calls due). <b>Runs had</b>: calls that were held. <b>Overall show</b> = runs had ÷ runs due. <b>No-show recovery</b>: of deals that missed a call in the period, the share held at a later slot (recent periods can still recover). <b>1st-time show</b> = new books held at their first slot ÷ new books whose first slot came due in the period. <b>MRR generated</b>: monthly retainer (USD) of deals closed won in the period, credited to the rep who booked them. <b>Designs</b> (designs created): deals moved into the Design/Prop Review stage in HubSpot. <b>Designs held</b>: deals moved from Design on to a later stage (Prop Update or beyond).</div>
     </div>
   </section>
 
@@ -350,7 +350,7 @@ details.how > div{margin-top:8px;line-height:1.5}
     <details class="how"><summary>How this is counted</summary><div>
       One row per L10 metric, one column per week (Mon to Sun) or month, newest on the right. The shaded column is the period in progress: it is checked against where the goal should be by yesterday. <b>Green</b> = at or above goal, <b>red</b> = below. <b>Avg</b> = average of the finished columns shown.<br>
       <b>Dials, connects, conversations</b> come from the weekly Nooks upload (RevOps L10 tab); a week shows blank until it is uploaded. <b>Conversation → book</b> = BDR books ÷ Nooks conversations (the sheet's "complete to disco").<br>
-      <b>Books</b> = new calls, counted on the day they were booked (a rebook only counts when it is booked 30+ days after the deal's last slot). <b>Runs due</b> = calls whose slot came up; <b>runs had</b> = calls that happened; <b>overall show</b> = had ÷ due; <b>1st-time show</b> = held at the first slot ÷ first slots that came due. <b>Outbound</b> = a BDR booked it and the first touch is cold call / RTB; <b>inbound leads</b> = inbound first touch or self-booked / CloseBot, whoever booked it.<br>
+      <b>Books</b> = new calls, counted on the day they were booked (a rebook only counts when it is booked 30+ days after the deal's last slot). <b>Runs due</b> = calls whose slot came up; <b>runs had</b> = calls that happened; <b>overall show</b> = calls held ÷ calls due, per call (a deal that no-shows and is rebooked = 2 calls due); <b>no-show recovery</b> = of deals that missed a call in the period, how many were held at a later slot (recent periods can still recover); <b>1st-time show</b> = held at the first slot ÷ first slots that came due. <b>Outbound</b> = a BDR booked it and the first touch is cold call / RTB; <b>inbound leads</b> = inbound first touch or self-booked / CloseBot, whoever booked it.<br>
       <b>AE time (slots)</b> (whole team and AE views): an AE slot = one AE + one start time that came up; it <b>ran</b> if at least one call in it was held. <b>Run rate per slot</b> = slots that ran ÷ slots that came up; <b>calls per slot</b> = calls due ÷ slots. The goal column shows the Jul 1 – Oct 4 baseline (before double booking); weeks marked <span style="color:var(--gold)">●</span> are double-booking weeks (from Oct 5). Before Oct 5, two deals on one slot means a cancelled call whose slot was rebooked but whose meeting was never marked cancelled.<br>
       Designs, designs held, diagnosis, prop updates, contracts and closes are counted on the day they happened; MRR is by close date. Click any number to see the deals.<br>
       <b>Goals</b> are weekly (monthly = ×4): per BDR 1,000 dials, 80 connects, 12 books, 8 runs had, 4 designs; per AE 20 runs, 5 designs held, 8 prop updates, 4 contracts, 2 closes, $10,750 MRR; 75% show; ratio goals from the L10 sheet (book → design 33%, run → design 50%, design → close 30%, contract → close 85%). Team goals = per-BDR goal × current BDRs.
@@ -388,7 +388,7 @@ details.how > div{margin-top:8px;line-height:1.5}
     <div class="ax-key" id="axKey"></div>
     <div class="ax-chart" id="axChart"></div>
     <details class="how"><summary>How this is counted</summary><div>
-      Each AE's numbers are the calls and deals assigned to them, whoever booked them. <b>AE slot</b> = one AE + one start time that came up; it <b>ran</b> if at least one call in it was held. <b>Run rate per slot</b> = slots that ran ÷ slots that came up: how much booked AE time turned into a conversation, the number double booking should lift. <b>Calls per slot</b> = calls due ÷ slots (1.0 = no double booking). <b>Overall show</b> = calls held ÷ calls due (per deal); <b>1st-time show</b> = held at the first slot ÷ first slots that came due. <b>Run → design</b> = designs created ÷ runs had in the same period; <b>design → close</b> = closes ÷ designs created. The dashed line is the Jul 1 – Oct 4 average (before double booking); the shaded weeks are double booking (from Oct 5). The last point is the period in progress (hollow). Click a number or a point to see the deals.
+      Each AE's numbers are the calls and deals assigned to them, whoever booked them. <b>AE slot</b> = one AE + one start time that came up; it <b>ran</b> if at least one call in it was held. <b>Run rate per slot</b> = slots that ran ÷ slots that came up: how much booked AE time turned into a conversation, the number double booking should lift. <b>Calls per slot</b> = calls due ÷ slots (1.0 = no double booking). <b>Overall show</b> = calls held ÷ calls due, per call (every slot that came up counts once); <b>no-show recovery</b> = deals that missed a call and were held at a later slot ÷ deals that missed a call; <b>1st-time show</b> = held at the first slot ÷ first slots that came due. <b>Run → design</b> = designs created ÷ runs had in the same period; <b>design → close</b> = closes ÷ designs created. The dashed line is the Jul 1 – Oct 4 average (before double booking); the shaded weeks are double booking (from Oct 5). The last point is the period in progress (hollow). Click a number or a point to see the deals.
     </div></details>
   </section>
 
@@ -491,7 +491,7 @@ details.how > div{margin-top:8px;line-height:1.5}
     <div class="table-wrap" id="ibByChannel"></div>
     <div class="ib-h">By who booked the call</div>
     <div class="table-wrap" id="ibByPath"></div>
-    <details class="how"><summary>How this is counted</summary><div><b>Inbound lead</b> = the deal's first touch is an inbound channel (form, ad, chat, organic…), or the lead booked the call themselves / through CloseBot. This includes inbound leads a BDR booked. An <b>RTB hit</b> first touch counts as outbound (it is an intent signal, not the lead reaching out). Use <b>Booked by</b> to split self-booked / CloseBot from BDR-booked. <b>Outbound calls</b> (grey) are there for comparison: cold-call and RTB leads a BDR booked. Same definitions everywhere: <b>Books</b> = new calls counted on the day they were booked; <b>Runs due</b> = calls whose slot came up; <b>Overall show</b> = had ÷ due; <b>1st-time show</b> = held at the first slot ÷ first slots that came due (counts underneath). Closes and MRR are by close date. Click any number to see the deals.</div></details>
+    <details class="how"><summary>How this is counted</summary><div><b>Inbound lead</b> = the deal's first touch is an inbound channel (form, ad, chat, organic…), or the lead booked the call themselves / through CloseBot. This includes inbound leads a BDR booked. An <b>RTB hit</b> first touch counts as outbound (it is an intent signal, not the lead reaching out). Use <b>Booked by</b> to split self-booked / CloseBot from BDR-booked. <b>Outbound calls</b> (grey) are there for comparison: cold-call and RTB leads a BDR booked. Same definitions everywhere: <b>Books</b> = new calls counted on the day they were booked; <b>Runs due</b> = calls whose slot came up; <b>Overall show</b> = calls held ÷ calls due (per call: a no-show that is rebooked and held = 2 calls, 1 held); <b>Recovery</b> = deals that missed a call and were held at a later slot ÷ deals that missed a call; <b>1st-time show</b> = held at the first slot ÷ first slots that came due (counts underneath). Closes and MRR are by close date. Click any number to see the deals.</div></details>
   </section>
 </div>
 
@@ -665,15 +665,30 @@ function showupStats(rows, p){
   // Books = NEW bookings counted on the day they were booked (a deal's first call, or one booked 30+ days after its last slot)
   const books = rows.filter(r=>inP(r.booked_at||r.first_slot,p) && slotPassed(r.booked_at||r.first_slot));   // through end of yesterday, like everything else
   const firsts = rows.filter(r=>inP(r.first_slot,p));
-  const due = rows.filter(r=>(r.due_ts||[]).some(t=>inP(t,p)) || inP(r.run_at,p));
-  const had = due.filter(r=>inP(r.run_at,p));
+  // Overall show is PER CALL (v4.4): every slot that came up in the period is one call due; it was had if the meeting ran
+  // at that slot. A deal that no-shows and is then held in the same period = 2 calls due, 1 had.
+  const due = [], had = [], missed = [];   // due/had = deals (for lists); missed = one entry per missed call
+  const near = (a,b) => Math.abs(Date.parse(a)-Date.parse(b)) <= 3*3600e3;
+  rows.forEach(r=>{
+    const ds = (r.due_ts||[]).filter(t=>inP(t,p));
+    const ran = inP(r.run_at,p);
+    if(!ds.length && !ran) return;
+    due.push(r); if(ran) had.push(r);
+    const miss = ds.filter(t=>!(r.run_at && near(t, r.run_at)));
+    r._miss = miss;                         // missed slots in this period (shown in the deal list)
+    miss.forEach(()=>missed.push(r));
+  });
+  const dueN = had.length + missed.length;
   const fdue = firsts.filter(r=>!r.pushed && slotPassed(r.first_slot));
   const f1 = fdue.filter(r=>r.cat==="first_time_show");
-  const notHad = due.filter(r=>!had.includes(r));
-  return { books, firsts, due, had, fdue, f1, notHad,
-    ns: notHad.filter(r=>r.cat==="no_show"||r.cat==="cst_unverified"||r.cat==="closed_no_mtg"||r.cat==="awaiting"||r.cat==="awaiting_recovery"),
-    ca: notHad.filter(r=>r.cat==="cancelled_ahead"),
-    show: due.length ? had.length/due.length : null,
+  const notHad = due.filter(r=>r._miss && r._miss.length);   // deals with at least one missed call (may also have been held later)
+  // No-show recovery: of deals that missed a call in the period, how many were held at a later slot (any time after)
+  const rec = notHad, recBack = notHad.filter(r=>r.run_at && Date.parse(r.run_at) > Date.parse(r._miss[0]));
+  return { books, firsts, due, dueN, had, fdue, f1, notHad, missed, rec, recBack,
+    ns: missed.filter(r=>r.cat!=="cancelled_ahead"),
+    ca: missed.filter(r=>r.cat==="cancelled_ahead"),
+    show: dueN ? had.length/dueN : null,
+    recovery: rec.length ? recBack.length/rec.length : null,
     first: fdue.length ? f1.length/fdue.length : null };
 }
 const NO_UTM = "(no first-touch UTM)", NO_UTM_KEY = NO_UTM;
@@ -743,8 +758,8 @@ function render(){
       <div class="who"><div class="name">${esc(b.name)}</div>
         <div class="sub"><button class="linkish" data-person="${esc(b.key)}" data-role="bdr" data-metric="all" data-title="${esc(b.name)}: all deals">See deals</button></div></div>
       <div class="track">${isPct ? barHTML((b.v||0)*100, null, pace, 100) : barHTML(b.v||0, goal, pace, topV)}
-        <div class="bar-meta">${isPct ? `<span>${t.had.length} of ${t.due.length} due held · 1st-time ${t.f1.length} of ${t.fdue.length}</span>` : (goal?`<span>Goal ${fmt(goal)}</span>${paceText(b.v||0, goal, pace)}`:"")}</div>
-        <div class="stats"><span>Books <b>${t.books.length}</b></span><span>Due <b>${t.due.length}</b></span><span>Had <b>${t.had.length}</b></span><span>Show <b>${pctS(t.show)}</b></span><span>1st-time <b>${pctS(t.first)}</b></span><span>Designs <b>${t.des.length}</b></span></div>
+        <div class="bar-meta">${isPct ? `<span>${t.had.length} of ${t.dueN} calls due held · 1st-time ${t.f1.length} of ${t.fdue.length}</span>` : (goal?`<span>Goal ${fmt(goal)}</span>${paceText(b.v||0, goal, pace)}`:"")}</div>
+        <div class="stats"><span>Books <b>${t.books.length}</b></span><span>Due <b>${t.dueN}</b></span><span>Had <b>${t.had.length}</b></span><span>Show <b>${pctS(t.show)}</b></span><span>1st-time <b>${pctS(t.first)}</b></span><span>Designs <b>${t.des.length}</b></span></div>
       </div>
       <div class="score">${num(shown, b.key, "bdr", metricKey, `${b.name}: ${metric.label}`)}<small>${metric.label.toLowerCase()}</small></div>
     </div>`;
@@ -753,12 +768,13 @@ function render(){
   // BDR scorecard
   const rows = [
     ["Books (new)", t=>t.books.length, "books", 12],
-    ["Runs due", t=>t.due.length, "due", null],
+    ["Runs due (calls)", t=>t.dueN, "due", null],
     ["Runs had", t=>t.had.length, "had", 8],
     ["Overall show", t=>pctS(t.show), "due", null],
     ["1st-time show", t=>pctS(t.first), "fdue", null],
     ["No-shows", t=>t.ns.length, "ns", null],
     ["Cancelled / DQ'd ahead", t=>t.ca.length, "ca", null],
+    ["No-show recovery", t=>pctS(t.recovery), "rec", null],
     ["Designs created", t=>t.des.length, "des", 4],
     ["Designs held", t=>t.dheld.length, "dheld", null],
     ["Closed won", t=>t.won.length, "won", null],
@@ -789,7 +805,7 @@ function render(){
       <div class="who"><div class="name">${esc(a.name)}</div>
         <div class="sub"><button class="linkish" data-person="${esc(a.key)}" data-role="ae" data-metric="all" data-title="${esc(a.name)}: all deals">See deals</button></div></div>
       <div class="track">${aePct ? barHTML((a.v||0)*100, null, pace, 100) : barHTML(a.v||0, aeGoal, pace, aeTop)}
-        <div class="bar-meta">${aePct ? `<span>${t.had.length} of ${t.due.length} due held</span>` : (aeGoal?`<span>Goal ${fmt(aeGoal, aeMoney)}</span>${aeMoney ? moneyPace(a.v||0, aeGoal) : paceText(a.v||0, aeGoal, pace)}`:"")}</div>
+        <div class="bar-meta">${aePct ? `<span>${t.had.length} of ${t.dueN} calls due held</span>` : (aeGoal?`<span>Goal ${fmt(aeGoal, aeMoney)}</span>${aeMoney ? moneyPace(a.v||0, aeGoal) : paceText(a.v||0, aeGoal, pace)}`:"")}</div>
         <div class="stats"><span>Run <b>${t.had.length}</b></span><span>No-shows <b>${t.ns.length}</b></span><span>Show <b>${pctS(t.show)}</b></span><span>Designs held <b>${t.dheld.length}</b></span><span>Props <b>${t.prop.length}</b></span><span>Contracts <b>${t.con.length}</b></span><span>Closes <b>${t.won.length}</b></span><span>MRR <b>${fmt(t.cwd,true)}</b></span></div>
       </div>
       <div class="score">${num(shown, a.key, "ae", aeM.list, `${a.name}: ${aeM.label}`)}<small>${aeM.label.toLowerCase()}</small></div>
@@ -797,7 +813,7 @@ function render(){
   }).join("");
   const aeRows = [
     ["Discos run (runs had)", t=>t.had.length, "had", 20],
-    ["Runs due", t=>t.due.length, "due", null],
+    ["Runs due (calls)", t=>t.dueN, "due", null],
     ["Disco no-shows", t=>t.ns.length, "ns", null],
     ["Overall show", t=>pctS(t.show), "due", null],
     ["1st-time show", t=>pctS(t.first), "fdue", null],
@@ -859,7 +875,7 @@ function whyShowup(r){
   bits.push(`First slot ${nice(r.first_slot)}`);
   if(r.run_at) bits.push(`held ${nice(r.run_at)}`);
   const due = (r.due_ts||[]).filter(t=>!r.run_at || Math.abs(Date.parse(t)-Date.parse(r.run_at))>3*3600e3);
-  if(due.length && !r.run_at) bits.push(`slot${due.length>1?"s":""} that came due: ${due.map(nice).join(", ")}`);
+  if(due.length) bits.push(`${r.run_at?"missed slot":"slot"}${due.length>1?"s":""} that came due: ${due.map(nice).join(", ")}`);
   if(r.pushed) bits.push("first slot was moved before it happened");
   if(r.flags) bits.push(r.flags);
   if(r.dq) bits.push("deal went to DQ");
@@ -906,10 +922,11 @@ function openList(person, role, metric, title, pOverride){
   const evOf = k => ev.filter(e=>e.kind===k);
   if(metric==="books") groups.push(["New books (booked in period)", s.books]);
   else if(metric==="had") groups.push(["Runs had", s.had]);
-  else if(metric==="due") groups.push(["Held", s.had], ["Due but not held", s.notHad]);
+  else if(metric==="due") groups.push(["Held", s.had], ["Missed calls (a deal can be in both lists)", s.notHad]);
+  else if(metric==="rec") groups.push(["Missed, then held at a later slot", s.recBack], ["Missed, not held since", s.rec.filter(r=>!s.recBack.includes(r))]);
   else if(metric==="fdue") groups.push(["Held at first slot", s.f1], ["First slot came due, not held there", s.fdue.filter(r=>!s.f1.includes(r))]);
-  else if(metric==="ns") groups.push(["No-shows", s.ns]);
-  else if(metric==="ca") groups.push(["Cancelled / DQ'd ahead", s.ca]);
+  else if(metric==="ns") groups.push(["No-shows (one per missed call)", [...new Set(s.ns)]]);
+  else if(metric==="ca") groups.push(["Cancelled / DQ'd ahead", [...new Set(s.ca)]]);
   else if(["des","dheld","prop","diag","con","won"].includes(metric)) groups.push([null, evOf({des:"design",dheld:"dheld",prop:"prop",diag:"diag",con:"contract",won:"won"}[metric])]);
   else {
     groups.push(["Held", s.had], ["Due but not held", s.notHad], ["Booked, not due yet", s.books.filter(r=>!s.due.includes(r))]);
@@ -1263,12 +1280,13 @@ const repOf = r => CUR_BDR.has(r.booker) ? r.booker : FORMER;
 const srcName = u => u===NO_UTM ? "No UTM" : u.replace(/^(Inbound|Outbound) - /,"");
 const BK_COLS = [
   {label:"Books",           f:t=>t.books.length, list:"books"},
-  {label:"Runs due",        f:t=>t.due.length,   list:"due"},
+  {label:"Runs due",        f:t=>t.dueN,         list:"due"},
   {label:"Runs had",        f:t=>t.had.length,   list:"had"},
-  {label:"Overall show",    f:t=>t.show,  pct:true, list:"due",  sub:t=>t.due.length?t.had.length+" of "+t.due.length:""},
+  {label:"Overall show",    f:t=>t.show,  pct:true, list:"due",  sub:t=>t.dueN?t.had.length+" of "+t.dueN:""},
   {label:"1st-time show",   f:t=>t.first, pct:true, list:"fdue", sub:t=>t.fdue.length?t.f1.length+" of "+t.fdue.length:""},
   {label:"No-shows",        f:t=>t.ns.length,    list:"ns"},
   {label:"Cancelled ahead", f:t=>t.ca.length,    list:"ca"},
+  {label:"Recovery",        f:t=>t.recovery, pct:true, list:"rec", sub:t=>t.rec.length?t.recBack.length+" of "+t.rec.length:""},
   {label:"Designs",         f:t=>t.des.length,   list:"des"},
   {label:"Closes",          f:t=>t.won.length,   list:"won"},
   {label:"MRR",             f:t=>t.cwd, money:true, list:"won"},
@@ -1291,7 +1309,7 @@ function bkTiles(sec, row, bench, benchName, p){
   const a = bkStats(row, p), b = bkStats(bench, p);
   const tile = (k,v,sub,ci) => `<div class="ib-tile"><div class="k">${k}</div><div class="v"><span class="click" data-bk="${sec}|${row.key}" data-bkc="${ci}">${v}</span></div><div class="s">${sub}</div></div>`;
   return tile("Books (new)", fmt(a.books.length), benchName+" "+fmt(b.books.length), 0) +
-    tile("Runs had", fmt(a.had.length), "of "+a.due.length+" due", 2) +
+    tile("Runs had", fmt(a.had.length), "of "+a.dueN+" calls due", 2) +
     tile("Overall show", pctS(a.show), benchName+" "+pctS(b.show), 3) +
     tile("1st-time show", pctS(a.first), benchName+" "+pctS(b.first), 4) +
     tile("Closes", fmt(a.won.length), benchName+" "+fmt(b.won.length), 8) +
@@ -1416,11 +1434,12 @@ const SC_ROWS = [
   {id:"c2b",      label:"Conversation → book",   act:true, ratio:true, f:(a,t)=>a.v?t.bdrBooks/a.v:null, sub:(a,t)=>a.v?t.bdrBooks+" of "+a.v:""},
   {grp:"Discovery calls"},
   {id:"books",    label:"Books (new)",           f:t=>t.books.length, list:"books", split:true},
-  {id:"due",      label:"Runs due",              f:t=>t.due.length, list:"due"},
+  {id:"due",      label:"Runs due (calls)",      f:t=>t.dueN, list:"due"},
   {id:"had",      label:"Runs had",              f:t=>t.had.length, list:"had", split:true},
   {id:"ns",       label:"No-shows",              f:t=>t.ns.length, list:"ns", lower:true},
   {id:"ca",       label:"Cancelled ahead",       f:t=>t.ca.length, list:"ca", lower:true},
-  {id:"show",     label:"Overall show",          ratio:true, f:t=>t.show, list:"due", sub:t=>t.due.length?t.had.length+" of "+t.due.length:"", split:true},
+  {id:"show",     label:"Overall show",          ratio:true, f:t=>t.show, list:"due", sub:t=>t.dueN?t.had.length+" of "+t.dueN:"", split:true},
+  {id:"rec",      label:"No-show recovery",      ratio:true, f:t=>t.recovery, list:"rec", sub:t=>t.rec.length?t.recBack.length+" of "+t.rec.length:""},
   {id:"first",    label:"1st-time show",         ratio:true, f:t=>t.first, list:"fdue", sub:t=>t.fdue.length?t.f1.length+" of "+t.fdue.length:""},
   {grp:"Pipeline"},
   {id:"des",      label:"Designs created",       f:t=>t.des.length, list:"des"},
@@ -1612,12 +1631,13 @@ function axSlots(v, p){
 }
 const axStats = (v, p) => v.ae ? statsFor(v.ae, "ae", p) : v.aeFormer ? statsFor(FORMER, "ae", p) : statsFor(v.key, "bdr", p);
 const AX_COLS = [
-  {id:"due",   label:"Runs due",        f:t=>t.due.length, list:"due"},
+  {id:"due",   label:"Runs due",        f:t=>t.dueN, list:"due"},
   {id:"had",   label:"Runs had",        f:t=>t.had.length, list:"had"},
   {id:"slots", label:"Slots",           slot:true, f:x=>x.slots},
   {id:"cps",   label:"Calls per slot",  slot:true, dec:true, f:x=>x.slots?x.calls/x.slots:null},
   {id:"rps",   label:"Run rate per slot", slot:true, ratio:true, f:x=>x.slots?x.used/x.slots:null, sub:x=>x.slots?x.used+" of "+x.slots:""},
-  {id:"show",  label:"Overall show",    ratio:true, f:t=>t.show, list:"due", sub:t=>t.due.length?t.had.length+" of "+t.due.length:""},
+  {id:"show",  label:"Overall show",    ratio:true, f:t=>t.show, list:"due", sub:t=>t.dueN?t.had.length+" of "+t.dueN:""},
+  {id:"rec",   label:"No-show recovery", ratio:true, f:t=>t.recovery, list:"rec", sub:t=>t.rec.length?t.recBack.length+" of "+t.rec.length:""},
   {id:"first", label:"1st-time show",   ratio:true, f:t=>t.first, list:"fdue", sub:t=>t.fdue.length?t.f1.length+" of "+t.fdue.length:""},
   {id:"des",   label:"Designs",         f:t=>t.des.length, list:"des"},
   {id:"r2d",   label:"Run → design",    ratio:true, f:t=>t.had.length?t.des.length/t.had.length:null, list:"des"},

@@ -251,6 +251,8 @@ details.how > div{margin-top:8px;line-height:1.5}
 .sc-tbl td small{display:block;font-size:11px;color:var(--muted);font-weight:400}
 .sc-wrap{background:var(--panel);border:1px solid var(--line);border-radius:12px;overflow-x:auto}
 .sc-note{color:var(--muted);font-size:13px;margin:8px 0 0}
+.sc-tbl th .db{color:var(--gold)}
+.sc-tbl td.goal small{display:block;font-size:11px}
 </style>
 <div class="wrap">
   <header class="top">
@@ -334,6 +336,7 @@ details.how > div{margin-top:8px;line-height:1.5}
       One row per L10 metric, one column per week (Mon to Sun) or month, newest on the right. The shaded column is the period in progress: it is checked against where the goal should be by yesterday. <b>Green</b> = at or above goal, <b>red</b> = below. <b>Avg</b> = average of the finished columns shown.<br>
       <b>Dials, connects, conversations</b> come from the weekly Nooks upload (RevOps L10 tab); a week shows blank until it is uploaded. <b>Conversation → book</b> = BDR books ÷ Nooks conversations (the sheet's "complete to disco").<br>
       <b>Books</b> = new calls, counted on the day they were booked (a rebook only counts when it is booked 30+ days after the deal's last slot). <b>Runs due</b> = calls whose slot came up; <b>runs had</b> = calls that happened; <b>overall show</b> = had ÷ due; <b>1st-time show</b> = held at the first slot ÷ first slots that came due. <b>Outbound</b> = a BDR booked it and the first touch is cold call / RTB; <b>inbound leads</b> = inbound first touch or self-booked / CloseBot, whoever booked it.<br>
+      <b>AE time (slots)</b> (whole team and AE views): an AE slot = one AE + one start time that came up; it <b>ran</b> if at least one call in it was held. <b>Run rate per slot</b> = slots that ran ÷ slots that came up; <b>calls per slot</b> = calls due ÷ slots. The goal column shows the Jul 1 – Oct 4 baseline (before double booking); weeks marked <span style="color:var(--gold)">●</span> are double-booking weeks (from Oct 5). Before Oct 5, two deals on one slot means a cancelled call whose slot was rebooked but whose meeting was never marked cancelled.<br>
       Designs, designs held, diagnosis, prop updates, contracts and closes are counted on the day they happened; MRR is by close date. Click any number to see the deals.<br>
       <b>Goals</b> are weekly (monthly = ×4): per BDR 1,000 dials, 80 connects, 12 books, 8 runs had, 4 designs; per AE 20 runs, 5 designs held, 8 prop updates, 4 contracts, 2 closes, $10,750 MRR; 75% show; ratio goals from the L10 sheet (book → design 33%, run → design 50%, design → close 30%, contract → close 85%). Team goals = per-BDR goal × current BDRs.
     </div></details>
@@ -1325,11 +1328,11 @@ const isLeadIn = r => isInbLead(r) && (NOT_A_BDR.has(r.booker) || isBdrBooked(r)
 // views: who the numbers are for. key = person key for statsFor/openList, nooks = which BDRs' activity counts
 function scViews(){
   const v = [
-    {id:"team", name:"Whole team", key:"sc:team", pred:r=>true, nooks:"all", split:true, g:"team"},
+    {id:"team", name:"Whole team", key:"sc:team", pred:r=>true, nooks:"all", split:true, slots:true, g:"team"},
     {id:"bdrs", name:"BDR team", key:"sc:bdrs", pred:isBdrBooked, nooks:"all", g:"bdrteam"},
     ...BDRS.map(b=>({id:b.key, name:b.name, key:"sc:"+b.key, pred:r=>r.booker===b.key, nooks:firstName(b.key), g:"bdr"})),
     {id:"inb", name:"Inbound leads", key:"sc:inb", pred:isLeadIn, g:"inb"},
-    ...AES.map(a=>({id:"ae:"+a.key, name:a.name+" (AE)", ae:a.key, g:"ae"})),
+    ...AES.map(a=>({id:"ae:"+a.key, name:a.name+" (AE)", ae:a.key, slots:true, g:"ae"})),
   ];
   v.forEach(x=>{ if(x.pred) PRED.set(x.key, x.pred); });
   return v;
@@ -1377,6 +1380,11 @@ const SC_ROWS = [
   {id:"diag",     label:"Moved to diagnosis",    f:t=>t.diag.length, list:"diag"},
   {id:"prop",     label:"Prop updates held",     f:t=>t.prop.length, list:"prop"},
   {id:"con",      label:"Contracts sent",        f:t=>t.con.length, list:"con"},
+  {grp:"AE time (slots)"},
+  {id:"slots", label:"AE slots that came up", slot:true, f:x=>x.slots},
+  {id:"cps",   label:"Calls per slot",        slot:true, dec:true, base:true, f:x=>x.slots?x.calls/x.slots:null, sub:x=>x.slots?x.calls+" calls":""},
+  {id:"sran",  label:"Slots that ran",        slot:true, f:x=>x.used},
+  {id:"rps",   label:"Run rate per slot",     slot:true, ratio:true, base:true, f:x=>x.slots?x.used/x.slots:null, sub:x=>x.slots?x.used+" of "+x.slots:""},
   {grp:"Revenue"},
   {id:"won",      label:"Closed won",            f:t=>t.won.length, list:"won"},
   {id:"cwd",      label:"MRR closed",            money:true, f:t=>t.cwd, list:"won"},
@@ -1399,6 +1407,25 @@ function scActivity(view, p){
   });
   return a.n ? a : null;
 }
+// AE slot = one AE + one exact start time that came up. It "ran" if at least one call in it was held.
+// Since double booking (week of Oct 5) a slot can hold two calls; before that, two deals on one slot = a cancelled call whose slot was rebooked.
+const DOUBLE_BOOK_FROM = "2026-10-05", SLOT_BASE = {start:"2026-07-01", end:"2026-10-04"};
+function scSlots(view, p){
+  if(!view.slots) return null;
+  const m = new Map();
+  effShowup().forEach(r=>{
+    if(r.dropped || !r.ae || (view.ae && r.ae!==view.ae)) return;
+    const run = r.run_at ? Date.parse(r.run_at) : null;
+    (r.due_ts||[]).forEach(t=>{
+      if(!inP(t,p)) return;
+      const ms = Date.parse(t), k = r.ae+"|"+ms, o = m.get(k) || {c:0, h:0};
+      o.c++; if(run!=null && Math.abs(run-ms) <= 3*3600e3) o.h++;
+      m.set(k, o);
+    });
+  });
+  let calls = 0, used = 0; m.forEach(o=>{ calls += o.c; if(o.h) used++; });
+  return {slots:m.size, calls, used};
+}
 function scStats(view, p){
   const t = view.ae ? statsFor(view.ae, "ae", p) : statsFor(view.key, "bdr", p);
   t.bdrBooks = view.ae ? 0 : statsFor(view.id==="team"||view.id==="bdrs" ? "sc:bdrs" : view.key, "bdr", p).books.length;
@@ -1418,12 +1445,12 @@ function scColumns(){
   }
   return out;
 }
-const scFmt = (m, v) => v==null ? "–" : m.ratio ? (m.id==="rate" ? (Math.round(v*1000)/10)+"%" : pctS(v)) : m.money ? fmt(v,true) : Math.abs(v)>=100 ? Math.round(v).toLocaleString() : fmt(v);
+const scFmt = (m, v) => v==null ? "–" : m.dec ? v.toFixed(2) : m.ratio ? (m.id==="rate" ? (Math.round(v*1000)/10)+"%" : pctS(v)) : m.money ? fmt(v,true) : Math.abs(v)>=100 ? Math.round(v).toLocaleString() : fmt(v);
 function scCell(m, v, goal, pace, sub, clickAttr){
   const has = v!=null && !(m.act && v===undefined);
   let cls = "";
   if(has && goal!=null){
-    const target = m.ratio ? goal : goal*pace;
+    const target = (m.ratio||m.dec) ? goal : goal*pace;
     if(!(m.ratio===undefined && pace===0)) cls = (m.lower ? v<=target : v>=target) ? "ok" : "bad";
   }
   const shown = !has ? "–" : scFmt(m, v);
@@ -1445,23 +1472,26 @@ function renderScorecard(){
   const done = cols.filter(c=>!c.cur);
   const avgP = done.length ? {start:done[0].p.start, end:done[done.length-1].p.end, label:"Average of "+done.length+" "+(SC.kind==="week"?"weeks":"months")} : null;
   // stats per column (+ the average span)
-  const T = cols.map(c=>scStats(view, c.p)), A = cols.map(c=>scActivity(view, c.p));
-  const avgT = avgP ? scStats(view, avgP) : null, avgA = avgP ? scActivity(view, avgP) : null;
+  const T = cols.map(c=>scStats(view, c.p)), A = cols.map(c=>scActivity(view, c.p)), SL = cols.map(c=>scSlots(view, c.p));
+  const avgT = avgP ? scStats(view, avgP) : null, avgA = avgP ? scActivity(view, avgP) : null, avgSL = avgP ? scSlots(view, avgP) : null;
+  const baseSL = scSlots(view, SLOT_BASE);
+  const SRC = {act:{cols:A, avg:avgA, show:!!view.nooks}, slot:{cols:SL, avg:avgSL, show:!!view.slots}};
   const n = done.length;
   const showAct = !!view.nooks;
-  let html = `<table class="sc-tbl"><thead><tr><th>${esc(view.name)}</th><th class="goal">Goal<small>per ${SC.kind}</small></th>${cols.map(c=>`<th class="${c.cur?"cur":""}">${c.head}<small>${c.cur?"so far":c.sub}</small></th>`).join("")}<th class="avg">Avg</th></tr></thead><tbody>`;
+  let html = `<table class="sc-tbl"><thead><tr><th>${esc(view.name)}</th><th class="goal">Goal<small>per ${SC.kind}</small></th>${cols.map(c=>`<th class="${c.cur?"cur":""}">${c.p.end>=DOUBLE_BOOK_FROM?'<span class="db" title="Double booking on">● </span>':""}${c.head}<small>${c.cur?"so far":c.sub}</small></th>`).join("")}<th class="avg">Avg</th></tr></thead><tbody>`;
   const splitRows = view.split ? SC_SPLIT.filter(x=>x.key!=="sc:split:ae" || cols.some(c=>statsFor(x.key,"bdr",c.p).books.length || statsFor(x.key,"bdr",c.p).had.length)) : [];
   let pendingGrp = null;
   SC_ROWS.forEach((m, mi)=>{
     if(m.grp){ pendingGrp = m.grp; return; }
-    if(m.act && !showAct) return;
+    const src = m.act ? "act" : m.slot ? "slot" : null;
+    if(src && !SRC[src].show) return;
     if(pendingGrp){ html += `<tr class="grp"><td colspan="${cols.length+3}">${pendingGrp}</td></tr>`; pendingGrp = null; }
-    const g = scGoal(m, view.g), goal = g==null ? null : (m.ratio ? g : g*mult);
-    const goalTxt = goal==null ? "" : scFmt(m, goal);
+    const g = m.base ? (baseSL ? m.f(baseSL) : null) : scGoal(m, view.g), goal = g==null ? null : ((m.ratio||m.dec) ? g : g*mult);
+    const goalTxt = goal==null ? "" : scFmt(m, goal) + (m.base ? "<small>Jul–Sep</small>" : "");
     html += `<tr><td>${m.label}</td><td class="goal">${goalTxt}</td>`;
     cols.forEach((c,ci)=>{
-      const t = T[ci], a = A[ci];
-      if(m.act){
+      const t = T[ci], a = src ? SRC[src].cols[ci] : null;
+      if(src){
         const v = a ? m.f(a, t) : null;
         html += scCell(m, v, goal, c.pace, a && m.sub ? m.sub(a,t) : "", "").replace("<td class=\"", `<td class="${c.cur?"cur ":""}`);
       } else {
@@ -1473,7 +1503,7 @@ function renderScorecard(){
     // average of finished columns: counts / n, ratios pooled over the span
     let av = null, avSub = "";
     if(n){
-      if(m.act){ if(avgA){ const v = m.f(avgA, avgT); av = v==null ? null : m.ratio ? v : v/n; } }
+      if(src){ const aa = SRC[src].avg; if(aa){ const v = m.f(aa, avgT); av = v==null ? null : (m.ratio||m.dec) ? v : v/n; } }
       else { const v = m.f(avgT); av = v==null ? null : m.ratio ? v : v/n; }
     }
     const avTxt = scFmt(m, av);

@@ -252,6 +252,20 @@ details.how > div{margin-top:8px;line-height:1.5}
 .sc-wrap{background:var(--panel);border:1px solid var(--line);border-radius:12px;overflow-x:auto}
 .sc-note{color:var(--muted);font-size:13px;margin:8px 0 0}
 .sc-tbl th .db{color:var(--gold)}
+.ax-chart{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px 14px 8px;position:relative}
+.ax-chart svg{display:block;width:100%;height:auto;overflow:visible}
+.ax-chart text{font-family:var(--body);fill:var(--muted);font-size:12px}
+.ax-chart .grid{stroke:var(--line);stroke-width:1}
+.ax-chart .ln{fill:none;stroke:var(--fill);stroke-width:2.5}
+.ax-chart .pt{fill:var(--fill);cursor:pointer}
+.ax-chart .pt.cur{fill:var(--panel);stroke:var(--fill);stroke-width:2}
+.ax-chart .base{stroke:var(--muted);stroke-dasharray:5 4;stroke-width:1.5}
+.ax-chart .dbz{fill:color-mix(in srgb,var(--gold) 12%,transparent)}
+.ax-chart .val{fill:var(--ink);font-weight:600;font-size:11px}
+.ax-key{display:flex;flex-wrap:wrap;gap:14px;font-size:13px;color:var(--muted);margin:0 0 8px}
+.ax-key i{display:inline-block;width:14px;height:3px;vertical-align:middle;margin-right:6px;background:var(--fill)}
+.ax-key i.b{background:none;border-top:2px dashed var(--muted);height:0}
+.ax-key i.z{height:10px;background:color-mix(in srgb,var(--gold) 25%,transparent)}
 .sc-tbl td.goal small{display:block;font-size:11px}
 </style>
 <div class="wrap">
@@ -312,6 +326,7 @@ details.how > div{margin-top:8px;line-height:1.5}
     <button role="tab" data-t="sc" aria-selected="true">Scorecard</button>
     <button role="tab" data-t="bd" aria-selected="false">BDRs</button>
     <button role="tab" data-t="ib" aria-selected="false">Inbound</button>
+    <button role="tab" data-t="ax" aria-selected="false">AEs</button>
     <button role="tab" data-t="tr" aria-selected="false">Trends</button>
   </nav>
 
@@ -339,6 +354,41 @@ details.how > div{margin-top:8px;line-height:1.5}
       <b>AE time (slots)</b> (whole team and AE views): an AE slot = one AE + one start time that came up; it <b>ran</b> if at least one call in it was held. <b>Run rate per slot</b> = slots that ran ÷ slots that came up; <b>calls per slot</b> = calls due ÷ slots. The goal column shows the Jul 1 – Oct 4 baseline (before double booking); weeks marked <span style="color:var(--gold)">●</span> are double-booking weeks (from Oct 5). Before Oct 5, two deals on one slot means a cancelled call whose slot was rebooked but whose meeting was never marked cancelled.<br>
       Designs, designs held, diagnosis, prop updates, contracts and closes are counted on the day they happened; MRR is by close date. Click any number to see the deals.<br>
       <b>Goals</b> are weekly (monthly = ×4): per BDR 1,000 dials, 80 connects, 12 books, 8 runs had, 4 designs; per AE 20 runs, 5 designs held, 8 prop updates, 4 contracts, 2 closes, $10,750 MRR; 75% show; ratio goals from the L10 sheet (book → design 33%, run → design 50%, design → close 30%, contract → close 85%). Team goals = per-BDR goal × current BDRs.
+    </div></details>
+  </section>
+
+  <section id="axSec" class="l10-sec" data-tab="ax" hidden>
+    <div class="sec-head">
+      <h2>AEs</h2>
+      <div class="ib-ctl">
+        <div class="seg" id="axKind" role="group" aria-label="Period">
+          <button data-k="week" aria-pressed="false">Week</button>
+          <button data-k="month" aria-pressed="true">Month</button>
+          <button data-k="quarter" aria-pressed="false">Quarter</button>
+        </div>
+        <div class="nav">
+          <button type="button" id="axPrev" aria-label="Previous period">‹</button>
+          <div class="period" id="axPeriod" aria-live="polite"></div>
+          <button type="button" id="axNext" aria-label="Next period">›</button>
+        </div>
+      </div>
+    </div>
+    <div class="table-wrap" id="axTable"></div>
+    <div class="sec-head" style="margin:26px 0 10px">
+      <div class="ib-h" style="margin:0">Trend</div>
+      <div class="ib-ctl">
+        <label class="ib-pick">Metric <select id="axMetric"></select></label>
+        <label class="ib-pick">AE <select id="axWho"></select></label>
+        <div class="seg" id="axScale" role="group" aria-label="Group by">
+          <button data-s="week" aria-pressed="true">Weekly</button>
+          <button data-s="month" aria-pressed="false">Monthly</button>
+        </div>
+      </div>
+    </div>
+    <div class="ax-key" id="axKey"></div>
+    <div class="ax-chart" id="axChart"></div>
+    <details class="how"><summary>How this is counted</summary><div>
+      Each AE's numbers are the calls and deals assigned to them, whoever booked them. <b>AE slot</b> = one AE + one start time that came up; it <b>ran</b> if at least one call in it was held. <b>Run rate per slot</b> = slots that ran ÷ slots that came up: how much booked AE time turned into a conversation, the number double booking should lift. <b>Calls per slot</b> = calls due ÷ slots (1.0 = no double booking). <b>Overall show</b> = calls held ÷ calls due (per deal); <b>1st-time show</b> = held at the first slot ÷ first slots that came due. <b>Run → design</b> = designs created ÷ runs had in the same period; <b>design → close</b> = closes ÷ designs created. The dashed line is the Jul 1 – Oct 4 average (before double booking); the shaded weeks are double booking (from Oct 5). The last point is the period in progress (hollow). Click a number or a point to see the deals.
     </div></details>
   </section>
 
@@ -1305,7 +1355,7 @@ function renderInboundBreakdown(){
 function renderL10(){
   if(!document.getElementById("bdSec")) return;
   for(const k of [...PRED.keys()]) if(k.startsWith("l10:")) PRED.delete(k);
-  renderScorecard(); renderBdrBreakdown(); renderInboundBreakdown();
+  renderScorecard(); renderBdrBreakdown(); renderInboundBreakdown(); renderAEs();
 }
 for(const sec of ["bd","ib"]){
   const st = L10[sec], draw = sec==="bd" ? renderBdrBreakdown : renderInboundBreakdown;
@@ -1545,15 +1595,153 @@ document.getElementById("scSec").addEventListener("click", e=>{
   else openList(view.key, "bdr", m.list, view.name+": "+m.label, col.p);
 });
 
+/* ---------- Sales L10: AEs tab (per-AE table + rate trends) ---------- */
+const AX = {kind:"month", offset:0, metric:"rps", who:"all", scale:"week"};
+// who: "all" = every AE (team), an AE key, or FORMER (AEs who have left)
+const axView = who => who==="all" ? {slots:true, key:"sc:team", name:"All AEs"} : who===FORMER ? {slots:true, aeFormer:true, name:"Former AEs"} : {slots:true, ae:who, name:who};
+function axSlots(v, p){
+  if(!v.aeFormer) return scSlots(v, p);
+  const m = new Map();
+  effShowup().forEach(r=>{
+    if(r.dropped || !r.ae || CUR_AE.has(r.ae)) return;
+    const run = r.run_at ? Date.parse(r.run_at) : null;
+    (r.due_ts||[]).forEach(t=>{ if(!inP(t,p)) return; const ms = Date.parse(t), k = r.ae+"|"+ms, o = m.get(k)||{c:0,h:0}; o.c++; if(run!=null && Math.abs(run-ms)<=3*3600e3) o.h++; m.set(k,o); });
+  });
+  let calls = 0, used = 0; m.forEach(o=>{ calls += o.c; if(o.h) used++; });
+  return {slots:m.size, calls, used};
+}
+const axStats = (v, p) => v.ae ? statsFor(v.ae, "ae", p) : v.aeFormer ? statsFor(FORMER, "ae", p) : statsFor(v.key, "bdr", p);
+const AX_COLS = [
+  {id:"due",   label:"Runs due",        f:t=>t.due.length, list:"due"},
+  {id:"had",   label:"Runs had",        f:t=>t.had.length, list:"had"},
+  {id:"slots", label:"Slots",           slot:true, f:x=>x.slots},
+  {id:"cps",   label:"Calls per slot",  slot:true, dec:true, f:x=>x.slots?x.calls/x.slots:null},
+  {id:"rps",   label:"Run rate per slot", slot:true, ratio:true, f:x=>x.slots?x.used/x.slots:null, sub:x=>x.slots?x.used+" of "+x.slots:""},
+  {id:"show",  label:"Overall show",    ratio:true, f:t=>t.show, list:"due", sub:t=>t.due.length?t.had.length+" of "+t.due.length:""},
+  {id:"first", label:"1st-time show",   ratio:true, f:t=>t.first, list:"fdue", sub:t=>t.fdue.length?t.f1.length+" of "+t.fdue.length:""},
+  {id:"des",   label:"Designs",         f:t=>t.des.length, list:"des"},
+  {id:"r2d",   label:"Run → design",    ratio:true, f:t=>t.had.length?t.des.length/t.had.length:null, list:"des"},
+  {id:"dheld", label:"Designs held",    f:t=>t.dheld.length, list:"dheld"},
+  {id:"prop",  label:"Prop updates",    f:t=>t.prop.length, list:"prop"},
+  {id:"con",   label:"Contracts",       f:t=>t.con.length, list:"con"},
+  {id:"won",   label:"Closes",          f:t=>t.won.length, list:"won"},
+  {id:"d2w",   label:"Design → close",  ratio:true, f:t=>t.des.length?t.won.length/t.des.length:null, list:"won"},
+  {id:"cwd",   label:"MRR",             money:true, f:t=>t.cwd, list:"won"},
+];
+const axVal = (c, v, p) => c.slot ? c.f(axSlots(v, p)) : c.f(axStats(v, p));
+const axSub = (c, v, p) => !c.sub ? "" : c.slot ? c.sub(axSlots(v, p)) : c.sub(axStats(v, p));
+function axWhoList(p){
+  const out = [...AES.map(a=>a.key)];
+  const fs0 = axSlots(axView(FORMER), p), ft = axStats(axView(FORMER), p);
+  if(fs0.slots || formerHasData(ft)) out.push(FORMER);
+  return out;
+}
+function renderAEs(){
+  const box = document.getElementById("axTable"); if(!box) return;
+  const p = periodFor(AX.kind, AX.offset);
+  document.getElementById("axPeriod").textContent = p.label;
+  document.querySelectorAll("#axKind button").forEach(b=>b.setAttribute("aria-pressed", b.dataset.k===AX.kind));
+  document.getElementById("axPrev").disabled = p.start <= DATA_FROM;
+  document.getElementById("axNext").disabled = AX.offset >= 0;
+  const rows = [...axWhoList(p).map(w=>({who:w, ...axView(w)})), {who:"all", ...axView("all"), cls:"tot"}];
+  box.innerHTML = `<table class="ib-tbl"><thead><tr><th></th>${AX_COLS.map(c=>`<th>${c.label}</th>`).join("")}</tr></thead><tbody>${rows.map(r=>
+    `<tr class="${r.cls||""}"><td>${esc(r.name)}</td>${AX_COLS.map((c,ci)=>{
+      const v = axVal(c, r, p), sub = axSub(c, r, p);
+      const txt = scFmt(c, v);
+      const cell = c.list && v!=null ? `<span class="click" data-ax="${esc(r.who)}|${ci}">${txt}</span>` : txt;
+      return `<td>${cell}${sub?`<small>${sub}</small>`:""}</td>`;
+    }).join("")}</tr>`).join("")}</tbody></table>`;
+  // trend controls
+  const whoOpts = [["all","All AEs"], ...AES.map(a=>[a.key, a.name]), [FORMER, "Former AEs"]];
+  if(!whoOpts.some(o=>o[0]===AX.who)) AX.who = "all";
+  document.getElementById("axWho").innerHTML = whoOpts.map(([k,l])=>`<option value="${esc(k)}"${k===AX.who?" selected":""}>${esc(l)}</option>`).join("");
+  document.getElementById("axMetric").innerHTML = AX_COLS.map(c=>`<option value="${c.id}"${c.id===AX.metric?" selected":""}>${c.label}</option>`).join("");
+  document.querySelectorAll("#axScale button").forEach(b=>b.setAttribute("aria-pressed", b.dataset.s===AX.scale));
+  renderAxChart();
+}
+function axBuckets(scale){
+  const out = [];
+  for(let off=0; off>-60; off--){
+    const p = periodFor(scale, off);
+    if(p.end < DATA_FROM) break;
+    out.unshift({p, cur: paceFraction(p) < 1});
+  }
+  return out;
+}
+let axPts = [];
+function renderAxChart(){
+  const el = document.getElementById("axChart"); if(!el || el.clientWidth < 200) return;   // hidden tab: drawn when the AEs tab opens
+  const c = AX_COLS.find(x=>x.id===AX.metric) || AX_COLS[4], v = {who:AX.who, ...axView(AX.who)};
+  const B = axBuckets(AX.scale);
+  const vals = B.map(b=>axVal(c, v, b.p));
+  const base = axVal(c, v, SLOT_BASE);
+  const W = el.clientWidth - 28, H = 280, L = 44, R = 10, T = 18, Bm = 34, w = W - L - R, h = H - T - Bm;
+  const nums = vals.filter(x=>x!=null).concat(base!=null && (c.ratio||c.dec) ? [base] : []);
+  let max = Math.max(...nums, 0);
+  if(c.ratio) max = Math.min(1, Math.max(0.1, Math.ceil(max*10)/10));
+  else if(c.dec) max = Math.max(1.5, Math.ceil(max*4)/4);
+  else max = niceStep(max/4)*4 || 1;
+  const x = i => L + (B.length===1 ? w/2 : i*w/(B.length-1)), y = val => T + h - (val/max)*h;
+  const fmtY = val => c.ratio ? Math.round(val*100)+"%" : c.money ? "$"+Math.round(val/1000)+"k" : c.dec ? val.toFixed(2) : Math.round(val);
+  let svg = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc(c.label)} trend">`;
+  // double booking zone
+  const dbI = B.findIndex(b=>b.p.end >= DOUBLE_BOOK_FROM);
+  if(dbI >= 0){ const x0 = dbI===0 ? L : (x(dbI-1)+x(dbI))/2; svg += `<rect class="dbz" x="${x0}" y="${T}" width="${L+w-x0+R/2}" height="${h}"/>`; }
+  for(let k=0;k<=4;k++){ const gv = max*k/4, gy = y(gv); svg += `<line class="grid" x1="${L}" x2="${L+w}" y1="${gy}" y2="${gy}"/><text x="${L-6}" y="${gy+4}" text-anchor="end">${fmtY(gv)}</text>`; }
+  if(base!=null && (c.ratio||c.dec)) svg += `<line class="base" x1="${L}" x2="${L+w}" y1="${y(base)}" y2="${y(base)}"/>`;
+  // line (skip gaps)
+  let d = ""; vals.forEach((val,i)=>{ if(val==null){ d += " "; return; } d += (d.trim()&&vals[i-1]!=null ? " L" : " M")+x(i)+" "+y(val); });
+  svg += `<path class="ln" d="${d.trim()}"/>`;
+  const step = Math.max(1, Math.ceil(B.length/12));
+  axPts = [];
+  B.forEach((b,i)=>{
+    const s0 = b.p.s, lab = AX.scale==="week" ? MON[s0.getMonth()]+" "+s0.getDate() : MON[s0.getMonth()];
+    if(i%step===0 || i===B.length-1) svg += `<text x="${x(i)}" y="${H-12}" text-anchor="middle">${lab}${b.cur?"*":""}</text>`;
+    if(vals[i]==null) return;
+    axPts.push({i, b});
+    svg += `<circle class="pt${b.cur?" cur":""}" cx="${x(i)}" cy="${y(vals[i])}" r="4.5" data-axp="${i}"><title>${esc(b.p.label)}: ${scFmt(c, vals[i])}${axSub(c, v, b.p)?" ("+axSub(c, v, b.p)+")":""}</title></circle>`;
+    if(B.length <= 16) svg += `<text class="val" x="${x(i)}" y="${y(vals[i])-9}" text-anchor="middle">${scFmt(c, vals[i])}</text>`;
+  });
+  el.innerHTML = svg + "</svg>";
+  el._axB = B; el._axC = c;
+  document.getElementById("axKey").innerHTML = `<span><i></i>${esc(v.name)}: ${esc(c.label)}</span>` +
+    (base!=null && (c.ratio||c.dec) ? `<span><i class="b"></i>Jul 1 – Oct 4 average: ${scFmt(c, base)}</span>` : "") +
+    `<span><i class="z"></i>Double booking (from Oct 5)</span>`;
+}
+document.querySelectorAll("#axKind button").forEach(b=>b.onclick=()=>{ AX.kind=b.dataset.k; AX.offset=0; renderAEs(); });
+document.getElementById("axPrev").onclick = ()=>{ AX.offset--; renderAEs(); };
+document.getElementById("axNext").onclick = ()=>{ if(AX.offset<0){ AX.offset++; renderAEs(); } };
+document.getElementById("axMetric").onchange = e=>{ AX.metric = e.target.value; renderAxChart(); };
+document.getElementById("axWho").onchange = e=>{ AX.who = e.target.value; renderAxChart(); };
+document.querySelectorAll("#axScale button").forEach(b=>b.onclick=()=>{ AX.scale=b.dataset.s; document.querySelectorAll("#axScale button").forEach(x=>x.setAttribute("aria-pressed", x.dataset.s===AX.scale)); renderAxChart(); });
+document.getElementById("axSec").addEventListener("click", e=>{
+  const pt = e.target.closest("[data-axp]");
+  if(pt){
+    const el = document.getElementById("axChart"), b = el._axB[+pt.dataset.axp], c = el._axC, v = axView(AX.who);
+    const list = c.list || "due";
+    if(v.ae) openList(v.ae, "ae", list, v.name+": "+c.label, b.p);
+    else if(v.aeFormer) openList(FORMER, "ae", list, "Former AEs: "+c.label, b.p);
+    else openList(v.key, "bdr", list, "All AEs: "+c.label, b.p);
+    return;
+  }
+  const cell = e.target.closest("[data-ax]"); if(!cell) return;
+  const [who, ci] = cell.dataset.ax.split("|"), c = AX_COLS[+ci], v = axView(who), p = periodFor(AX.kind, AX.offset);
+  if(v.ae) openList(v.ae, "ae", c.list, v.name+": "+c.label, p);
+  else if(v.aeFormer) openList(FORMER, "ae", c.list, "Former AEs: "+c.label, p);
+  else openList(v.key, "bdr", c.list, "All AEs: "+c.label, p);
+});
+let axResize; window.addEventListener("resize", ()=>{ clearTimeout(axResize); axResize = setTimeout(renderAxChart, 150); });
+
 /* ---------- Sales L10 tabs ---------- */
 function l10Tab(t){
   document.querySelectorAll("#l10Tabs button").forEach(b=>b.setAttribute("aria-selected", b.dataset.t===t));
   document.querySelectorAll("section[data-tab]").forEach(sec=>sec.hidden = sec.dataset.tab!==t);
   try{ localStorage.setItem("jf_l10_tab", t); }catch(e){}
   if(t==="tr") renderTrends();
+  if(t==="ax") requestAnimationFrame(renderAEs);
 }
 document.querySelectorAll("#l10Tabs button").forEach(b=>b.onclick=()=>l10Tab(b.dataset.t));
-if(REPORTING){ let t0 = "sc"; try{ t0 = localStorage.getItem("jf_l10_tab") || "sc"; }catch(e){} l10Tab(["sc","bd","ib","tr"].includes(t0)?t0:"sc"); }
+if(REPORTING){ let t0 = "sc"; try{ t0 = localStorage.getItem("jf_l10_tab") || "sc"; }catch(e){} l10Tab(["sc","bd","ib","ax","tr"].includes(t0)?t0:"sc"); }
 render(); refresh();
 </script>
 </body>

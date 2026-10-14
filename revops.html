@@ -267,6 +267,7 @@ section[hidden]{display:none}
     <div class="sec-head">
       <h2 id="crTitle">Connect rate</h2>
       <div class="nav">
+        <div class="seg" id="crView" role="group" aria-label="View"><button type="button" data-v="week" aria-pressed="true">Weekly</button><button type="button" data-v="quarter" aria-pressed="false">Quarterly</button></div>
         <button type="button" id="crPrev" aria-label="Previous week">‹</button>
         <div class="period" id="crWeekLabel" aria-live="polite"></div>
         <button type="button" id="crNext" aria-label="Next week">›</button>
@@ -318,7 +319,7 @@ const h = s => String(s??"").replace(/[&<>"']/g, c=>({"&":"&amp;","<":"&lt;",">"
 const MON = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
 const ORDER = ["Brandon","Issa","Erich","Jules"];
 const TIERS = ["Tier 1","Tier 2","Tier 3","None"];
-const S = { data:null, week:null, open:{}, parsed:null, file:"", saving:false };
+const S = { data:null, week:null, view:"week", q:null, open:{}, parsed:null, file:"", saving:false };
 
 const token = () => { try{ return localStorage.getItem("jf_token"); }catch(e){ return null; } };
 async function call(path, opts){
@@ -349,35 +350,45 @@ function weekList(){
   const set = new Set(); (S.data.connectRate||[]).forEach(r=>set.add(r.week_ending));
   return Array.from(set).sort().reverse();
 }
+
+/* a week belongs to the quarter its Monday falls in (same rule as the Q3 table: Jul 6 - Oct 3 is Q3) */
+const quarterOf = w => { const m = s2d(add(w,-5)); return m.getUTCFullYear()+"-Q"+(Math.floor(m.getUTCMonth()/3)+1); };
+function quarterList(){
+  const g = {}; weekList().forEach(w=>{ const k = quarterOf(w); (g[k] = g[k] || []).push(w); });
+  return Object.keys(g).sort().reverse().map(k=>({ key:k, weeks:g[k].slice().sort() }));
+}
+const quarterLabel = q => { const p = q.key.split("-"); const a = add(q.weeks[0],-5), z = q.weeks[q.weeks.length-1];
+  return p[1]+" "+p[0]+" · "+lbl(a)+" – "+lbl(z)+" · "+q.weeks.length+(q.weeks.length === 1 ? " week" : " weeks"); };
 function buildWeek(w){
   const D = S.data, by = {};
-  const mk = bdr => by[bdr] || (by[bdr] = { bdr, tiers:{}, d:0, c:0, v:0, books:0, inb:0, leads:0, rtb:0, inl:0 });
+  const inW = Array.isArray(w) ? (x => w.indexOf(x) >= 0) : (x => x === w);   // one week, or every week of a quarter (everything below adds up)
+  const mk = bdr => by[bdr] || (by[bdr] = { bdr, tiers:{}, d:0, c:0, v:0, books:0, inb:0, leads:0, rtb:0, inl:0, lw:0 });
   const tier = (b,t) => b.tiers[t] || (b.tiers[t] = { tier:t, d:0, c:0, v:0, books:0, lists:{} });
-  (D.connectRate||[]).filter(r=>r.week_ending===w).forEach(r=>{
+  (D.connectRate||[]).filter(r=>inW(r.week_ending)).forEach(r=>{
     const b = mk(r.bdr), t = tier(b, r.tier);
     t.d += r.dials; t.c += r.connects; t.v += r.meaningful_dispositions;
     b.d += r.dials; b.c += r.connects; b.v += r.meaningful_dispositions;
   });
-  (D.byList||[]).filter(r=>r.week_ending===w).forEach(r=>{
+  (D.byList||[]).filter(r=>inW(r.week_ending)).forEach(r=>{
     const t = tier(mk(r.bdr), r.tier);
     const l = t.lists[r.list_name] || (t.lists[r.list_name] = { name:r.list_name, d:0, c:0, v:0, books:0 });
     l.d += r.dials; l.c += r.connects; l.v += r.meaningful_dispositions;
   });
-  (D.discos||[]).filter(r=>r.week_ending===w).forEach(r=>{ if(r.discos_booked || by[r.bdr]) mk(r.bdr).books = r.discos_booked; });
-  (D.books||[]).filter(r=>r.week_ending===w).forEach(r=>{
+  (D.discos||[]).filter(r=>inW(r.week_ending)).forEach(r=>{ if(r.discos_booked || by[r.bdr]) mk(r.bdr).books += r.discos_booked; });
+  (D.books||[]).filter(r=>inW(r.week_ending)).forEach(r=>{
     const t = tier(mk(r.bdr), r.tier);
     t.books += r.outbound_books;
     const l = t.lists[r.list_name] || (t.lists[r.list_name] = { name:r.list_name, d:0, c:0, v:0, books:0 });
     l.books += r.outbound_books;
   });
-  (D.inbound||[]).filter(r=>r.week_ending===w).forEach(r=>{ if(r.inbound_books || by[r.bdr]) mk(r.bdr).inb = r.inbound_books; });
-  (D.segments||[]).filter(r=>r.week_ending===w).forEach(r=>{ if(SKIP_BDRS.indexOf(r.bdr) < 0 && (r.parallel_leads + r.power_leads + (r.other_leads||0) || by[r.bdr])) { const b = mk(r.bdr); b.leads = r.parallel_leads + r.power_leads + (r.other_leads||0); b.rtb = r.rtb_leads||0; b.inl = r.inbound_leads||0; } });
+  (D.inbound||[]).filter(r=>inW(r.week_ending)).forEach(r=>{ if(r.inbound_books || by[r.bdr]) mk(r.bdr).inb += r.inbound_books; });
+  (D.segments||[]).filter(r=>inW(r.week_ending)).forEach(r=>{ if(SKIP_BDRS.indexOf(r.bdr) < 0 && (r.parallel_leads + r.power_leads + (r.other_leads||0) || by[r.bdr])) { const b = mk(r.bdr), n = r.parallel_leads + r.power_leads + (r.other_leads||0); b.leads += n; b.rtb += r.rtb_leads||0; b.inl += r.inbound_leads||0; if(n > 0) b.lw++; } });
   const list = Object.values(by).sort((a,b)=>{
     const ia = ORDER.indexOf(a.bdr), ib = ORDER.indexOf(b.bdr);
     return (ia<0?99:ia) - (ib<0?99:ib) || a.bdr.localeCompare(b.bdr);
   });
   const team = list.reduce((a,b)=>({ d:a.d+b.d, c:a.c+b.c, v:a.v+b.v, books:a.books+b.books, inb:a.inb+b.inb, leads:a.leads+b.leads, rtb:a.rtb+b.rtb, inl:a.inl+b.inl }), { d:0, c:0, v:0, books:0, inb:0, leads:0, rtb:0, inl:0 });
-  team.leadN = list.filter(b=>b.leads > 0).length;   // BDRs that were given leads this week
+  team.leadN = list.reduce((a,b)=>a+b.lw, 0);   // BDR-weeks that were given leads (= number of BDRs in a single week)
   return { bdrs:list, team };
 }
 
@@ -385,10 +396,16 @@ function buildWeek(w){
 function render(){
   const D = S.data;
   if(!D){ return; }
-  const weeks = weekList();
+  const isQ = S.view === "quarter";
+  document.querySelectorAll("#crView button").forEach(b=>b.setAttribute("aria-pressed", String(b.dataset.v === S.view)));
+  $("crPrev").setAttribute("aria-label", isQ ? "Previous quarter" : "Previous week");
+  $("crNext").setAttribute("aria-label", isQ ? "Next quarter" : "Next week");
+  const weeks = weekList(), quarters = quarterList();
   if(!S.week || weeks.indexOf(S.week) < 0) S.week = weeks[0] || null;
-  const i = weeks.indexOf(S.week);
-  $("crPrev").disabled = i < 0 || i >= weeks.length-1;
+  if(!S.q || !quarters.some(x=>x.key === S.q)) S.q = quarters[0] ? quarters[0].key : null;
+  const i = isQ ? quarters.findIndex(x=>x.key === S.q) : weeks.indexOf(S.week);
+  const n = isQ ? quarters.length : weeks.length;
+  $("crPrev").disabled = i < 0 || i >= n-1;
   $("crNext").disabled = i <= 0;
   $("crLatest").disabled = i <= 0;
   if(!S.week){
@@ -396,14 +413,15 @@ function render(){
     $("crTiles").innerHTML = ""; $("crTable").innerHTML = '<tbody><tr><td class="empty">Drop a Nooks CSV above to add the first week.</td></tr></tbody>';
     return;
   }
-  $("crWeekLabel").textContent = weekLabel(S.week);
-  const W = buildWeek(S.week);
+  const Q = isQ ? quarters[i] : null;
+  $("crWeekLabel").textContent = isQ ? quarterLabel(Q) : weekLabel(S.week);
+  const W = buildWeek(isQ ? Q.weeks : S.week);
   const T = W.team;
   $("crTiles").innerHTML =
     tile("Team connect rate", T.d ? '<span class="'+((T.c/T.d)>=target()?"ahead":"behind")+'">'+pct(T.c,T.d)+'</span>' : "–", "target "+(target()*100).toFixed(1)+"%") +
     tile("Dials", num(T.d), "") + tile("Connects", num(T.c), "") + tile("Conversations", num(T.v), "") +
-    tile("Outbound books", num(T.books), "") + tile("Inbound books", num(T.inb), "") + tile("7 Day TVL", T.leadN ? num(Math.round(T.leads/T.leadN)) : "–", T.leadN ? "avg cold leads per BDR (parallel + power), across "+T.leadN+" BDRs" : "") +
-    tile("RTB leads", num(T.rtb), T.leadN ? "avg "+num(Math.round(T.rtb/T.leadN))+" per BDR" : "") + tile("Inbound leads", num(T.inl), T.leadN ? "avg "+num(Math.round(T.inl/T.leadN))+" per BDR" : "");
+    tile("Outbound books", num(T.books), "") + tile("Inbound books", num(T.inb), "") + tile("7 Day TVL", T.leadN ? num(Math.round(T.leads/T.leadN)) : "–", T.leadN ? (isQ ? "avg cold leads per BDR per week (parallel + power)" : "avg cold leads per BDR (parallel + power), across "+T.leadN+" BDRs") : "") +
+    tile("RTB leads", num(T.rtb), T.leadN ? "avg "+num(Math.round(T.rtb/T.leadN))+" per BDR"+(isQ ? " per week" : "") : "") + tile("Inbound leads", num(T.inl), T.leadN ? "avg "+num(Math.round(T.inl/T.leadN))+" per BDR"+(isQ ? " per week" : "") : "");
 
   let rows = '<thead><tr><th></th><th>Dials</th><th>Connects</th><th>Connect rate</th><th>Conversations</th><th>Outbound books</th></tr></thead><tbody>';
   rows += '<tr class="team"><td>Team</td><td>'+num(T.d)+'</td><td>'+num(T.c)+'</td><td>'+rateCell(T.c,T.d)+'</td><td>'+num(T.v)+'</td><td>'+num(T.books)+'</td></tr>';
@@ -425,7 +443,7 @@ function render(){
   rows += '</tbody>';
   $("crTable").innerHTML = rows;
 
-  $("crLegend").innerHTML = '<b>Connect rate</b> = connects ÷ dials, green at or above the '+(target()*100).toFixed(1)+'% target. Click a BDR to see tiers, then a tier to see its lists. <b>Conversations</b> are the Nooks "meaningful" dispositions. Weeks run Monday to Saturday. Outbound books count a Discovery Booked call, or a Meeting Rebook 30+ days after the last Discovery Booked, in the week of the call.';
+  $("crLegend").innerHTML = '<b>Connect rate</b> = connects ÷ dials, green at or above the '+(target()*100).toFixed(1)+'% target. Click a BDR to see tiers, then a tier to see its lists. <b>Conversations</b> are the Nooks "meaningful" dispositions. Weeks run Monday to Saturday. Outbound books count a Discovery Booked call, or a Meeting Rebook 30+ days after the last Discovery Booked, in the week of the call.'+(isQ ? ' <b>Quarterly view</b> adds up every week in the quarter: the connect rate for a BDR, tier or list is its total connects ÷ its total dials, so busier weeks count for more. Tiers and lists are the same as the weekly view.' : '');
   try{ renderQ3(); }catch(e){ console.error('Q3 section', e); }
   const up = (D.uploads||[])[0];
   const synced = D.booksSyncedAt ? new Date(D.booksSyncedAt).toLocaleString("en-US",{month:"short",day:"numeric",hour:"numeric",minute:"2-digit"}) : null;
@@ -599,9 +617,17 @@ function wire(){
   drop.addEventListener("drop", e=>{ const f = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0]; onFile(f); });
   $("crSunday").onchange = () => { updateWeekLbl(); renderPreview(); };
   $("crSunday").value = sundayOnOrBefore(todayStr()); updateWeekLbl();
-  $("crPrev").onclick = () => { const w = weekList(), i = w.indexOf(S.week); if(i >= 0 && i < w.length-1){ S.week = w[i+1]; render(); } };
-  $("crNext").onclick = () => { const w = weekList(), i = w.indexOf(S.week); if(i > 0){ S.week = w[i-1]; render(); } };
-  $("crLatest").onclick = () => { S.week = weekList()[0] || null; render(); };
+  $("crPrev").onclick = () => {
+    if(S.view === "quarter"){ const q = quarterList(), i = q.findIndex(x=>x.key === S.q); if(i >= 0 && i < q.length-1){ S.q = q[i+1].key; render(); } return; }
+    const w = weekList(), i = w.indexOf(S.week); if(i >= 0 && i < w.length-1){ S.week = w[i+1]; render(); } };
+  $("crNext").onclick = () => {
+    if(S.view === "quarter"){ const q = quarterList(), i = q.findIndex(x=>x.key === S.q); if(i > 0){ S.q = q[i-1].key; render(); } return; }
+    const w = weekList(), i = w.indexOf(S.week); if(i > 0){ S.week = w[i-1]; render(); } };
+  $("crLatest").onclick = () => { if(S.view === "quarter"){ S.q = (quarterList()[0] || {}).key || null; } else { S.week = weekList()[0] || null; } render(); };
+  document.querySelectorAll("#crView button").forEach(b => { b.onclick = () => {
+    S.view = b.dataset.v;
+    if(S.view === "quarter" && S.week) S.q = quarterOf(S.week);   // open the quarter of the week you were looking at
+    render(); }; });
   $("crTable").addEventListener("click", e=>{ const b = e.target.closest("[data-k]"); if(!b) return; const k = b.getAttribute("data-k"); S.open[k] = !S.open[k]; render(); });
   // the page also lets people drop a file anywhere on this section
   const sec = $("crSec");

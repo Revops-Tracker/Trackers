@@ -223,6 +223,34 @@ section[hidden]{display:none}
 .ib-pick{display:inline-flex;align-items:center;gap:8px;font-size:14px;color:var(--muted);font-weight:500}
 .ib-pick select{border:1px solid var(--line);background:var(--panel);color:var(--ink);border-radius:8px;padding:7px 10px;font:inherit;font-size:14px}
 .l10-sec{margin-top:8px}
+/* Sales L10 layout: tabs + scorecard */
+.l10-tabs{display:none}
+html.view-reporting .l10-tabs{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 22px;border-bottom:1px solid var(--line)}
+.l10-tabs button{border:0;background:transparent;padding:10px 14px;font-weight:600;color:var(--muted);cursor:pointer;border-bottom:3px solid transparent;margin-bottom:-1px;font-size:15px}
+.l10-tabs button[aria-selected="true"]{color:var(--ink);border-bottom-color:var(--fill)}
+html.view-reporting section[data-tab][hidden]{display:none!important}
+details.how{margin-top:12px;color:var(--muted);font-size:13px}
+details.how summary{cursor:pointer;font-weight:600;color:var(--muted);list-style:none;display:inline-flex;align-items:center;gap:6px}
+details.how summary::before{content:"ⓘ";font-size:14px}
+details.how summary::-webkit-details-marker{display:none}
+details.how > div{margin-top:8px;line-height:1.5}
+.sc-ctl{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+.sc-tbl{min-width:860px;border-collapse:collapse;width:100%}
+.sc-tbl th,.sc-tbl td{padding:7px 8px;font-size:14px;text-align:right;font-variant-numeric:tabular-nums;border-bottom:1px solid var(--line);white-space:nowrap}
+.sc-tbl th{font-size:12px;color:var(--muted);font-weight:600;vertical-align:bottom}
+.sc-tbl th small{display:block;font-weight:500}
+.sc-tbl th:first-child,.sc-tbl td:first-child{text-align:left;position:sticky;left:0;background:var(--panel);z-index:1}
+.sc-tbl td.goal,.sc-tbl th.goal{color:var(--muted);border-right:1px solid var(--line)}
+.sc-tbl td.avg,.sc-tbl th.avg{border-left:1px solid var(--line);font-weight:600}
+.sc-tbl th.cur,.sc-tbl td.cur{background:color-mix(in srgb,var(--fill) 6%,var(--panel))}
+.sc-tbl tr.grp td{background:var(--paper);font-family:var(--display);font-weight:700;font-size:15px;letter-spacing:.04em;text-transform:uppercase;color:var(--muted);padding-top:12px}
+.sc-tbl tr.sub td:first-child{padding-left:26px;color:var(--muted);font-size:13px}
+.sc-tbl tr.sub td{font-size:13px}
+.sc-tbl td.ok{color:var(--ahead);font-weight:600}
+.sc-tbl td.bad{color:var(--behind);font-weight:600}
+.sc-tbl td small{display:block;font-size:11px;color:var(--muted);font-weight:400}
+.sc-wrap{background:var(--panel);border:1px solid var(--line);border-radius:12px;overflow-x:auto}
+.sc-note{color:var(--muted);font-size:13px;margin:8px 0 0}
 </style>
 <div class="wrap">
   <header class="top">
@@ -278,7 +306,40 @@ section[hidden]{display:none}
     </div>
   </section>
 
-  <section class="tr-root" id="rpTrends">
+  <nav class="l10-tabs" id="l10Tabs" role="tablist" aria-label="Sales L10 views">
+    <button role="tab" data-t="sc" aria-selected="true">Scorecard</button>
+    <button role="tab" data-t="bd" aria-selected="false">BDRs</button>
+    <button role="tab" data-t="ib" aria-selected="false">Inbound</button>
+    <button role="tab" data-t="tr" aria-selected="false">Trends</button>
+  </nav>
+
+  <section id="scSec" class="l10-sec" data-tab="sc">
+    <div class="sec-head">
+      <h2>Scorecard</h2>
+      <div class="sc-ctl">
+        <label class="ib-pick">View <select id="scView"></select></label>
+        <div class="seg" id="scKind" role="group" aria-label="Columns">
+          <button data-k="week" aria-pressed="true">Weekly</button>
+          <button data-k="month" aria-pressed="false">Monthly</button>
+        </div>
+        <div class="nav">
+          <button type="button" id="scPrev" aria-label="Earlier">‹</button>
+          <button type="button" id="scNext" aria-label="Later">›</button>
+        </div>
+      </div>
+    </div>
+    <div class="sc-wrap" id="scTable"></div>
+    <p class="sc-note" id="scNote"></p>
+    <details class="how"><summary>How this is counted</summary><div>
+      One row per L10 metric, one column per week (Mon to Sun) or month, newest on the right. The shaded column is the period in progress: it is checked against where the goal should be by yesterday. <b>Green</b> = at or above goal, <b>red</b> = below. <b>Avg</b> = average of the finished columns shown.<br>
+      <b>Dials, connects, conversations</b> come from the weekly Nooks upload (RevOps L10 tab); a week shows blank until it is uploaded. <b>Conversation → book</b> = BDR books ÷ Nooks conversations (the sheet's "complete to disco").<br>
+      <b>Books</b> = new calls, counted on the day they were booked (a rebook only counts when it is booked 30+ days after the deal's last slot). <b>Runs due</b> = calls whose slot came up; <b>runs had</b> = calls that happened; <b>overall show</b> = had ÷ due; <b>1st-time show</b> = held at the first slot ÷ first slots that came due. <b>Outbound</b> = a BDR booked it and the first touch is cold call / RTB; <b>inbound leads</b> = inbound first touch or self-booked / CloseBot, whoever booked it.<br>
+      Designs, designs held, diagnosis, prop updates, contracts and closes are counted on the day they happened; MRR is by close date. Click any number to see the deals.<br>
+      <b>Goals</b> are weekly (monthly = ×4): per BDR 1,000 dials, 80 connects, 12 books, 8 runs had, 4 designs; per AE 20 runs, 5 designs held, 8 prop updates, 4 contracts, 2 closes, $10,750 MRR; 75% show; ratio goals from the L10 sheet (book → design 33%, run → design 50%, design → close 30%, contract → close 85%). Team goals = per-BDR goal × current BDRs.
+    </div></details>
+  </section>
+
+  <section class="tr-root" id="rpTrends" data-tab="tr" hidden>
     <div class="sec-head">
       <h2>Team trends</h2>
       <div class="chips" id="trMetric" role="group" aria-label="Trend metric"></div>
@@ -323,10 +384,10 @@ section[hidden]{display:none}
       <div class="tr-tip" id="trTip"></div>
     </div>
     <div class="table-wrap" id="trTableWrap" hidden></div>
-    <div class="legend">Each bar is split by who booked the deal. <b>BDRs only</b> = Brandon, Erich, Issa and former BDRs. <b>Inbound</b> = calls with no BDR (booked by the lead) plus CloseBot; under Inbound the bars are split by the deal's first-touch UTM source (pick one to see it alone, split into lead-booked vs CloseBot). Sources outside the main six are grouped as Other sources (hover the legend to see them). AE-booked calls only show under All sources. The number on top is the total. Closes and MRR are by close date. Click a coloured block to see the deals. * = period not finished or cut by the range.</div>
+    <details class="how"><summary>How this is counted</summary><div>Each bar is split by who booked the deal. <b>BDRs only</b> = Brandon, Erich, Issa and former BDRs. <b>Inbound</b> = calls with no BDR (booked by the lead) plus CloseBot; under Inbound the bars are split by the deal's first-touch UTM source (pick one to see it alone, split into lead-booked vs CloseBot). Sources outside the main six are grouped as Other sources (hover the legend to see them). AE-booked calls only show under All sources. The number on top is the total. Closes and MRR are by close date. Click a coloured block to see the deals. * = period not finished or cut by the range.</div></details>
   </section>
 
-  <section id="bdSec" class="l10-sec">
+  <section id="bdSec" class="l10-sec" data-tab="bd" hidden>
     <div class="sec-head">
       <h2>BDRs</h2>
       <div class="ib-ctl">
@@ -348,10 +409,10 @@ section[hidden]{display:none}
     <div class="sec-head" style="margin:22px 0 8px"><div class="ib-h" style="margin:0">By lead source (first touch)</div>
       <label class="ib-pick">Rep <select id="bdRep"></select></label></div>
     <div class="table-wrap" id="bdBySource"></div>
-    <div class="legend">Every call a BDR booked (current BDRs and former BDRs), whatever the lead source. <b>Lead source</b> = the deal's first-touch UTM: cold call, RTB hit, or an inbound channel (an inbound lead a BDR converted). Pick a rep to see their sources. Inbound leads a BDR booked also appear in the Inbound section below, under "Booked by BDRs". Click any number to see the deals.</div>
+    <details class="how"><summary>How this is counted</summary><div>Every call a BDR booked (current BDRs and former BDRs), whatever the lead source. <b>Lead source</b> = the deal's first-touch UTM: cold call, RTB hit, or an inbound channel (an inbound lead a BDR converted). Pick a rep to see their sources. Inbound leads a BDR booked also appear in the Inbound section below, under "Booked by BDRs". Click any number to see the deals.</div></details>
   </section>
 
-  <section id="ibSec" class="l10-sec">
+  <section id="ibSec" class="l10-sec" data-tab="ib" hidden>
     <div class="sec-head">
       <h2>Inbound</h2>
       <div class="ib-ctl">
@@ -377,7 +438,7 @@ section[hidden]{display:none}
     <div class="table-wrap" id="ibByChannel"></div>
     <div class="ib-h">By who booked the call</div>
     <div class="table-wrap" id="ibByPath"></div>
-    <div class="legend"><b>Inbound lead</b> = the deal's first touch is an inbound channel (form, ad, chat, organic…), or the lead booked the call themselves / through CloseBot. This includes inbound leads a BDR booked. An <b>RTB hit</b> first touch counts as outbound (it is an intent signal, not the lead reaching out). Use <b>Booked by</b> to split self-booked / CloseBot from BDR-booked. <b>Outbound calls</b> (grey) are there for comparison: cold-call and RTB leads a BDR booked. Same definitions everywhere: <b>Books</b> = new calls counted on the day they were booked; <b>Runs due</b> = calls whose slot came up; <b>Overall show</b> = had ÷ due; <b>1st-time show</b> = held at the first slot ÷ first slots that came due (counts underneath). Closes and MRR are by close date. Click any number to see the deals.</div>
+    <details class="how"><summary>How this is counted</summary><div><b>Inbound lead</b> = the deal's first touch is an inbound channel (form, ad, chat, organic…), or the lead booked the call themselves / through CloseBot. This includes inbound leads a BDR booked. An <b>RTB hit</b> first touch counts as outbound (it is an intent signal, not the lead reaching out). Use <b>Booked by</b> to split self-booked / CloseBot from BDR-booked. <b>Outbound calls</b> (grey) are there for comparison: cold-call and RTB leads a BDR booked. Same definitions everywhere: <b>Books</b> = new calls counted on the day they were booked; <b>Runs due</b> = calls whose slot came up; <b>Overall show</b> = had ÷ due; <b>1st-time show</b> = held at the first slot ÷ first slots that came due (counts underneath). Closes and MRR are by close date. Click any number to see the deals.</div></details>
   </section>
 </div>
 
@@ -880,6 +941,18 @@ async function refresh(){
   state.pend = new Map((r.overrides||[]).filter(o=>o.status==="pending").map(o=>[o.key,o]));
   state.reviews = new Map((r.reviews||[]).map(v=>[v.key+"|"+v.rep, v]));
   render();
+  if(REPORTING && !state.act) loadActivity();
+}
+// Nooks dials / connects / conversations (weekly upload on the RevOps L10 tab), for the Sales L10 scorecard
+async function loadActivity(){
+  try{
+    const base = ((window.JF_CONFIG||{}).API_BASE||"").replace(/\/jf-sso$/, "/bdr-report");
+    const res = await fetch(base+"/state", {headers:{Authorization:"Bearer "+token()}, cache:"no-store"});
+    const j = await res.json().catch(()=>({}));
+    if(!res.ok || j.ok===false) throw new Error(j.error||res.status);
+    state.act = {rows: j.connectRate||[], target: parseFloat((j.config||{}).connect_rate_target||"0.03")};
+  }catch(e){ console.warn("activity", e); state.act = {rows:[], target:0.03, failed:true}; }
+  renderScorecard();
 }
 function toast(msg){ const t=document.getElementById("toast"); t.textContent=msg; t.classList.add("show"); setTimeout(()=>t.classList.remove("show"),2200); }
 
@@ -1229,7 +1302,7 @@ function renderInboundBreakdown(){
 function renderL10(){
   if(!document.getElementById("bdSec")) return;
   for(const k of [...PRED.keys()]) if(k.startsWith("l10:")) PRED.delete(k);
-  renderBdrBreakdown(); renderInboundBreakdown();
+  renderScorecard(); renderBdrBreakdown(); renderInboundBreakdown();
 }
 for(const sec of ["bd","ib"]){
   const st = L10[sec], draw = sec==="bd" ? renderBdrBreakdown : renderInboundBreakdown;
@@ -1244,6 +1317,213 @@ for(const sec of ["bd","ib"]){
 }
 document.querySelectorAll("#ibWho button").forEach(b=>b.onclick=()=>{ L10.ib.who=b.dataset.w; renderInboundBreakdown(); });
 document.getElementById("bdRep").onchange = e=>{ L10.bd.rep = e.target.value; renderBdrBreakdown(); };
+/* ---------- Sales L10: scorecard (one row per L10 metric, one column per week / month) ---------- */
+const SC = {kind:"week", shift:0, view:"team", cols:[]};
+const SC_N = {week:8, month:6};
+const isOutb = r => isBdrBooked(r) && !isInbLead(r);
+const isLeadIn = r => isInbLead(r) && (NOT_A_BDR.has(r.booker) || isBdrBooked(r) || CUR_AE.has(r.booker) || !r.booker);
+// views: who the numbers are for. key = person key for statsFor/openList, nooks = which BDRs' activity counts
+function scViews(){
+  const v = [
+    {id:"team", name:"Whole team", key:"sc:team", pred:r=>true, nooks:"all", split:true, g:"team"},
+    {id:"bdrs", name:"BDR team", key:"sc:bdrs", pred:isBdrBooked, nooks:"all", g:"bdrteam"},
+    ...BDRS.map(b=>({id:b.key, name:b.name, key:"sc:"+b.key, pred:r=>r.booker===b.key, nooks:firstName(b.key), g:"bdr"})),
+    {id:"inb", name:"Inbound leads", key:"sc:inb", pred:isLeadIn, g:"inb"},
+    ...AES.map(a=>({id:"ae:"+a.key, name:a.name+" (AE)", ae:a.key, g:"ae"})),
+  ];
+  v.forEach(x=>{ if(x.pred) PRED.set(x.key, x.pred); });
+  return v;
+}
+// weekly goals (monthly = x MULT.month). From the L10 sheet + the leaderboard goals.
+const SC_GOAL = {
+  bdr:     {dials:1000, connects:80, books:12, had:8, des:4},
+  ae:      {had:20, dheld:5, prop:8, con:4, won:2, cwd:10750, des:5},
+  inb:     {},
+};
+const SC_RATIO = {rate:null, show:0.75, b2d:0.33, r2d:0.5, d2w:0.3, c2w:0.85};
+function scGoal(m, g){
+  if(m.ratio) return m.id==="rate" ? (state.act ? state.act.target : 0.03) : SC_RATIO[m.id] ?? null;
+  const nB = BDRS.length;
+  if(g==="bdr") return SC_GOAL.bdr[m.id] ?? null;
+  if(g==="ae") return SC_GOAL.ae[m.id] ?? null;
+  if(g==="bdrteam") return SC_GOAL.bdr[m.id]!=null ? SC_GOAL.bdr[m.id]*nB : null;
+  if(g==="team"){
+    if(["dials","connects","books","had"].includes(m.id)) return SC_GOAL.bdr[m.id]*nB;
+    if(m.id==="des") return SC_GOAL.bdr.des*nB;
+    return SC_GOAL.ae[m.id] ?? null;
+  }
+  return null;
+}
+const SC_ROWS = [
+  {grp:"Activity (Nooks)"},
+  {id:"dials",    label:"Dials",                 act:true, f:a=>a.d},
+  {id:"connects", label:"Connects",              act:true, f:a=>a.c},
+  {id:"rate",     label:"Connect rate",          act:true, ratio:true, f:a=>a.d?a.c/a.d:null, sub:a=>a.d?a.c+" of "+a.d.toLocaleString():""},
+  {id:"conv",     label:"Conversations",         act:true, f:a=>a.v},
+  {id:"c2b",      label:"Conversation → book",   act:true, ratio:true, f:(a,t)=>a.v?t.bdrBooks/a.v:null, sub:(a,t)=>a.v?t.bdrBooks+" of "+a.v:""},
+  {grp:"Discovery calls"},
+  {id:"books",    label:"Books (new)",           f:t=>t.books.length, list:"books", split:true},
+  {id:"due",      label:"Runs due",              f:t=>t.due.length, list:"due"},
+  {id:"had",      label:"Runs had",              f:t=>t.had.length, list:"had", split:true},
+  {id:"ns",       label:"No-shows",              f:t=>t.ns.length, list:"ns", lower:true},
+  {id:"ca",       label:"Cancelled ahead",       f:t=>t.ca.length, list:"ca", lower:true},
+  {id:"show",     label:"Overall show",          ratio:true, f:t=>t.show, list:"due", sub:t=>t.due.length?t.had.length+" of "+t.due.length:"", split:true},
+  {id:"first",    label:"1st-time show",         ratio:true, f:t=>t.first, list:"fdue", sub:t=>t.fdue.length?t.f1.length+" of "+t.fdue.length:""},
+  {grp:"Pipeline"},
+  {id:"des",      label:"Designs created",       f:t=>t.des.length, list:"des"},
+  {id:"b2d",      label:"Book → design",         ratio:true, f:t=>t.books.length?t.des.length/t.books.length:null, list:"des"},
+  {id:"r2d",      label:"Run → design",          ratio:true, f:t=>t.had.length?t.des.length/t.had.length:null, list:"des"},
+  {id:"dheld",    label:"Designs held",          f:t=>t.dheld.length, list:"dheld"},
+  {id:"diag",     label:"Moved to diagnosis",    f:t=>t.diag.length, list:"diag"},
+  {id:"prop",     label:"Prop updates held",     f:t=>t.prop.length, list:"prop"},
+  {id:"con",      label:"Contracts sent",        f:t=>t.con.length, list:"con"},
+  {grp:"Revenue"},
+  {id:"won",      label:"Closed won",            f:t=>t.won.length, list:"won"},
+  {id:"cwd",      label:"MRR closed",            money:true, f:t=>t.cwd, list:"won"},
+  {id:"d2w",      label:"Design → close",        ratio:true, f:t=>t.des.length?t.won.length/t.des.length:null, list:"won"},
+  {id:"c2w",      label:"Contract → close",      ratio:true, f:t=>t.con.length?t.won.length/t.con.length:null, list:"won"},
+];
+const SC_SPLIT = [
+  {key:"sc:split:out", name:"Outbound (BDR)", pred:isOutb},
+  {key:"sc:split:inb", name:"Inbound leads",  pred:isLeadIn},
+  {key:"sc:split:ae",  name:"AE-booked outbound", pred:r=>CUR_AE.has(r.booker) && !isInbLead(r)},
+];
+SC_SPLIT.forEach(x=>PRED.set(x.key, x.pred));
+function scActivity(view, p){
+  const a = {d:0, c:0, v:0, n:0};
+  if(!state.act || !view.nooks) return null;
+  state.act.rows.forEach(r=>{
+    if(r.week_ending < p.start || r.week_ending > p.end) return;
+    if(view.nooks!=="all" && r.bdr!==view.nooks) return;
+    a.d += r.dials||0; a.c += r.connects||0; a.v += r.meaningful_dispositions||0; a.n++;
+  });
+  return a.n ? a : null;
+}
+function scStats(view, p){
+  const t = view.ae ? statsFor(view.ae, "ae", p) : statsFor(view.key, "bdr", p);
+  t.bdrBooks = view.ae ? 0 : statsFor(view.id==="team"||view.id==="bdrs" ? "sc:bdrs" : view.key, "bdr", p).books.length;
+  return t;
+}
+// one column = a period. The in-progress one is compared against the goal pro-rated to yesterday.
+function scColumns(){
+  const n = SC_N[SC.kind], out = [];
+  for(let i=n-1;i>=0;i--){
+    const off = -i + SC.shift, p = periodFor(SC.kind, off);
+    if(p.end < DATA_FROM) continue;
+    const pace = paceFraction(p);
+    const s = p.s, e = p.e;
+    const head = SC.kind==="week" ? MON[s.getMonth()]+" "+s.getDate() : MONTHS[s.getMonth()];
+    const sub = SC.kind==="week" ? "to "+(e.getMonth()===s.getMonth()?e.getDate():MON[e.getMonth()]+" "+e.getDate()) : String(s.getFullYear());
+    out.push({p, off, pace, cur: pace<1, head, sub});
+  }
+  return out;
+}
+const scFmt = (m, v) => v==null ? "–" : m.ratio ? (m.id==="rate" ? (Math.round(v*1000)/10)+"%" : pctS(v)) : m.money ? fmt(v,true) : Math.abs(v)>=100 ? Math.round(v).toLocaleString() : fmt(v);
+function scCell(m, v, goal, pace, sub, clickAttr){
+  const has = v!=null && !(m.act && v===undefined);
+  let cls = "";
+  if(has && goal!=null){
+    const target = m.ratio ? goal : goal*pace;
+    if(!(m.ratio===undefined && pace===0)) cls = (m.lower ? v<=target : v>=target) ? "ok" : "bad";
+  }
+  const shown = !has ? "–" : scFmt(m, v);
+  const inner = clickAttr && has ? `<span class="click" ${clickAttr}>${shown}</span>` : shown;
+  return `<td class="${cls}">${inner}${sub?`<small>${sub}</small>`:""}</td>`;
+}
+function renderScorecard(){
+  const box = document.getElementById("scTable"); if(!box) return;
+  const views = scViews();
+  if(!views.some(v=>v.id===SC.view)) SC.view = "team";
+  const view = views.find(v=>v.id===SC.view);
+  const sel = document.getElementById("scView");
+  sel.innerHTML = views.map(v=>`<option value="${esc(v.id)}"${v.id===SC.view?" selected":""}>${esc(v.name)}</option>`).join("");
+  document.querySelectorAll("#scKind button").forEach(b=>b.setAttribute("aria-pressed", b.dataset.k===SC.kind));
+  const cols = scColumns(); SC.cols = cols;
+  document.getElementById("scNext").disabled = SC.shift >= 0;
+  document.getElementById("scPrev").disabled = !cols.length || cols[0].p.start <= DATA_FROM;
+  const mult = SC.kind==="month" ? MULT.month : 1;
+  const done = cols.filter(c=>!c.cur);
+  const avgP = done.length ? {start:done[0].p.start, end:done[done.length-1].p.end, label:"Average of "+done.length+" "+(SC.kind==="week"?"weeks":"months")} : null;
+  // stats per column (+ the average span)
+  const T = cols.map(c=>scStats(view, c.p)), A = cols.map(c=>scActivity(view, c.p));
+  const avgT = avgP ? scStats(view, avgP) : null, avgA = avgP ? scActivity(view, avgP) : null;
+  const n = done.length;
+  const showAct = !!view.nooks;
+  let html = `<table class="sc-tbl"><thead><tr><th>${esc(view.name)}</th><th class="goal">Goal<small>per ${SC.kind}</small></th>${cols.map(c=>`<th class="${c.cur?"cur":""}">${c.head}<small>${c.cur?"so far":c.sub}</small></th>`).join("")}<th class="avg">Avg</th></tr></thead><tbody>`;
+  const splitRows = view.split ? SC_SPLIT.filter(x=>x.key!=="sc:split:ae" || cols.some(c=>statsFor(x.key,"bdr",c.p).books.length || statsFor(x.key,"bdr",c.p).had.length)) : [];
+  let pendingGrp = null;
+  SC_ROWS.forEach((m, mi)=>{
+    if(m.grp){ pendingGrp = m.grp; return; }
+    if(m.act && !showAct) return;
+    if(pendingGrp){ html += `<tr class="grp"><td colspan="${cols.length+3}">${pendingGrp}</td></tr>`; pendingGrp = null; }
+    const g = scGoal(m, view.g), goal = g==null ? null : (m.ratio ? g : g*mult);
+    const goalTxt = goal==null ? "" : scFmt(m, goal);
+    html += `<tr><td>${m.label}</td><td class="goal">${goalTxt}</td>`;
+    cols.forEach((c,ci)=>{
+      const t = T[ci], a = A[ci];
+      if(m.act){
+        const v = a ? m.f(a, t) : null;
+        html += scCell(m, v, goal, c.pace, a && m.sub ? m.sub(a,t) : "", "").replace("<td class=\"", `<td class="${c.cur?"cur ":""}`);
+      } else {
+        const v = m.f(t);
+        const click = m.list ? `data-sc="${mi}|${ci}|"` : "";
+        html += scCell(m, v, goal, c.pace, m.sub ? m.sub(t) : "", click).replace("<td class=\"", `<td class="${c.cur?"cur ":""}`);
+      }
+    });
+    // average of finished columns: counts / n, ratios pooled over the span
+    let av = null, avSub = "";
+    if(n){
+      if(m.act){ if(avgA){ const v = m.f(avgA, avgT); av = v==null ? null : m.ratio ? v : v/n; } }
+      else { const v = m.f(avgT); av = v==null ? null : m.ratio ? v : v/n; }
+    }
+    const avTxt = scFmt(m, av);
+    let avCls = "";
+    if(av!=null && goal!=null) avCls = (m.lower ? av<=goal : av>=goal) ? "ok" : "bad";
+    html += `<td class="avg ${avCls}">${avTxt}</td></tr>`;
+    // Whole team: split books / runs had / show into outbound vs inbound leads
+    if(m.split && splitRows.length){
+      splitRows.forEach(x=>{
+        html += `<tr class="sub"><td>${x.name}</td><td class="goal"></td>`;
+        cols.forEach((c,ci)=>{
+          const t = statsFor(x.key, "bdr", c.p), v = m.f(t);
+          html += scCell({...m}, v, null, c.pace, m.sub ? m.sub(t) : "", `data-sc="${mi}|${ci}|${x.key}"`).replace("<td class=\"", `<td class="${c.cur?"cur ":""}`);
+        });
+        let av2 = null;
+        if(n){ const v = m.f(statsFor(x.key,"bdr",avgP)); av2 = v==null ? null : m.ratio ? v : v/n; }
+        html += `<td class="avg">${scFmt(m, av2)}</td></tr>`;
+      });
+    }
+  });
+  html += `</tbody></table>`;
+  box.innerHTML = html;
+  const last = (state.act && state.act.rows.length) ? state.act.rows.reduce((a,r)=>r.week_ending>a?r.week_ending:a, "") : null;
+  document.getElementById("scNote").textContent = !showAct ? "" :
+    !state.act ? "Loading Nooks activity…" : state.act.failed ? "Could not load Nooks activity (dials, connects)." :
+    last ? "Nooks activity uploaded through the week ending "+last+". Upload a new week on the RevOps L10 tab." : "No Nooks uploads yet.";
+}
+document.getElementById("scView").onchange = e=>{ SC.view = e.target.value; renderScorecard(); };
+document.querySelectorAll("#scKind button").forEach(b=>b.onclick=()=>{ SC.kind=b.dataset.k; SC.shift=0; renderScorecard(); });
+document.getElementById("scPrev").onclick = ()=>{ SC.shift -= Math.max(1, SC_N[SC.kind]-2); renderScorecard(); };
+document.getElementById("scNext").onclick = ()=>{ SC.shift = Math.min(0, SC.shift + Math.max(1, SC_N[SC.kind]-2)); renderScorecard(); };
+document.getElementById("scSec").addEventListener("click", e=>{
+  const c = e.target.closest("[data-sc]"); if(!c) return;
+  const [mi, ci, sub] = c.dataset.sc.split("|"); const m = SC_ROWS[+mi], col = SC.cols[+ci]; if(!m || !col) return;
+  const view = scViews().find(v=>v.id===SC.view);
+  const subName = sub ? " · "+SC_SPLIT.find(x=>x.key===sub).name : "";
+  if(sub) openList(sub, "bdr", m.list, m.label+subName, col.p);
+  else if(view.ae) openList(view.ae, "ae", m.list, view.name+": "+m.label, col.p);
+  else openList(view.key, "bdr", m.list, view.name+": "+m.label, col.p);
+});
+
+/* ---------- Sales L10 tabs ---------- */
+function l10Tab(t){
+  document.querySelectorAll("#l10Tabs button").forEach(b=>b.setAttribute("aria-selected", b.dataset.t===t));
+  document.querySelectorAll("section[data-tab]").forEach(sec=>sec.hidden = sec.dataset.tab!==t);
+  try{ localStorage.setItem("jf_l10_tab", t); }catch(e){}
+  if(t==="tr") renderTrends();
+}
+document.querySelectorAll("#l10Tabs button").forEach(b=>b.onclick=()=>l10Tab(b.dataset.t));
+if(REPORTING){ let t0 = "sc"; try{ t0 = localStorage.getItem("jf_l10_tab") || "sc"; }catch(e){} l10Tab(["sc","bd","ib","tr"].includes(t0)?t0:"sc"); }
 render(); refresh();
 </script>
 </body>

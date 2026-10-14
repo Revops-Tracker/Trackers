@@ -344,7 +344,7 @@ function weekList(){
 }
 function buildWeek(w){
   const D = S.data, by = {};
-  const mk = bdr => by[bdr] || (by[bdr] = { bdr, tiers:{}, d:0, c:0, v:0, books:0, inb:0, leads:0 });
+  const mk = bdr => by[bdr] || (by[bdr] = { bdr, tiers:{}, d:0, c:0, v:0, books:0, inb:0, leads:0, rtb:0, inl:0 });
   const tier = (b,t) => b.tiers[t] || (b.tiers[t] = { tier:t, d:0, c:0, v:0, books:0, lists:{} });
   (D.connectRate||[]).filter(r=>r.week_ending===w).forEach(r=>{
     const b = mk(r.bdr), t = tier(b, r.tier);
@@ -364,12 +364,12 @@ function buildWeek(w){
     l.books += r.outbound_books;
   });
   (D.inbound||[]).filter(r=>r.week_ending===w).forEach(r=>{ if(r.inbound_books || by[r.bdr]) mk(r.bdr).inb = r.inbound_books; });
-  (D.segments||[]).filter(r=>r.week_ending===w).forEach(r=>{ if(SKIP_BDRS.indexOf(r.bdr) < 0 && (r.parallel_leads + r.power_leads + (r.other_leads||0) || by[r.bdr])) mk(r.bdr).leads = r.parallel_leads + r.power_leads + (r.other_leads||0); });
+  (D.segments||[]).filter(r=>r.week_ending===w).forEach(r=>{ if(SKIP_BDRS.indexOf(r.bdr) < 0 && (r.parallel_leads + r.power_leads + (r.other_leads||0) || by[r.bdr])) { const b = mk(r.bdr); b.leads = r.parallel_leads + r.power_leads + (r.other_leads||0); b.rtb = r.rtb_leads||0; b.inl = r.inbound_leads||0; } });
   const list = Object.values(by).sort((a,b)=>{
     const ia = ORDER.indexOf(a.bdr), ib = ORDER.indexOf(b.bdr);
     return (ia<0?99:ia) - (ib<0?99:ib) || a.bdr.localeCompare(b.bdr);
   });
-  const team = list.reduce((a,b)=>({ d:a.d+b.d, c:a.c+b.c, v:a.v+b.v, books:a.books+b.books, inb:a.inb+b.inb, leads:a.leads+b.leads }), { d:0, c:0, v:0, books:0, inb:0, leads:0 });
+  const team = list.reduce((a,b)=>({ d:a.d+b.d, c:a.c+b.c, v:a.v+b.v, books:a.books+b.books, inb:a.inb+b.inb, leads:a.leads+b.leads, rtb:a.rtb+b.rtb, inl:a.inl+b.inl }), { d:0, c:0, v:0, books:0, inb:0, leads:0, rtb:0, inl:0 });
   team.leadN = list.filter(b=>b.leads > 0).length;   // BDRs that were given leads this week
   return { bdrs:list, team };
 }
@@ -395,7 +395,8 @@ function render(){
   $("crTiles").innerHTML =
     tile("Team connect rate", T.d ? '<span class="'+((T.c/T.d)>=target()?"ahead":"behind")+'">'+pct(T.c,T.d)+'</span>' : "–", "target "+(target()*100).toFixed(1)+"%") +
     tile("Dials", num(T.d), "") + tile("Connects", num(T.c), "") + tile("Conversations", num(T.v), "") +
-    tile("Outbound books", num(T.books), "") + tile("Inbound books", num(T.inb), "") + tile("7 Day TVL", T.leadN ? num(Math.round(T.leads/T.leadN)) : "–", T.leadN ? "avg leads per BDR (parallel + power), across "+T.leadN+" BDRs" : "");
+    tile("Outbound books", num(T.books), "") + tile("Inbound books", num(T.inb), "") + tile("7 Day TVL", T.leadN ? num(Math.round(T.leads/T.leadN)) : "–", T.leadN ? "avg cold leads per BDR (parallel + power), across "+T.leadN+" BDRs" : "") +
+    tile("RTB leads", num(T.rtb), T.leadN ? "avg "+num(Math.round(T.rtb/T.leadN))+" per BDR" : "") + tile("Inbound leads", num(T.inl), T.leadN ? "avg "+num(Math.round(T.inl/T.leadN))+" per BDR" : "");
 
   let rows = '<thead><tr><th></th><th>Dials</th><th>Connects</th><th>Connect rate</th><th>Conversations</th><th>Outbound books</th></tr></thead><tbody>';
   rows += '<tr class="team"><td>Team</td><td>'+num(T.d)+'</td><td>'+num(T.c)+'</td><td>'+rateCell(T.c,T.d)+'</td><td>'+num(T.v)+'</td><td>'+num(T.books)+'</td></tr>';
@@ -441,14 +442,16 @@ function renderQ3(){
     t += '<tr><td>'+h(weekLabel(w))+(w<="2026-08-01" ? '<div style="'+sm+'">leads split across 5 BDRs</div>' : '')+'</td>'+names.map(n=>{
       const r = get(n,w);
       const o = r ? (r.other_leads||0) : 0;
-      return '<td>'+(r ? num(r.parallel_leads+r.power_leads+o)+'<div style="'+sm+'">'+(o ? num(o)+' Closed Lost (manual list)' : num(r.parallel_leads)+' parallel + '+num(r.power_leads)+' power')+'</div>' : (OFF_WEEKS[n+"|"+w] ? 'Off<div style="'+sm+'">removed from round robin</div>' : "–"))+'</td>';
+      const cold = r ? r.parallel_leads+r.power_leads+o : 0, rtb = r ? (r.rtb_leads||0) : 0, inl = r ? (r.inbound_leads||0) : 0;
+      return '<td>'+(r ? num(cold+rtb+inl)+'<div style="'+sm+'">'+num(cold)+' cold ('+(o ? num(o)+' Closed Lost (manual list)' : num(r.parallel_leads)+' parallel + '+num(r.power_leads)+' power')+')</div><div style="'+sm+'">'+num(rtb)+' RTB · '+num(inl)+' inbound</div>' : (OFF_WEEKS[n+"|"+w] ? 'Off<div style="'+sm+'">removed from round robin</div>' : "–"))+'</td>';
     }).join("")+'</tr>';
   });
   t += '<tr class="team"><td>Average per week<div style="'+sm+'">over the weeks each BDR was on the list</div></td>'+names.map(n=>{
     const rs = weeks.map(w=>get(n,w)).filter(Boolean);
     if(!rs.length) return '<td>–</td>';
     const ap = rs.reduce((a,r)=>a+r.parallel_leads,0)/rs.length, aw = rs.reduce((a,r)=>a+r.power_leads,0)/rs.length, ao = rs.reduce((a,r)=>a+(r.other_leads||0),0)/rs.length;
-    return '<td>'+num(Math.round(ap+aw+ao))+'<div style="'+sm+'">'+num(Math.round(ap))+' parallel + '+num(Math.round(aw))+' power'+(ao ? ' + '+num(Math.round(ao))+' Closed Lost' : '')+' · '+rs.length+' wks</div></td>';
+    const ar = rs.reduce((a,r)=>a+(r.rtb_leads||0),0)/rs.length, ai = rs.reduce((a,r)=>a+(r.inbound_leads||0),0)/rs.length;
+    return '<td>'+num(Math.round(ap+aw+ao+ar+ai))+'<div style="'+sm+'">'+num(Math.round(ap+aw+ao))+' cold ('+num(Math.round(ap))+' parallel + '+num(Math.round(aw))+' power'+(ao ? ' + '+num(Math.round(ao))+' Closed Lost' : '')+')</div><div style="'+sm+'">'+num(Math.round(ar))+' RTB · '+num(Math.round(ai))+' inbound · '+rs.length+' wks</div></td>';
   }).join("")+'</tr></tbody></table>';
   $("q3Leads").innerHTML = t;
 }

@@ -458,6 +458,7 @@ const happened = r => r.kind ? torDay(r.at) >= REVIEW_SINCE
 function reviewState(r, rep){
   const v = state.reviews.get(r.key+"|"+rep);
   if(r.pend) return "waiting";                                   // someone proposed a change: nothing to sign until it is decided
+  if(r.ov) return "true";                                        // an approved/approver correction is final: signed off for the rep
   if(!v) return "todo";
   if(v.verdict==="true" && v.label_at_review===labelOf(r)) return "true";
   if(v.verdict==="false" && r.ov) return "true";                 // their correction was approved and is applied

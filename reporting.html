@@ -437,7 +437,7 @@ details.how > div{margin-top:8px;line-height:1.5}
       <div class="tr-tip" id="trTip"></div>
     </div>
     <div class="table-wrap" id="trTableWrap" hidden></div>
-    <details class="how"><summary>How this is counted</summary><div>Each bar is split by who booked the deal. <b>BDRs only</b> = Brandon, Erich, Issa and former BDRs. <b>Inbound</b> = calls with no BDR (booked by the lead) plus CloseBot; under Inbound the bars are split by the deal's first-touch UTM source (pick one to see it alone, split into lead-booked vs CloseBot). Sources outside the main six are grouped as Other sources (hover the legend to see them). AE-booked calls only show under All sources. The number on top is the total. Closes and MRR are by close date. Click a coloured block to see the deals. * = period not finished or cut by the range.</div></details>
+    <details class="how"><summary>How this is counted</summary><div>Each bar is split by who booked the deal. <b>BDRs only</b> = Brandon, Issa and former BDRs. <b>Inbound</b> = calls with no BDR (booked by the lead) plus CloseBot; under Inbound the bars are split by the deal's first-touch UTM source (pick one to see it alone, split into lead-booked vs CloseBot). Sources outside the main six are grouped as Other sources (hover the legend to see them). AE-booked calls only show under All sources. The number on top is the total. Closes and MRR are by close date. Click a coloured block to see the deals. * = period not finished or cut by the range.</div></details>
   </section>
 
   <section id="bdSec" class="l10-sec" data-tab="bd" hidden>
@@ -516,7 +516,6 @@ const TZ = "America/Toronto";
 /* ---------- roster and goals (weekly goals from Max's leaderboard / L10 scorecard) ---------- */
 const BDRS = [
   {key:"Brandon Cameron", name:"Brandon Cameron"},
-  {key:"Erich Roeder",    name:"Erich Roeder"},
   {key:"Issa Hattar",     name:"Issa Hattar"},
 ];
 const AES = [{key:"Dipen Mistry", name:"Dipen Mistry"}];
@@ -531,7 +530,7 @@ const AE_RANK = [
 ];
 const DATA_FROM = "2026-07-01";   // history is backfilled from the start of Q3
 const NOT_A_BDR = new Set(["Inbound","CloseBot AI"]);
-// Reps who have left (e.g. Jules, Hannah, Armin in Q3) are not shown by name: their numbers roll up into one "Former reps" bucket.
+// Reps who have left (e.g. Jules, Hannah, Armin in Q3; Erich in Oct) are not shown by name: their numbers roll up into one "Former reps" bucket.
 const FORMER = "Former reps", OTHER = "Other", INB_ALL = "All inbound";
 const PRED = new Map();   // Sales L10 breakdown rows: person key -> predicate on a record
 const CUR_BDR = new Set(BDRS.map(b=>b.key)), CUR_AE = new Set(AES.map(a=>a.key));
@@ -605,7 +604,7 @@ function paceFraction(p){
 /* ---------- state ---------- */
 const state = { kind:"week", offset:0, rank:"had", aeRank:"cwd", me:null, showup:[], events:[], ov:new Map(), pend:new Map(), reviews:new Map(), lastRun:null };
 const REVIEW_SINCE = "2026-10-01";   // reps sign off on everything from here on
-const REPS = ["Brandon","Erich","Issa","Dipen"];
+const REPS = ["Brandon","Issa","Dipen"];
 
 /* ---------- corrections applied on top of the engine (approved only; pending ones are shown, not counted) ---------- */
 function effShowup(){
@@ -639,7 +638,7 @@ function effEvents(){
 const firstName = s => String(s||"").split(" ")[0];
 const credited = (r, rep) => !!rep && [r.booker, r.ae].some(n=>firstName(n)===rep);
 // one reviewer per record: the BDR who booked it; deals with no BDR (inbound, CloseBot) go to the AE
-const BDR_NAMES = BDRS.map(b=>b.key);
+const BDR_NAMES = [...BDRS.map(b=>b.key), "Erich Roeder"];   // former BDRs still own their records (no AE queue spill-over)
 const reviewOwner = r => BDR_NAMES.includes(r.booker) ? firstName(r.booker) : firstName(r.ae);
 const labelOf = r => r.kind ? r.kind : (r.dropped ? "not_a_booking" : r.cat);
 const happened = r => r.kind ? torDay(r.at) >= REVIEW_SINCE
@@ -965,7 +964,7 @@ function fixForm(key, isEv){
   slot.innerHTML = `<div class="fixbox">
     ${isEv ? `<label><span><input type="checkbox" id="fx-ex" checked> This should not count</span></label>`
            : `<label>What actually happened<select id="fx-cat">${cats.map(c=>`<option value="${c}" ${(rec.cat===c)?"selected":""}>${LABEL[c]}</option>`).join("")}</select></label>`}
-    <label>Credit to<select id="fx-bk">${["Inbound","Brandon Cameron","Erich Roeder","Issa Hattar"].map(n=>`<option ${rec.booker===n?"selected":""}>${n}</option>`).join("")}</select></label>
+    <label>Credit to<select id="fx-bk">${["Inbound","Brandon Cameron","Issa Hattar"].map(n=>`<option ${rec.booker===n?"selected":""}>${n}</option>`).join("")}</select></label>
     <label>Why (required, e.g. "prospect joined late, Fathom missed it")<textarea id="fx-note">${esc(prev?prev.note:"")}</textarea></label>
     <div class="err" id="fx-err" style="padding:0"></div>
     <div class="row"><button class="btn ghost" type="button" data-cancel="1">Cancel</button><button class="btn" type="button" id="fx-save">${approver?"Save correction":"Send for approval"}</button></div></div>`;
@@ -1057,7 +1056,6 @@ const TR_METRICS = [
 // fixed colour per source (never by rank). Stack order + slots validated for colour-blind separation in light and dark.
 const TR_SOURCES = [
   {key:"Brandon Cameron", name:"Brandon",     g:"bdr",     c:"var(--s1)"},
-  {key:"Erich Roeder",    name:"Erich",       g:"bdr",     c:"var(--s2)"},
   {key:"Issa Hattar",     name:"Issa",        g:"bdr",     c:"var(--s3)"},
   {key:FORMER,            name:"Former BDRs", g:"bdr",     c:"var(--s7)"},
   {key:"Inbound",         name:"Inbound",     g:"inbound", c:"var(--s4)"},
@@ -1079,7 +1077,7 @@ function utmSeries(from, to){
   if(rest.length) out.push({key:"utm:other", who:INB_ALL, utm:rest, name:"Other sources", c:"var(--s6)", title:rest.map(utmName).join(", ")});
   return out;
 }
-const ALWAYS = new Set(["Brandon Cameron","Erich Roeder","Issa Hattar","Inbound"]);   // shown in legend/table even at zero
+const ALWAYS = new Set(["Brandon Cameron","Issa Hattar","Inbound"]);   // shown in legend/table even at zero
 const trend = {metric:"books", scale:"week", group:"all", pick:"", range:"q3", from:null, to:null, table:false};
 const trVal = (v,m) => m.money ? fmt(v,true) : fmt(v);
 const dOf = s => new Date(s+"T00:00:00");

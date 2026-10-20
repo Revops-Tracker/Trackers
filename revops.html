@@ -290,6 +290,10 @@ section[hidden]{display:none}
           <summary>7 Day TVL leads per week, Q3</summary>
           <div class="table-wrap" id="q3Leads"></div>
         </details>
+        <details id="q4Box" open>
+          <summary>7 Day TVL leads per week, Q4</summary>
+          <div class="table-wrap" id="q4Leads"></div>
+        </details>
         <div class="legend" id="crFoot"></div>
       </div>
 
@@ -465,11 +469,12 @@ const tile = (k,v,s) => '<div class="cr-tile"><div class="k">'+h(k)+'</div><div 
 /* ---------- Q3: 7 Day TVL leads per BDR (HubSpot segments: parallel + power) ---------- */
 const SKIP_BDRS = [];                           // nobody left out; Jules has rows only for the weeks she was a BDR
 const OFF_WEEKS = {"Issa|2026-08-15": 1};          // BDR was off the round robin that week: shown as Off, left out of the average
-const Q3_FIRST = "2026-07-11", Q3_LAST = "2026-10-03";   // week-ending Saturdays of the 13 Mon-Sun weeks that start in Q3
+const Q3_FIRST = "2026-07-11", Q3_LAST = "2026-10-03", Q4_FIRST = "2026-10-10", Q4_LAST = "2027-01-02";   // week-ending Saturdays of the 13 Mon-Sun weeks that start in Q3
 const lsRow = (cls,label,v) => '<div class="ls '+cls+(v ? '' : ' z')+'">'+label+' <b>'+num(v)+'</b></div>';
-function renderQ3(){
+function renderQ3(){ renderLeadsTable("q3Leads", Q3_FIRST, Q3_LAST); renderLeadsTable("q4Leads", Q4_FIRST, Q4_LAST); }
+function renderLeadsTable(boxId, first, last){
   const D = S.data, seg = D.segments || [];
-  const weeks = Array.from(new Set(seg.map(r=>r.week_ending))).filter(w=>w>=Q3_FIRST && w<=Q3_LAST).sort();
+  const weeks = Array.from(new Set(seg.map(r=>r.week_ending))).filter(w=>w>=first && w<=last).sort();
   const names = ORDER.filter(n => SKIP_BDRS.indexOf(n) < 0 && seg.some(r=>r.bdr===n));
   const get = (n,w) => OFF_WEEKS[n+"|"+w] ? null : (seg.filter(r=>r.bdr===n && r.week_ending===w)[0] || null);
   const sm = 'font-size:12px;font-weight:400;color:var(--muted)';
@@ -489,7 +494,7 @@ function renderQ3(){
     const ar = rs.reduce((a,r)=>a+(r.rtb_leads||0),0)/rs.length, ai = rs.reduce((a,r)=>a+(r.inbound_leads||0),0)/rs.length;
     return '<td><div class="ls-tot">'+num(Math.round(ap+aw+ao+ar+ai))+'</div>'+lsRow('cold','Cold',Math.round(ap+aw+ao))+'<div class="ls-sub">'+num(Math.round(ap))+' parallel + '+num(Math.round(aw))+' power'+(ao ? ' + '+num(Math.round(ao))+' Closed Lost' : '')+'</div>'+lsRow('rtb','RTB',Math.round(ar))+lsRow('inb','Inbound',Math.round(ai))+'<div class="ls-sub">'+rs.length+' wks</div></td>';
   }).join("")+'</tr></tbody></table>';
-  $("q3Leads").innerHTML = t;
+  $(boxId).innerHTML = t;
 }
 
 

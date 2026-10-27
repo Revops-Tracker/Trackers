@@ -224,10 +224,17 @@ section[hidden]{display:none}
 .ib-pick select{border:1px solid var(--line);background:var(--panel);color:var(--ink);border-radius:8px;padding:7px 10px;font:inherit;font-size:14px}
 .l10-sec{margin-top:8px}
 /* Deals tab (Sales L10) */
-.cl-filters{display:flex;flex-wrap:wrap;gap:10px 14px;align-items:center;margin:0 0 16px}
-.cl-in{border:1px solid var(--line);background:var(--panel);color:var(--ink);border-radius:8px;padding:7px 10px;font:inherit;font-size:14px;max-width:100%;min-width:200px}
-.cl-in[hidden]{display:none}
-.cl-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,520px),1fr));gap:4px 22px}
+.cl-panel{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:12px 14px;margin:0 0 16px;display:grid;gap:12px}
+.cl-row{display:flex;flex-wrap:wrap;gap:10px 16px;align-items:flex-end}
+.cl-f{display:flex;flex-direction:column;gap:4px;font-size:12px;font-weight:600;color:var(--muted);min-width:0}
+.cl-f select,.cl-f input{border:1px solid var(--line);background:var(--panel);color:var(--ink);border-radius:8px;padding:7px 10px;font:inherit;font-size:14px;font-weight:500;max-width:100%}
+.cl-f select[data-flt]{min-width:170px}
+.cl-pair{display:flex;gap:6px;flex-wrap:wrap}
+.cl-pair [hidden]{display:none}
+#clUtmVal,#clUtmTxt{min-width:210px}
+#clClear{align-self:center;margin-left:auto}
+.cl-by{display:flex;align-items:flex-end;justify-content:space-between;gap:10px;margin:6px 0 8px}
+.cl-f-in{flex-direction:row;align-items:center;gap:10px;font-size:15px;color:var(--ink)}
 .cl-tbl{min-width:0;width:100%}
 .cl-tbl td.cl-bc{width:18%;min-width:48px;overflow:hidden}
 .cl-bar{height:8px;border-radius:4px;background:var(--fill);min-width:2px;max-width:100%}
@@ -519,30 +526,37 @@ details.how > div{margin-top:8px;line-height:1.5}
         </div>
       </div>
     </div>
-    <div class="cl-filters">
-      <div class="seg" id="clLead" role="group" aria-label="Lead type">
-        <button data-l="all" aria-pressed="true">All leads</button>
-        <button data-l="Inbound" aria-pressed="false">Inbound</button>
-        <button data-l="Outbound" aria-pressed="false">Outbound</button>
+    <div class="cl-panel">
+      <div class="cl-row">
+        <div class="seg" id="clLead" role="group" aria-label="Lead type">
+          <button data-l="all" aria-pressed="true">All leads</button>
+          <button data-l="Inbound" aria-pressed="false">Inbound</button>
+          <button data-l="Outbound" aria-pressed="false">Outbound</button>
+        </div>
+        <label class="cl-f"><span>UTM</span><span class="cl-pair"><select id="clUtmMode" aria-label="Which UTM">
+          <option value="first">First touch</option>
+          <option value="last">Last touch</option>
+          <option value="hist">History contains</option>
+        </select><select id="clUtmVal" aria-label="UTM value"></select><input id="clUtmTxt" type="search" placeholder="e.g. Meta, RTB" aria-label="UTM history contains" hidden></span></label>
+        <label class="cl-f"><span>Revenue band</span><span class="cl-pair"><select id="clBand" aria-label="Which revenue figure">
+          <option value="self">Self-claimed</option>
+          <option value="jf">JF verified</option>
+        </select><select data-flt="band" aria-label="Revenue band"></select></span></label>
       </div>
-      <label class="ib-pick">UTM <select id="clUtmMode">
-        <option value="first">First touch is</option>
-        <option value="last">Last touch is</option>
-        <option value="hist">UTM history contains</option>
-      </select></label>
-      <select id="clUtmVal" class="cl-in" aria-label="UTM value"></select>
-      <input id="clUtmTxt" class="cl-in" type="search" placeholder="e.g. Meta, LinkedIn, RTB" aria-label="UTM history contains" hidden>
-      <label class="ib-pick">Revenue band <select id="clBand">
-        <option value="self">Self-claimed ARR</option>
-        <option value="jf">JF verified ARR</option>
-      </select></label>
+      <div class="cl-row">
+        <label class="cl-f"><span>Show-up confirmed</span><select data-flt="conf"></select></label>
+        <label class="cl-f"><span>Pre-call VSL</span><select data-flt="vsl"></select></label>
+        <label class="cl-f"><span>Audit videos</span><select data-flt="hw"></select></label>
+        <label class="cl-f"><span>Audit videos watched</span><select data-flt="hwmax"></select></label>
+        <button type="button" class="linkish" id="clClear" hidden>Clear filters</button>
+      </div>
     </div>
     <div class="ib-tiles" id="clTiles"></div>
+    <div class="cl-by"><label class="cl-f cl-f-in"><span>Break down by</span><select id="clBy"></select></label></div>
     <div id="clTables"></div>
     <details class="how"><summary>How this is counted</summary><div>
-      <b>Runs</b> = deals whose disco was held in the period (one per deal). Each row follows those deals forward: <b>Designs</b> = the deal reached Design / Prop Review, <b>Closes</b> = it closed won, whenever that happened. <b>Close rate</b> = closes ÷ runs (our close-rate definition: per disco run, never won ÷ lost). Recent periods keep rising as their deals close. <b>MRR</b> = closed-won amount (USD/month).<br>
-      Breakdowns come from the HubSpot deal, refreshed every morning: <b>Show-up confirmed</b> = replied YES to the reminder text, or clicked "I'll be there" on the thank-you or pre-call VSL page (one bucket per deal, strongest first). <b>Pre-call VSL</b> = clicked the pre-call VSL link. <b>Homework videos</b> = the tracked homework page (6 Killers + Scaling & Authority, live from Oct 27): Opened = entered their email, Started = watched part of a video, Watched = both videos 75%+. <b>Most watched</b> = the higher of the two videos. Deals with no value get their own row, so every table adds up to the total.<br>
-      Filters: <b>lead type</b> = the deal's Lead Type; <b>UTM</b> = first touch, last touch, or anywhere in the UTM history. Click any number to see the deals.
+      <b>Runs</b> = deals whose disco was held in the period (one per deal). Each deal is followed forward: <b>Designs</b> = it reached Design / Prop Review, <b>Closes</b> = it closed won, whenever that happened. <b>Close rate</b> = closes ÷ runs (per disco run, never won ÷ lost), so recent periods keep rising as their deals close. <b>MRR</b> = closed-won amount (USD/month).<br>
+      Everything else comes from the HubSpot deal, refreshed every morning. <b>Show-up confirmed</b> = replied YES to the reminder text, or clicked "I'll be there" on the thank-you or pre-call VSL page (one per deal, strongest first). <b>Pre-call VSL</b> = clicked the pre-call VSL link. <b>Audit videos</b> = the tracked pre-audit video page (6 Killers + Scaling &amp; Authority, live from Oct 27): Opened = entered their email, Started = watched part of a video, Watched = both videos 75%+. <b>Audit videos watched</b> = the most of either video. <b>Revenue band</b> = self-claimed or JF verified ARR. Deals with no value get their own row, so the table always adds up to the total. Click any number to see the deals.
     </div></details>
   </section>
 </div>
@@ -1440,28 +1454,33 @@ for(const sec of ["bd","ib"]){
 }
 document.querySelectorAll("#ibWho button").forEach(b=>b.onclick=()=>{ L10.ib.who=b.dataset.w; renderInboundBreakdown(); });
 document.getElementById("bdRep").onchange = e=>{ L10.bd.rep = e.target.value; renderBdrBreakdown(); };
-/* ---------- Sales L10: Deals tab (close rate per disco run, broken down by deal attributes) ---------- */
+/* ---------- Sales L10: Deals tab (close rate per disco run, filtered + broken down by deal attributes) ---------- */
 // Cohort = deals whose disco was held in the period (one per deal); each is followed forward to design / close, whenever that happened.
-// Attributes come from lb_auto_deal_attr (n8n GFmBhA4xG16yAgWS, daily 8:30am): lead type, UTMs, show-up confirmation, VSL click, homework video %, ARR band.
-const CL = {kind:"quarter", offset:0, lead:"all", utmMode:"first", utmVal:"", utmTxt:"", band:"self", rows:{}};
+// Attributes come from lb_auto_deal_attr (n8n GFmBhA4xG16yAgWS, daily 8:30am): lead type, UTMs, show-up confirmation, VSL click, audit video %, ARR band.
+const CL = {kind:"quarter", offset:0, lead:"all", utmMode:"first", utmVal:"", utmTxt:"", band:"self", by:"conf", flt:{}, rows:{}};
 const UNK = "(no value)";
 const BANDS = ["<$250k","$250k-$500K","$500k-$750K","$750k-$1.2M","$1.2M-$3M","$3M-$5M","$5M-$10M","$3M-$10M","$10M+"];
+const WATCH = ["75%+","50–74%","25–49%","Under 25%","Not watched"];
 const attrOf = id => (state.attrs && state.attrs.get(String(id))) || {};
 const pctBand = v => { const n = Number(v)||0; return n>=75 ? "75%+" : n>=50 ? "50–74%" : n>=25 ? "25–49%" : n>0 ? "Under 25%" : "Not watched"; };
+// every dimension can be a breakdown; the ones with filter:true also get a dropdown in the filter bar
 const CL_DIMS = [
-  {id:"conf", title:"Show-up confirmed", order:["Replied YES to the reminder text","Clicked \"I'll be there\" (thank-you page)","Clicked \"I'll be there\" (pre-call VSL page)","Tapped Confirm via Text, no YES","No confirmation"],
+  {id:"conf", title:"Show-up confirmed", filter:true, order:["Replied YES to the reminder text","Clicked \"I'll be there\" (thank-you page)","Clicked \"I'll be there\" (pre-call VSL page)","Tapped Confirm via Text, no YES","No confirmation"],
     f:a => a.showup_confirmed_replied_yes==="Yes" ? "Replied YES to the reminder text" : a.showup_confirmed_thankyou_page==="Yes" ? "Clicked \"I'll be there\" (thank-you page)"
       : a.showup_confirmed_vsl_page==="Yes" ? "Clicked \"I'll be there\" (pre-call VSL page)" : a.showup_thankyou_text_clicked==="Yes" ? "Tapped Confirm via Text, no YES" : "No confirmation"},
-  {id:"vsl", title:"Pre-call VSL link", order:["Clicked","Not clicked"], f:a => a.precall_vsl_link_clicked==="Yes" ? "Clicked" : "Not clicked"},
-  {id:"vsle", title:"VSL engagement (logged by the AE)", order:["Watched VSL Before Demo","Watched VSL on Demo","Never Watched VSL",UNK], f:a => a.vsl_engagment || UNK},
-  {id:"hw", title:"Homework videos (live from Oct 27)", order:["Watched (both 75%+)","Started","Opened (entered email)","Not opened"],
+  {id:"vsl", title:"Pre-call VSL link", filter:true, order:["Clicked","Not clicked"], f:a => a.precall_vsl_link_clicked==="Yes" ? "Clicked" : "Not clicked"},
+  {id:"hw", title:"Audit videos", filter:true, order:["Watched (both 75%+)","Started","Opened (entered email)","Not opened"],
     f:a => ({watched:"Watched (both 75%+)", started:"Started", opted_in:"Opened (entered email)"})[a.video_homework_status] || "Not opened"},
-  {id:"hwmax", title:"Homework: most watched (either video)", order:["75%+","50–74%","25–49%","Under 25%","Not watched"],
+  {id:"hwmax", title:"Audit videos watched (most of either)", filter:true, order:WATCH,
     f:a => pctBand(Math.max(Number(a.video_6_killers_watch_pct)||0, Number(a.video_scaling_authority_watch_pct)||0))},
-  {id:"band", title:"Revenue band", order:[...BANDS, UNK], f:a => String((CL.band==="jf" ? a.jf_verified_arr_band : a.self_claimed_msp_arr) || UNK).split(";")[0]},
+  {id:"k6", title:"6 Killers watched", order:WATCH, f:a => pctBand(a.video_6_killers_watch_pct)},
+  {id:"sa", title:"Scaling & Authority watched", order:WATCH, f:a => pctBand(a.video_scaling_authority_watch_pct)},
+  {id:"band", title:"Revenue band", filter:true, order:[...BANDS, UNK], f:a => String((CL.band==="jf" ? a.jf_verified_arr_band : a.self_claimed_msp_arr) || UNK).split(";")[0]},
   {id:"lead", title:"Lead type", order:["Inbound","Outbound",UNK], f:a => a.lead_type__outbound_inbound_ || UNK},
   {id:"utm1", title:"First-touch UTM", order:null, f:a => a.utm_first_touch || UNK},
+  {id:"utml", title:"Last-touch UTM", order:null, f:a => a.utm_last_touch || UNK},
 ];
+const dimOf = id => CL_DIMS.find(d=>d.id===id);
 function clPeriod(){
   if(CL.kind==="all"){ const y = new Date(); y.setHours(0,0,0,0); y.setDate(y.getDate()-1); return {start:DATA_FROM, end:ymd(y), label:"Jul 1 to "+MON[y.getMonth()]+" "+y.getDate()+", "+y.getFullYear()}; }
   return periodFor(CL.kind, CL.offset);
@@ -1478,12 +1497,16 @@ function clCohort(p){
   });
   return out;
 }
-function clFilter(rows){
+// skip = a filter id to ignore (so each dropdown's counts reflect the other filters)
+function clFilter(rows, skip){
   return rows.filter(x=>{
     const a = x.a;
     if(CL.lead!=="all" && a.lead_type__outbound_inbound_!==CL.lead) return false;
-    if(CL.utmMode==="hist"){ const q = CL.utmTxt.trim().toLowerCase(); if(q && !String(a.utm_history||"").toLowerCase().includes(q)) return false; }
-    else if(CL.utmVal){ const v = (CL.utmMode==="last" ? a.utm_last_touch : a.utm_first_touch) || UNK; if(v!==CL.utmVal) return false; }
+    if(skip!=="utm"){
+      if(CL.utmMode==="hist"){ const q = CL.utmTxt.trim().toLowerCase(); if(q && !String(a.utm_history||"").toLowerCase().includes(q)) return false; }
+      else if(CL.utmVal){ const v = (CL.utmMode==="last" ? a.utm_last_touch : a.utm_first_touch) || UNK; if(v!==CL.utmVal) return false; }
+    }
+    for(const [id, v] of Object.entries(CL.flt)) if(v && id!==skip && dimOf(id).f(a)!==v) return false;
     return true;
   });
 }
@@ -1497,15 +1520,19 @@ const CL_COLS = [
   {label:"Close rate", f:t=>pctS(t.rate), list:"won", sub:t=>t.n ? t.w.length+" of "+t.n : ""},
   {label:"MRR", f:t=>fmt(t.mrr,true), list:"won"},
 ];
-function clTable(dim, rows, total){
-  const g = new Map(); rows.forEach(x=>{ const k = dim.f(x.a); if(!g.has(k)) g.set(k, []); g.get(k).push(x); });
-  let keys = dim.order ? dim.order.filter(k=>g.has(k)) : [...g.keys()].sort((a,b)=>((a===UNK)-(b===UNK)) || g.get(b).length-g.get(a).length);
-  [...g.keys()].forEach(k=>{ if(!keys.includes(k)) keys.push(k); });   // any value not in the fixed order still shows
+const clKeys = (dim, g) => { const keys = dim.order ? dim.order.filter(k=>g.has(k)) : [...g.keys()].sort((a,b)=>((a===UNK)-(b===UNK)) || g.get(b).length-g.get(a).length || a.localeCompare(b));
+  [...g.keys()].forEach(k=>{ if(!keys.includes(k)) keys.push(k); }); return keys; };   // any value not in the fixed order still shows
+const groupBy = (dim, rows) => { const g = new Map(); rows.forEach(x=>{ const k = dim.f(x.a); if(!g.has(k)) g.set(k, []); g.get(k).push(x); }); return g; };
+function clTable(dim, rows){
+  const g = groupBy(dim, rows), keys = clKeys(dim, g);
   const maxRate = Math.max(0.0001, ...keys.map(k=>{ const s = clStats(g.get(k)); return s.n>=3 ? s.rate||0 : 0; }));
   const tr = (key, name, list, cls) => { const t = clStats(list); CL.rows[key] = {name, list};
-    return `<tr class="${cls||""}"><td>${esc(name)}</td>${CL_COLS.map((c,i)=>`<td><span class="click" data-cl="${esc(key)}" data-clc="${i}">${c.f(t)}</span>${c.sub&&c.sub(t)?`<small>${c.sub(t)}</small>`:""}</td>`).join("")}<td class="cl-bc">${cls!=="tot"&&t.n?`<div class="cl-bar" style="width:${Math.round(100*(t.rate||0)/maxRate)}%;opacity:${t.n<3?.35:1}" title="Close rate ${pctS(t.rate)}${t.n<3?" (fewer than 3 runs)":""}"></div>`:""}</td></tr>`; };
-  const body = keys.map(k=>tr(dim.id+"|"+k, k, g.get(k))).join("") + tr(dim.id+"|__tot", "All runs shown", total, "tot");
-  return `<div><div class="ib-h">${esc(dim.title)}</div><div class="table-wrap"><table class="ib-tbl cl-tbl"><thead><tr><th></th>${CL_COLS.map(c=>`<th>${c.label}</th>`).join("")}<th aria-label="Close rate bar"></th></tr></thead><tbody>${body}</tbody></table></div></div>`;
+    return `<tr class="${cls||""}"><td>${esc(name===UNK?"No value":name)}</td>${CL_COLS.map((c,i)=>`<td><span class="click" data-cl="${esc(key)}" data-clc="${i}">${c.f(t)}</span>${c.sub&&c.sub(t)?`<small>${c.sub(t)}</small>`:""}</td>`).join("")}<td class="cl-bc">${cls!=="tot"&&t.n?`<div class="cl-bar" style="width:${Math.round(100*(t.rate||0)/maxRate)}%;opacity:${t.n<3?.35:1}" title="Close rate ${pctS(t.rate)}${t.n<3?" (fewer than 3 runs)":""}"></div>`:""}</td></tr>`; };
+  const body = keys.map(k=>tr(dim.id+"|"+k, k, g.get(k))).join("") + tr(dim.id+"|__tot", "Total", rows, "tot");
+  return `<div class="table-wrap"><table class="ib-tbl cl-tbl"><thead><tr><th>${esc(dim.title)}</th>${CL_COLS.map(c=>`<th>${c.label}</th>`).join("")}<th aria-label="Close rate bar"></th></tr></thead><tbody>${rows.length?body:`<tr><td class="empty" colspan="${CL_COLS.length+2}">No runs match these filters.</td></tr>`}</tbody></table></div>`;
+}
+function clOptions(sel, values, cnt, cur, anyLabel){
+  sel.innerHTML = `<option value="">${anyLabel||"Any"}</option>` + values.map(v=>`<option value="${esc(v)}"${v===cur?" selected":""}>${esc(v===UNK?"No value":v)} (${cnt[v]||0})</option>`).join("");
 }
 function renderCloses(){
   if(!document.getElementById("clSec")) return;
@@ -1516,27 +1543,39 @@ function renderCloses(){
   document.getElementById("clPrev").disabled = CL.kind==="all" || p.start <= DATA_FROM;
   document.getElementById("clNext").disabled = CL.kind==="all" || CL.offset >= 0;
   const cohort = clCohort(p);
-  // UTM value picker: values seen in this period (busiest first), keeps the current choice
+  // UTM picker: values left after the other filters, busiest first
   const hist = CL.utmMode==="hist";
   document.getElementById("clUtmTxt").hidden = !hist; document.getElementById("clUtmVal").hidden = hist;
   if(!hist){
-    const cnt = {}; cohort.forEach(x=>{ const v = (CL.utmMode==="last" ? x.a.utm_last_touch : x.a.utm_first_touch) || UNK; cnt[v] = (cnt[v]||0)+1; });
+    const base = clFilter(cohort, "utm"), cnt = {};
+    base.forEach(x=>{ const v = (CL.utmMode==="last" ? x.a.utm_last_touch : x.a.utm_first_touch) || UNK; cnt[v] = (cnt[v]||0)+1; });
     const vals = Object.keys(cnt).sort((a,b)=>((a===UNK)-(b===UNK)) || cnt[b]-cnt[a] || a.localeCompare(b));
     if(CL.utmVal && !vals.includes(CL.utmVal)) vals.push(CL.utmVal);
-    document.getElementById("clUtmVal").innerHTML = `<option value="">Any</option>` + vals.map(v=>`<option value="${esc(v)}"${v===CL.utmVal?" selected":""}>${esc(v===UNK?"No UTM":v)} (${cnt[v]||0})</option>`).join("");
+    clOptions(document.getElementById("clUtmVal"), vals, cnt, CL.utmVal, "Any UTM");
   }
+  // attribute dropdowns (counts = runs left after the other filters)
+  document.querySelectorAll("#clSec select[data-flt]").forEach(sel=>{
+    const dim = dimOf(sel.dataset.flt), g = groupBy(dim, clFilter(cohort, dim.id)), cnt = {};
+    g.forEach((v,k)=>cnt[k]=v.length);
+    const keys = clKeys(dim, g); const cur = CL.flt[dim.id]||""; if(cur && !keys.includes(cur)) keys.push(cur);
+    clOptions(sel, keys, cnt, cur);
+  });
+  const filtered = !!(CL.lead!=="all" || CL.utmVal || (hist && CL.utmTxt.trim()) || Object.values(CL.flt).some(Boolean));
+  document.getElementById("clClear").hidden = !filtered;
   const rows = clFilter(cohort), t = clStats(rows);
   CL.rows = {}; CL.rows["__all"] = {name:"All runs shown", list:rows};
   const tile = (k, v, s, ci) => `<div class="ib-tile"><div class="k">${k}</div><div class="v"><span class="click" data-cl="__all" data-clc="${ci}">${v}</span></div><div class="s">${s}</div></div>`;
-  const unseen = rows.filter(x=>!state.attrs || !state.attrs.has(String(x.run.deal_id))).length;
   document.getElementById("clTiles").innerHTML =
-    tile("Discos run", fmt(t.n), cohort.length!==t.n ? "of "+cohort.length+" before filters" : "deals, one per deal", 0) +
+    tile("Discos run", fmt(t.n), filtered ? "of "+cohort.length+" before filters" : "deals, one per deal", 0) +
     tile("Designs", fmt(t.d.length), pctS(t.drate)+" of runs", 1) +
     tile("Closes", fmt(t.w.length), "won, any date after", 3) +
     tile("Close rate", pctS(t.rate), "closes ÷ runs", 4) +
     tile("MRR", fmt(t.mrr,true), t.w.length ? "avg "+fmt(t.mrr/t.w.length,true)+" per close" : "USD/month", 5);
-  document.getElementById("clTables").innerHTML = (unseen ? `<p class="sc-note">${unseen} deal${unseen>1?"s":""} not yet described from HubSpot (counted under "no value" until the next morning refresh).</p>` : "")
-    + `<div class="cl-grid">${CL_DIMS.filter(d=>!(d.id==="lead" && CL.lead!=="all")).map(d=>clTable(d, rows, rows)).join("")}</div>`;
+  const by = document.getElementById("clBy");
+  by.innerHTML = CL_DIMS.map(d=>`<option value="${d.id}"${d.id===CL.by?" selected":""}>${esc(d.title)}</option>`).join("");
+  const unseen = rows.filter(x=>!state.attrs || !state.attrs.has(String(x.run.deal_id))).length;
+  document.getElementById("clTables").innerHTML = clTable(dimOf(CL.by), rows)
+    + (unseen ? `<p class="sc-note">${unseen} deal${unseen>1?"s":""} not yet read from HubSpot: shown as "No value" / "Not clicked" until the next morning refresh.</p>` : "");
 }
 function clOpen(key, ci){
   const r = CL.rows[key], c = CL_COLS[ci]; if(!r || !c) return;
@@ -1544,7 +1583,7 @@ function clOpen(key, ci){
   const groups = c.list==="runs" ? [["Discos run", list.map(x=>x.run)]]
     : c.list==="des" ? [["Reached Design", list.filter(x=>x.des).map(x=>x.des)], ["Ran, no design yet", list.filter(x=>!x.des).map(x=>x.run)]]
     : [["Closed won", list.filter(x=>x.won).map(x=>x.won)], ["Ran, not closed (yet)", list.filter(x=>!x.won).map(x=>x.run)]];
-  showDialog(r.name+": "+c.label, `Deals whose disco was held ${p.label}. Click a deal name to open it in HubSpot.`, groups);
+  showDialog((r.name===UNK?"No value":r.name)+": "+c.label, `Deals whose disco was held ${p.label}. Click a deal name to open it in HubSpot.`, groups);
 }
 document.querySelectorAll("#clKind button").forEach(b=>b.onclick=()=>{ CL.kind=b.dataset.k; CL.offset=0; renderCloses(); });
 document.querySelectorAll("#clLead button").forEach(b=>b.onclick=()=>{ CL.lead=b.dataset.l; renderCloses(); });
@@ -1553,7 +1592,10 @@ document.getElementById("clNext").onclick = ()=>{ if(CL.offset<0){ CL.offset++; 
 document.getElementById("clUtmMode").onchange = e=>{ CL.utmMode=e.target.value; CL.utmVal=""; renderCloses(); };
 document.getElementById("clUtmVal").onchange = e=>{ CL.utmVal=e.target.value; renderCloses(); };
 document.getElementById("clUtmTxt").oninput = e=>{ CL.utmTxt=e.target.value; clearTimeout(CL.tm); CL.tm=setTimeout(renderCloses, 250); };
-document.getElementById("clBand").onchange = e=>{ CL.band=e.target.value; renderCloses(); };
+document.getElementById("clBand").onchange = e=>{ CL.band=e.target.value; CL.flt.band=""; renderCloses(); };
+document.querySelectorAll("#clSec select[data-flt]").forEach(sel=>sel.onchange=()=>{ CL.flt[sel.dataset.flt]=sel.value; renderCloses(); });
+document.getElementById("clBy").onchange = e=>{ CL.by=e.target.value; renderCloses(); };
+document.getElementById("clClear").onclick = ()=>{ CL.lead="all"; CL.utmVal=""; CL.utmTxt=""; document.getElementById("clUtmTxt").value=""; CL.flt={}; renderCloses(); };
 document.getElementById("clSec").addEventListener("click", e=>{ const c = e.target.closest("[data-cl]"); if(c) clOpen(c.dataset.cl, +c.dataset.clc); });
 /* ---------- Sales L10: scorecard (one row per L10 metric, one column per week / month) ---------- */
 const SC = {kind:"week", shift:0, view:"team", cols:[]};

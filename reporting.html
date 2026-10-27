@@ -552,6 +552,7 @@ details.how > div{margin-top:8px;line-height:1.5}
         <label class="cl-f"><span>Pre-call VSL</span><select data-flt="vsl"></select></label>
         <label class="cl-f"><span>Audit videos</span><select data-flt="hw"></select></label>
         <label class="cl-f"><span>Audit videos watched</span><select data-flt="hwmax"></select></label>
+        <label class="cl-f"><span>AE flag (asked on call)</span><select data-flt="aeflag"></select></label>
         <label class="cl-f"><span>Offer</span><select data-flt="offer"></select></label>
         <button type="button" class="linkish" id="clClear" hidden>Clear filters</button>
       </div>
@@ -565,7 +566,7 @@ details.how > div{margin-top:8px;line-height:1.5}
     <div id="clRank"></div>
     <details class="how"><summary>How this is counted</summary><div>
       <b>Runs</b> = deals whose disco was held in the period (one per deal). Each deal is followed forward: <b>Designs</b> = it reached Design / Prop Review, <b>Closes</b> = it closed won, whenever that happened. <b>Close rate</b> = closes ÷ runs (per disco run, never won ÷ lost), so recent periods keep rising as their deals close. <b>MRR</b> = closed-won amount (USD/month).<br>
-      Everything else comes from the HubSpot deal, refreshed every morning. <b>Show-up confirmed</b> = replied YES to the reminder text, or clicked "I'll be there" on the thank-you or pre-call VSL page (one per deal, strongest first). <b>Pre-call VSL</b> = clicked the pre-call VSL link. <b>Audit videos</b> = the tracked pre-audit video page (6 Killers + Scaling &amp; Authority, live from Oct 27): Opened = entered their email, Started = watched part of a video, Watched = both videos 75%+. <b>Audit videos watched</b> = the most of either video. <b>Revenue band</b> = self-claimed ARR, or JF verified ARR (the JF Verified ARR Band, else banded from the AE-entered JF Verified ARR amount; only filled on deals up to late Aug so far). <b>Offer</b> = HT / LT, set by the AE after the disco. Deals with no value get their own row, so the table always adds up to the total. Click any number to see the deals.
+      Everything else comes from the HubSpot deal, refreshed every morning. <b>Show-up confirmed</b> = replied YES to the reminder text, or clicked "I'll be there" on the thank-you or pre-call VSL page (one per deal, strongest first). <b>Pre-call VSL</b> = clicked the pre-call VSL link. <b>Audit videos</b> = the tracked pre-audit video page (6 Killers + Scaling &amp; Authority, live from Oct 27): Opened = entered their email, Started = watched part of a video, Watched = both videos 75%+. <b>Audit videos watched</b> = the most of either video. <b>AE flag</b> = what the AE recorded after asking on the call (HubSpot "Audit videos: AE flag"), kept separate from the tracking. <b>Revenue band</b> = self-claimed ARR, or JF verified ARR (the JF Verified ARR Band, else banded from the AE-entered JF Verified ARR amount; only filled on deals up to late Aug so far). <b>Offer</b> = HT / LT, set by the AE after the disco. Deals with no value get their own row, so the table always adds up to the total. Click any number to see the deals.
     </div></details>
   </section>
 </div>
@@ -1486,6 +1487,8 @@ const CL_DIMS = [
     f:a => ({watched:"Watched (both 75%+)", started:"Started", opted_in:"Opened (entered email)"})[a.video_homework_status] || "Not opened"},
   {id:"hwmax", title:"Audit videos watched (most of either)", filter:true, order:WATCH,
     f:a => pctBand(Math.max(Number(a.video_6_killers_watch_pct)||0, Number(a.video_scaling_authority_watch_pct)||0))},
+  {id:"aeflag", title:"Audit videos: AE flag", filter:true, order:["Watched both","Watched 6 Killers only","Watched Scaling & Authority only","Started, did not finish","Did not watch","Not flagged"],
+    f:a => ({watched_both:"Watched both", watched_6_killers:"Watched 6 Killers only", watched_scaling:"Watched Scaling & Authority only", partial:"Started, did not finish", not_watched:"Did not watch"})[a.audit_videos_ae_flag] || "Not flagged"},
   {id:"k6", title:"6 Killers watched", order:WATCH, f:a => pctBand(a.video_6_killers_watch_pct)},
   {id:"sa", title:"Scaling & Authority watched", order:WATCH, f:a => pctBand(a.video_scaling_authority_watch_pct)},
   {id:"band", title:"Revenue band", filter:true, order:[...BANDS, UNK], f:a => String((CL.band==="jf" ? jfBand(a) : a.self_claimed_msp_arr) || UNK).split(";")[0]},

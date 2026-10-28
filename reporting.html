@@ -177,9 +177,9 @@ html.view-reporting .lb-only{display:none!important}
 .nav button:disabled{opacity:.35;cursor:not-allowed}
 .nav button.btn{width:auto;padding:0 14px;font-size:15px;white-space:nowrap}
 .deal .pend{background:color-mix(in srgb,var(--fill) 12%,transparent);border-radius:8px;padding:6px 9px;font-size:13px;margin-top:6px}
-.tr-root{--s1:#2a78d6;--s2:#eb6834;--s3:#1baf7a;--s4:#eda100;--s5:#e87ba4;--s6:#008300;--s7:#4a3aa7}
-@media (prefers-color-scheme: dark){:root:not([data-theme="light"]) .tr-root{--s1:#3987e5;--s2:#d95926;--s3:#199e70;--s4:#c98500;--s5:#d55181;--s6:#008300;--s7:#9085e9}}
-:root[data-theme="dark"] .tr-root{--s1:#3987e5;--s2:#d95926;--s3:#199e70;--s4:#c98500;--s5:#d55181;--s6:#008300;--s7:#9085e9}
+.tr-root{--s1:#2a78d6;--s2:#eb6834;--s3:#1baf7a;--s4:#eda100;--s5:#e87ba4;--s6:#008300;--s7:#4a3aa7;--s8:#7d8590;--s9:#a0522d}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]) .tr-root{--s1:#3987e5;--s2:#d95926;--s3:#199e70;--s4:#c98500;--s5:#d55181;--s6:#008300;--s7:#9085e9;--s8:#9aa3ad;--s9:#c98a62}}
+:root[data-theme="dark"] .tr-root{--s1:#3987e5;--s2:#d95926;--s3:#199e70;--s4:#c98500;--s5:#d55181;--s6:#008300;--s7:#9085e9;--s8:#9aa3ad;--s9:#c98a62}
 .tr-bar{display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:space-between;margin:0 0 12px}
 .tr-card{position:relative;background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:14px 16px 8px}
 .tr-legend{display:flex;flex-wrap:wrap;gap:14px;font-size:13px;color:var(--muted);margin-bottom:6px}
@@ -769,7 +769,10 @@ function showupStats(rows, p){
     first: fdue.length ? f1.length/fdue.length : null };
 }
 const NO_UTM = "(no first-touch UTM)", NO_UTM_KEY = NO_UTM;
-const utmOf = r => r.utm || NO_UTM;
+const META_UTM = "Inbound - META PPC";
+// Meta PPC is split into Lead Form / VSL (HubSpot deal property meta_lead_channel, stamped by n8n 5vpYcV7EhNRUzi6X); unlabelled or unclear = Unclear
+const META_CH = {lead_form:" - Lead Form", vsl:" - VSL"};
+const utmOf = r => r.utm===META_UTM ? META_UTM + (META_CH[attrOf(r.deal_id).meta_lead_channel] || " - Unclear") : (r.utm || NO_UTM);
 const utmOk = (r,p) => !p || p.utm==null || (Array.isArray(p.utm) ? p.utm.includes(utmOf(r)) : utmOf(r)===p.utm);
 const utmName = u => u===NO_UTM ? "No UTM" : u.replace(/^Inbound - /,"");
 function statsFor(person, role, p){
@@ -1141,18 +1144,20 @@ const TR_SOURCES = [
   {key:OTHER,             name:"AE-booked",   g:"other",   c:"var(--s6)"},
 ];
 const TR_UTM = [
-  {utm:"Inbound - META PPC",              c:"var(--s1)"},
-  {utm:"Inbound - Website Price Request", c:"var(--s2)"},
-  {utm:"Inbound - Website Contact Us",    c:"var(--s3)"},
+  {utm:"Inbound - META PPC - Lead Form", c:"var(--s1)"},
+  {utm:"Inbound - META PPC - VSL",       c:"var(--s2)"},
+  {utm:"Inbound - META PPC - Unclear",   c:"var(--s8)"},
+  {utm:"Inbound - Website Price Request", c:"var(--s3)"},
+  {utm:"Inbound - Website Contact Us",    c:"var(--s4)"},
   {utm:NO_UTM_KEY,                        c:"var(--s7)"},
-  {utm:"Inbound - META Organic",          c:"var(--s4)"},
-  {utm:"Inbound - Google PPC",            c:"var(--s5)"},
+  {utm:"Inbound - META Organic",          c:"var(--s5)"},
+  {utm:"Inbound - Google PPC",            c:"var(--s6)"},
 ];
 function utmSeries(from, to){
   const known = new Set(TR_UTM.map(u=>u.utm));
   const rest = inboundUtms(from, to).filter(u=>!known.has(u));
   const out = TR_UTM.map(u=>({key:"utm:"+u.utm, who:INB_ALL, utm:u.utm, name:utmName(u.utm), c:u.c}));
-  if(rest.length) out.push({key:"utm:other", who:INB_ALL, utm:rest, name:"Other sources", c:"var(--s6)", title:rest.map(utmName).join(", ")});
+  if(rest.length) out.push({key:"utm:other", who:INB_ALL, utm:rest, name:"Other sources", c:"var(--s9)", title:rest.map(utmName).join(", ")});
   return out;
 }
 const ALWAYS = new Set(["Brandon Cameron","Issa Hattar","Inbound"]);   // shown in legend/table even at zero
@@ -1437,9 +1442,9 @@ function renderInboundBreakdown(){
   const all = bkRow("ib", "all", whoName, base, "tot");
   const out = bkRow("ib", "out", "Outbound calls (for comparison)", r=>isBdrBooked(r) && !isInbLead(r), "bench");
   document.getElementById("ibTiles").innerHTML = bkTiles("ib", all, out, "Outbound", p);
-  const MC = [["lead_form","Lead Form"],["vsl","VSL"],["unclear","Unclear"]];
-  const ch = bkSources(base, p).flatMap(u=>[bkRow("ib", "ch:"+u, srcName(u), r=>base(r) && utmOf(r)===u),
-    ...(u==="Inbound - META PPC" ? MC.map(([k,l])=>bkRow("ib", "mc:"+k, "↳ Meta PPC: "+l, r=>base(r) && utmOf(r)===u && attrOf(r.deal_id).meta_lead_channel===k)) : [])]);
+  const srcs = bkSources(base, p), nMeta = srcs.filter(u=>u.startsWith(META_UTM)).length;
+  const ch = srcs.flatMap(u=>[...(nMeta>1 && u===srcs.find(x=>x.startsWith(META_UTM)) ? [bkRow("ib", "ch:metaall", "META PPC (all)", r=>base(r) && r.utm===META_UTM, "tot")] : []),
+    bkRow("ib", "ch:"+u, srcName(u), r=>base(r) && utmOf(r)===u)]);
   document.getElementById("ibByChannel").innerHTML = bkTable("ib", ch.length ? [...ch, all, out] : [], p);
   const paths = [bkRow("ib", "self", "Lead booked themselves", r=>isInbLead(r) && r.booker==="Inbound"),
                  bkRow("ib", "cb", "CloseBot", r=>isInbLead(r) && r.booker==="CloseBot AI"),

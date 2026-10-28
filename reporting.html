@@ -1473,10 +1473,8 @@ const BANDS = ["<$250k","$250k-$500K","$500k-$750K","$750k-$1.2M","$1.2M-$3M","$
 const WATCH = ["75%+","50–74%","25–49%","Under 25%","Not watched"];
 const attrOf = id => (state.attrs && state.attrs.get(String(id))) || {};
 const pctBand = v => { const n = Number(v)||0; return n>=75 ? "75%+" : n>=50 ? "50–74%" : n>=25 ? "25–49%" : n>0 ? "Under 25%" : "Not watched"; };
-// JF verified band, else banded from the AE-entered JF Verified ARR amount (msp_mrr, free text: first money figure, K/M aware)
-const moneyOf = s => { const m = String(s||"").replace(/,/g,"").match(/\$?\s*(\d+(?:\.\d+)?)\s*([kKmM])?/); if(!m) return null; const n = parseFloat(m[1]) * (/[mM]/.test(m[2]||"") ? 1e6 : /[kK]/.test(m[2]||"") ? 1e3 : 1); return n >= 10000 ? n : null; };
-const bandOfAmt = n => n==null ? null : n<250e3 ? "<$250k" : n<500e3 ? "$250k-$500K" : n<750e3 ? "$500k-$750K" : n<1.2e6 ? "$750k-$1.2M" : n<3e6 ? "$1.2M-$3M" : n<5e6 ? "$3M-$5M" : n<10e6 ? "$5M-$10M" : "$10M+";
-const jfBand = a => a.jf_verified_arr_band || bandOfAmt(moneyOf(a.msp_mrr));
+// JF Verified ARR Band: picked by the AE, else stamped daily from the call transcript
+const jfBand = a => a.jf_verified_arr_band;
 // every dimension can be a breakdown; the ones with filter:true also get a dropdown in the filter bar
 const CL_DIMS = [
   {id:"conf", title:"Show-up confirmed", filter:true, order:["Replied YES to the reminder text","Clicked \"I'll be there\" (thank-you page)","Clicked \"I'll be there\" (pre-call VSL page)","Tapped Confirm via Text, no YES","No confirmation"],

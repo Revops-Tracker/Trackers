@@ -548,6 +548,7 @@ details.how > div{margin-top:8px;line-height:1.5}
         </select><select data-flt="band" aria-label="Revenue band"></select></span></label>
       </div>
       <div class="cl-row">
+        <label class="cl-f"><span>Meta channel</span><select data-flt="mc"></select></label>
         <label class="cl-f"><span>Show-up confirmed</span><select data-flt="conf"></select></label>
         <label class="cl-f"><span>Pre-call VSL</span><select data-flt="vsl"></select></label>
         <label class="cl-f"><span>Audit videos</span><select data-flt="hw"></select></label>
@@ -1436,7 +1437,9 @@ function renderInboundBreakdown(){
   const all = bkRow("ib", "all", whoName, base, "tot");
   const out = bkRow("ib", "out", "Outbound calls (for comparison)", r=>isBdrBooked(r) && !isInbLead(r), "bench");
   document.getElementById("ibTiles").innerHTML = bkTiles("ib", all, out, "Outbound", p);
-  const ch = bkSources(base, p).map(u=>bkRow("ib", "ch:"+u, srcName(u), r=>base(r) && utmOf(r)===u));
+  const MC = [["lead_form","Lead Form"],["vsl","VSL"],["unclear","Unclear"]];
+  const ch = bkSources(base, p).flatMap(u=>[bkRow("ib", "ch:"+u, srcName(u), r=>base(r) && utmOf(r)===u),
+    ...(u==="Inbound - META PPC" ? MC.map(([k,l])=>bkRow("ib", "mc:"+k, "↳ Meta PPC: "+l, r=>base(r) && utmOf(r)===u && attrOf(r.deal_id).meta_lead_channel===k)) : [])]);
   document.getElementById("ibByChannel").innerHTML = bkTable("ib", ch.length ? [...ch, all, out] : [], p);
   const paths = [bkRow("ib", "self", "Lead booked themselves", r=>isInbLead(r) && r.booker==="Inbound"),
                  bkRow("ib", "cb", "CloseBot", r=>isInbLead(r) && r.booker==="CloseBot AI"),
@@ -1491,6 +1494,10 @@ const CL_DIMS = [
   {id:"sa", title:"Scaling & Authority watched", order:WATCH, f:a => pctBand(a.video_scaling_authority_watch_pct)},
   {id:"band", title:"Revenue band", filter:true, order:[...BANDS, UNK], f:a => String((CL.band==="jf" ? jfBand(a) : a.self_claimed_msp_arr) || UNK).split(";")[0]},
   {id:"offer", title:"Offer", filter:true, order:["High ticket (HT)","Low ticket (LT)","Not set"], f:a => ({ht:"High ticket (HT)", lt:"Low ticket (LT)"})[a.offer] || "Not set"},
+  // Meta PPC deals labelled from the booking note by n8n 5vpYcV7EhNRUzi6X (HubSpot deal property meta_lead_channel), hourly
+  {id:"mc", title:"Meta channel", filter:true, order:["Meta Lead Form","Meta VSL","Meta, unclear","Meta, not labelled yet","Not Meta PPC"],
+    f:a => ({lead_form:"Meta Lead Form", vsl:"Meta VSL", unclear:"Meta, unclear"})[a.meta_lead_channel]
+      || (a.utm_first_touch==="Inbound - META PPC" || a.utm_last_touch==="Inbound - META PPC" ? "Meta, not labelled yet" : "Not Meta PPC")},
   {id:"lead", title:"Lead type", order:["Inbound","Outbound",UNK], f:a => a.lead_type__outbound_inbound_ || UNK},
   {id:"utm1", title:"First-touch UTM", order:null, f:a => a.utm_first_touch || UNK},
   {id:"utml", title:"Last-touch UTM", order:null, f:a => a.utm_last_touch || UNK},

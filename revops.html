@@ -239,6 +239,15 @@ html.view-reporting .lb-only{display:none!important}
 .cr-tbl tr.tier td:first-child{padding-left:30px}
 .cr-tbl tr.list td{color:var(--muted)}
 .cr-tbl tr.list td:first-child{padding-left:52px}
+.nd{margin:14px 0 4px;border:1px solid var(--line,#e5e7eb);border-radius:10px;padding:12px 14px}
+.nd h3{margin:0 0 8px;font-size:14px;font-weight:700}
+.nd .nd-row{display:flex;gap:10px;align-items:flex-start;padding:6px 0;border-top:1px solid var(--line,#e5e7eb)}
+.nd .nd-row:first-of-type{border-top:0}
+.nd .nd-who{flex:0 0 78px;font-weight:700;font-size:13px;padding-top:3px}
+.nd .nd-chips{display:flex;flex-wrap:wrap;gap:6px}
+.nd .chip{font-size:12px;padding:3px 9px;border-radius:999px;border:1px solid var(--muted);color:var(--muted)}
+.nd .chip.t1{border-color:var(--behind);color:var(--behind);font-weight:600}
+.nd .nd-ok{font-size:13px;color:var(--ahead);padding-top:3px}
 .ls{display:flex;justify-content:flex-end;align-items:baseline;gap:10px;font-size:14px;font-weight:600;color:var(--ink);padding:2px 10px 2px 0;margin:3px 0;border-right:4px solid var(--c);line-height:1.25}
 .ls b{font-size:17px;font-weight:700;min-width:38px;text-align:right;color:var(--c)}
 .ls.z{opacity:.55}
@@ -285,6 +294,7 @@ section[hidden]{display:none}
       <div class="cr-main">
         <div class="cr-tiles" id="crTiles"></div>
         <div class="table-wrap"><table class="cr-tbl" id="crTable"></table></div>
+        <div id="crNotDialed"></div>
         <div class="legend" id="crLegend"></div>
         <details id="q3Box" open>
           <summary>7 Day TVL leads per week, Q3</summary>
@@ -458,6 +468,7 @@ function render(){
   $("crTable").innerHTML = rows;
 
   $("crLegend").innerHTML = '<b>Connect rate</b> = connects ÷ dials, green at or above the '+(target()*100).toFixed(1)+'% target. Click a BDR to see tiers, then a tier to see its lists. <b>Conversations</b> are the Nooks "meaningful" dispositions. Weeks run Monday to Saturday. Outbound books count a Discovery Booked call, or a Meeting Rebook 30+ days after the last Discovery Booked, in the week of the call.'+(isP ? ' <b>'+(S.view === 'month' ? 'Monthly' : 'Quarterly')+' view</b> adds up every week in the '+unit+' (a week counts in the '+unit+' its Monday falls in): the connect rate for a BDR, tier or list is its total connects ÷ its total dials, so busier weeks count for more. Tiers and lists are the same as the weekly view.' : '');
+  try{ renderNotDialed(W, isP ? 'this '+unit : 'this week'); }catch(e){ console.error('Not dialed', e); }
   try{ renderQ3(); }catch(e){ console.error('Q3 section', e); }
   const up = (D.uploads||[])[0];
   const synced = D.booksSyncedAt ? new Date(D.booksSyncedAt).toLocaleString("en-US",{month:"short",day:"numeric",hour:"numeric",minute:"2-digit"}) : null;
@@ -465,6 +476,21 @@ function render(){
     'Books, inbound books and leads delivered come from the Weekly BDR Report sheet'+(synced ? ' (last synced '+h(synced)+')' : '')+'.';
 }
 const tile = (k,v,s) => '<div class="cr-tile"><div class="k">'+h(k)+'</div><div class="v">'+v+'</div>'+(s?'<div class="s">'+h(s)+'</div>':'')+'</div>';
+
+/* ---------- lists not dialed: every tier list a BDR logged zero dials on in the period ---------- */
+function renderNotDialed(W, when){
+  const tl = (S.data.tierLists||[]).slice().sort((a,b)=>a.tier.localeCompare(b.tier) || a.list_name.localeCompare(b.list_name));
+  const act = W.bdrs.filter(b=>b.d > 0);
+  if(!tl.length || !act.length){ $("crNotDialed").innerHTML = ""; return; }
+  let t = '<div class="nd"><h3>Lists not dialed '+h(when)+'</h3>';
+  act.forEach(b=>{
+    const missed = tl.filter(l=>{ const x = b.tiers[l.tier]; return !(x && x.lists[l.list_name] && x.lists[l.list_name].d > 0); });
+    t += '<div class="nd-row"><div class="nd-who">'+h(b.bdr)+'</div>'+(missed.length
+      ? '<div class="nd-chips">'+missed.map(l=>'<span class="chip'+(l.tier === "Tier 1" ? " t1" : "")+'">'+h(l.tier.replace("Tier ","T"))+' · '+h(l.list_name)+'</span>').join("")+'</div>'
+      : '<div class="nd-ok">Dialed every list</div>')+'</div>';
+  });
+  $("crNotDialed").innerHTML = t+'</div>';
+}
 
 /* ---------- Q3: 7 Day TVL leads per BDR (HubSpot segments: parallel + power) ---------- */
 const SKIP_BDRS = [];                           // nobody left out; Jules has rows only for the weeks she was a BDR

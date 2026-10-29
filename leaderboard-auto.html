@@ -241,7 +241,7 @@ html.view-reporting .lb-only{display:none!important}
     <div class="tbl-toggle"><button class="btn ghost" type="button" id="bdrTableBtn" aria-expanded="false" aria-controls="bdrMetrics">Show metrics table</button></div>
     <div id="bdrMetrics" hidden>
     <div class="table-wrap" id="bdrTable"></div>
-    <div class="legend"><b>Books</b>: new calls booked in the period, counted on the day they were booked (a rebook only counts as new when it is booked more than 30 days after the deal's last slot). <b>Runs due</b>: discovery calls whose slot arrived in the period, counted per call (a deal that no-shows and is rebooked into the same period = 2 calls due). <b>Runs had</b>: calls that were held. <b>Overall show</b> = runs had ÷ runs due. <b>No-show recovery</b>: of deals that missed a call in the period, the share held at a later slot (recent periods can still recover). <b>1st-time show</b> = new books held at their first slot ÷ new books whose first slot came due in the period. <b>MRR generated</b>: monthly retainer (USD) of deals closed won in the period, credited to the rep who booked them. <b>Designs</b> (designs created): deals moved into the Design/Prop Review stage in HubSpot. <b>Designs held</b>: deals moved from Design on to a later stage (Prop Update or beyond).</div>
+    <div class="legend"><b>Books</b>: new calls booked in the period, counted on the day they were booked (a rebook only counts as new when it is booked more than 30 days after the deal's last slot). <b>Runs due</b>: discovery calls whose slot arrived in the period, counted per call (a deal that no-shows and is rebooked into the same period = 2 calls due). <b>Runs had</b>: calls that were held. <b>Overall show</b> = runs had ÷ runs due. <b>No-show recovery</b>: of deals that missed a call in the period, the share held at a later slot (recent periods can still recover). <b>1st-time show</b> = new books held at their first slot ÷ new books whose first slot came due in the period. <b>Showed, then DQ'd</b>: of the calls held in the period, the share where the deal went to the DQ stage (showed up but was not a fit). Lower is better; a high number means the rep is booking people who show but do not qualify. <b>MRR generated</b>: monthly retainer (USD) of deals closed won in the period, credited to the rep who booked them. <b>Designs</b> (designs created): deals moved into the Design/Prop Review stage in HubSpot. <b>Designs held</b>: deals moved from Design on to a later stage (Prop Update or beyond).</div>
     </div>
   </section>
 
@@ -361,6 +361,7 @@ const BDR_RANK = [
   {id:"books", label:"Books (new)",   goal:12, fmt:"n"},
   {id:"show",  label:"Overall show",  goal:null, fmt:"pct"},
   {id:"first", label:"1st-time show", goal:null, fmt:"pct"},
+  {id:"dq",    label:"Showed, then DQ'd", goal:null, fmt:"pct", lower:true},
   {id:"des",   label:"Designs",       goal:4,  fmt:"n"},
 ];
 const LABEL = {
@@ -495,7 +496,9 @@ function showupStats(rows, p){
   const notHad = due.filter(r=>r._miss && r._miss.length);   // deals with at least one missed call (may also have been held later)
   // No-show recovery: of deals that missed a call in the period, how many were held at a later slot (any time after)
   const rec = notHad, recBack = notHad.filter(r=>r.run_at && Date.parse(r.run_at) > Date.parse(r._miss[0]));
-  return { books, firsts, due, dueN, had, fdue, f1, notHad, missed, rec, recBack,
+  const hdq = had.filter(r=>r.dq);   // held calls where the deal went to the DQ stage: showed up, then disqualified
+  return { books, firsts, due, dueN, had, fdue, f1, notHad, missed, rec, recBack, hdq,
+    dqRate: had.length ? hdq.length/had.length : null,
     ns: missed.filter(r=>r.cat!=="cancelled_ahead"),
     ca: missed.filter(r=>r.cat==="cancelled_ahead"),
     show: dueN ? had.length/dueN : null,
@@ -514,7 +517,7 @@ function statsFor(person, role, p){
   return {...s, des:k("design"), dheld:k("dheld"), prop:k("prop"), diag:k("diag"), con:k("contract"), won:k("won"),
     cwd: k("won").reduce((a,e)=>a+(Number(e.amount)||0),0)};
 }
-const valOf = (t,id) => id==="had"?t.had.length : id==="books"?t.books.length : id==="des"?t.des.length : id==="show"?t.show : t.first;
+const valOf = (t,id) => id==="had"?t.had.length : id==="books"?t.books.length : id==="des"?t.des.length : id==="show"?t.show : id==="dq"?t.dqRate : t.first;
 
 /* ---------- render helpers ---------- */
 const fmt = (v,money) => money ? "$"+Math.round(v).toLocaleString() : (Math.round(v*10)/10).toLocaleString();
@@ -555,22 +558,22 @@ function render(){
   const goal = metric.goal ? metric.goal*mult : null;
   document.getElementById("prev").disabled = p.start <= DATA_FROM;
   const bdrs = BDRS.map(b=>{ const t=statsFor(b.key,"bdr",p); return {...b, t, v:valOf(t,metric.id)}; })
-    .sort((a,b)=>((b.v??-1)-(a.v??-1)) || a.name.localeCompare(b.name));
+    .sort((a,b)=>(metric.lower ? ((a.v??2)-(b.v??2)) : ((b.v??-1)-(a.v??-1))) || a.name.localeCompare(b.name));
   const topV = Math.max(...bdrs.map(b=>b.v||0), 0);
   let rank=0, prev=null;
   document.getElementById("lanes").innerHTML = bdrs.map((b,i)=>{
     if(b.v!==prev){ rank=i+1; prev=b.v; }
-    const lead = rank===1 && (b.v||0)>0;
+    const lead = rank===1 && (metric.lower ? b.v!=null : (b.v||0)>0);
     const t = b.t;
     const shown = isPct ? pctS(b.v) : fmt(b.v||0);
-    const metricKey = {had:"had",books:"books",des:"des",show:"due",first:"fdue"}[metric.id];
+    const metricKey = {had:"had",books:"books",des:"des",show:"due",first:"fdue",dq:"dq"}[metric.id];
     return `<div class="lane${lead?" lead":""}">
       <div class="rank">${rank}</div>
       <div class="who"><div class="name">${esc(b.name)}</div>
         <div class="sub"><button class="linkish" data-person="${esc(b.key)}" data-role="bdr" data-metric="all" data-title="${esc(b.name)}: all deals">See deals</button></div></div>
       <div class="track">${isPct ? barHTML((b.v||0)*100, null, pace, 100) : barHTML(b.v||0, goal, pace, topV)}
-        <div class="bar-meta">${isPct ? `<span>${t.had.length} of ${t.dueN} calls due held · 1st-time ${t.f1.length} of ${t.fdue.length}</span>` : (goal?`<span>Goal ${fmt(goal)}</span>${paceText(b.v||0, goal, pace)}`:"")}</div>
-        <div class="stats"><span>Books <b>${t.books.length}</b></span><span>Due <b>${t.dueN}</b></span><span>Had <b>${t.had.length}</b></span><span>Show <b>${pctS(t.show)}</b></span><span>1st-time <b>${pctS(t.first)}</b></span><span>Designs <b>${t.des.length}</b></span></div>
+        <div class="bar-meta">${isPct && metric.id==="dq" ? `<span>${t.hdq.length} of ${t.had.length} held calls ended in DQ</span>` : isPct ? `<span>${t.had.length} of ${t.dueN} calls due held · 1st-time ${t.f1.length} of ${t.fdue.length}</span>` : (goal?`<span>Goal ${fmt(goal)}</span>${paceText(b.v||0, goal, pace)}`:"")}</div>
+        <div class="stats"><span>Books <b>${t.books.length}</b></span><span>Due <b>${t.dueN}</b></span><span>Had <b>${t.had.length}</b></span><span>Show <b>${pctS(t.show)}</b></span><span>1st-time <b>${pctS(t.first)}</b></span><span>DQ'd <b>${pctS(t.dqRate)}</b></span><span>Designs <b>${t.des.length}</b></span></div>
       </div>
       <div class="score">${num(shown, b.key, "bdr", metricKey, `${b.name}: ${metric.label}`)}<small>${metric.label.toLowerCase()}</small></div>
     </div>`;
@@ -583,6 +586,7 @@ function render(){
     ["Runs had", t=>t.had.length, "had", 8],
     ["Overall show", t=>pctS(t.show), "due", null],
     ["1st-time show", t=>pctS(t.first), "fdue", null],
+    ["Showed, then DQ'd", t=>pctS(t.dqRate), "dq", null],
     ["No-shows", t=>t.ns.length, "ns", null],
     ["Cancelled / DQ'd ahead", t=>t.ca.length, "ca", null],
     ["No-show recovery", t=>pctS(t.recovery), "rec", null],
@@ -628,6 +632,7 @@ function render(){
     ["Disco no-shows", t=>t.ns.length, "ns", null],
     ["Overall show", t=>pctS(t.show), "due", null],
     ["1st-time show", t=>pctS(t.first), "fdue", null],
+    ["Showed, then DQ'd", t=>pctS(t.dqRate), "dq", null],
     ["Moved to Diagnosis", t=>t.diag.length, "diag", null],
     ["Designs created", t=>t.des.length, "des", null],
     ["Designs held", t=>t.dheld.length, "dheld", 5],
@@ -734,6 +739,7 @@ function openList(person, role, metric, title, pOverride){
   else if(metric==="had") groups.push(["Runs had", s.had]);
   else if(metric==="due") groups.push(["Held", s.had], ["Missed calls (a deal can be in both lists)", s.notHad]);
   else if(metric==="rec") groups.push(["Missed, then held at a later slot", s.recBack], ["Missed, not held since", s.rec.filter(r=>!s.recBack.includes(r))]);
+  else if(metric==="dq") groups.push(["Showed, then DQ'd", s.hdq], ["Showed, not DQ'd", s.had.filter(r=>!s.hdq.includes(r))]);
   else if(metric==="fdue") groups.push(["Held at first slot", s.f1], ["First slot came due, not held there", s.fdue.filter(r=>!s.f1.includes(r))]);
   else if(metric==="ns") groups.push(["No-shows (one per missed call)", [...new Set(s.ns)]]);
   else if(metric==="ca") groups.push(["Cancelled / DQ'd ahead", [...new Set(s.ca)]]);

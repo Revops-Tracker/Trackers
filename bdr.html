@@ -1030,6 +1030,8 @@
     var wkTot = {}, splitMap = {}, otherBooked = {};
     (state.lists.discos || []).forEach(function (r) { wkTot[r.week_ending + '|' + r.bdr] = Number(r.discos_booked || 0); });
     (state.lists.monthSplit || []).forEach(function (r) { var k = r.week_ending + '|' + r.bdr; (splitMap[k] = splitMap[k] || []).push(r); });
+    var splitListMap = {};
+    (state.lists.monthSplitList || []).forEach(function (r) { var k = r.week_ending + '|' + r.bdr; (splitListMap[k] = splitListMap[k] || []).push(r); });
     function bookRatio(we, bdr) {
       if (lv.kind === 'all' || lv.kind === 'week') return 1;
       var sp = splitMap[we + '|' + bdr], tot = wkTot[we + '|' + bdr];
@@ -1043,7 +1045,10 @@
     var rawBooked = {};
     (state.lists.books || []).forEach(function (r) {
       if (P.weeks.indexOf(r.week_ending) === -1) return;
-      var n = Number(r.outbound_books || 0) * bookRatio(r.week_ending, r.bdr);
+      var sl = (lv.kind === 'month' || lv.kind === 'quarter') ? splitListMap[r.week_ending + '|' + r.bdr] : null;   // straddling week: exact by call date, per list
+      var n = sl
+        ? sl.filter(function (x) { return x.tier === r.tier && x.list_name === r.list_name && (lv.kind === 'month' ? x.month === P.key : inQuarter(x.month, P.key)); }).reduce(function (a, x) { return a + Number(x.outbound || 0); }, 0)
+        : Number(r.outbound_books || 0) * bookRatio(r.week_ending, r.bdr);
       if (r.tier === 'None') { otherBooked[r.bdr] = (otherBooked[r.bdr] || 0) + n; return; }
       var k = r.bdr + '|' + r.tier + '|' + r.list_name;
       rawBooked[k] = (rawBooked[k] || 0) + n;

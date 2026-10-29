@@ -393,6 +393,7 @@ function buildWeek(w, P){
   const f = wk => P ? (P.wts[wk] || 0) : 1;   // share of that week that falls inside the period
   const splits = {}; (D.monthSplit||[]).forEach(r=>{ const k = r.week_ending+"|"+r.bdr; (splits[k] = splits[k] || []).push(r); });
   const dMap = {}; (D.discos||[]).forEach(r=>{ dMap[r.week_ending+"|"+r.bdr] = r.discos_booked; });
+  const slist = {}; (D.monthSplitList||[]).forEach(r=>{ const k = r.week_ending+"|"+r.bdr; (slist[k] = slist[k] || []).push(r); });
   // books of one BDR-week that fall in the period: exact by call date when the week was split, otherwise by weekday share
   const share = (wk,bdr,kind,total) => {
     if(!P) return total;
@@ -418,7 +419,8 @@ function buildWeek(w, P){
   (D.discos||[]).filter(r=>inW(r.week_ending)).forEach(r=>{ const v = share(r.week_ending, r.bdr, "outbound", r.discos_booked); if(v || by[r.bdr]) mk(r.bdr).books += v; });
   (D.books||[]).filter(r=>inW(r.week_ending)).forEach(r=>{
     const t = tier(mk(r.bdr), r.tier);
-    const q = ratio(r.week_ending, r.bdr), nb = r.outbound_books*q;
+    const sl = P && slist[r.week_ending+"|"+r.bdr];   // straddling week: exact by call date, per list
+    const nb = sl ? sl.filter(x=>x.tier === r.tier && x.list_name === r.list_name && monthToKey(P.view, x.month) === P.key).reduce((a,x)=>a+(x.outbound||0),0) : r.outbound_books*ratio(r.week_ending, r.bdr);
     t.books += nb;
     const l = t.lists[r.list_name] || (t.lists[r.list_name] = { name:r.list_name, d:0, c:0, v:0, books:0 });
     l.books += nb;

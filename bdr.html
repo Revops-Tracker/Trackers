@@ -999,7 +999,22 @@
       var a = agg[k] || (agg[k] = { d: 0, c: 0 });
       a.d += Number(r.dials || 0); a.c += Number(r.connects || 0);
     });
+    // booked meetings per list (HubSpot, credited to the list the lead was dialed from); tier 'None' = no list tag
+    var otherBooked = {};
+    (state.lists.books || []).forEach(function (r) {
+      if (P.weeks.indexOf(r.week_ending) === -1) return;
+      var n = Number(r.outbound_books || 0);
+      if (r.tier === 'None') { otherBooked[r.bdr] = (otherBooked[r.bdr] || 0) + n; return; }
+      var a = agg[r.bdr + '|' + r.tier + '|' + r.list_name] || (agg[r.bdr + '|' + r.tier + '|' + r.list_name] = { d: 0, c: 0 });
+      a.b = (a.b || 0) + n;
+    });
     function dials(rep, l) { return (agg[rep + '|' + l.tier + '|' + l.list_name] || { d: 0 }).d; }
+    function booked(rep, l) { return (agg[rep + '|' + l.tier + '|' + l.list_name] || {}).b || 0; }
+    function bookedTotal(rep) {
+      var t = otherBooked[rep] || 0;
+      tl.forEach(function (l) { t += booked(rep, l); });
+      return Math.round(t * 10) / 10;
+    }
     var hasData = {};
     state.lists.rows.forEach(function (r) { if (P.weeks.indexOf(r.week_ending) !== -1) hasData[r.bdr] = true; });
 
@@ -1014,13 +1029,14 @@
       var missed = tl.filter(function (l) { return dials(r, l) === 0; });
       var t1 = missed.filter(function (l) { return l.tier === 'Tier 1'; }).length;
       return '<div class="stat"><div class="k">' + esc(r) + ' &mdash; lists dialed</div><div class="v">' + (tl.length - missed.length) + ' / ' + tl.length + '</div>'
-        + '<div class="sub">' + (missed.length ? '<span class="pill bad">' + missed.length + ' not dialed' + (t1 ? ' (' + t1 + ' in Tier 1)' : '') + '</span>' : '<span class="pill good">Dialed every list</span>') + '</div></div>';
+        + '<div class="sub">' + bookedTotal(r) + ' meetings booked &middot; ' + (missed.length ? '<span class="pill bad">' + missed.length + ' not dialed' + (t1 ? ' (' + t1 + ' in Tier 1)' : '') + '</span>' : '<span class="pill good">Dialed every list</span>') + '</div></div>';
     }).join('') + '</div>';
 
     function cell(rep, l) {
       if (!hasData[rep]) return '<td class="dim">&mdash;</td>';
       var d = dials(rep, l), why = noteFor(rep, P.key, l.tier, l.list_name);
-      return '<td>' + (d > 0 ? f0(d) : '<span class="nd">Not dialed</span>') + (why ? '<span class="why">' + esc(why) + '</span>' : '') + '</td>';
+      var bk = booked(rep, l);
+      return '<td>' + (d > 0 ? f0(d) : '<span class="nd">Not dialed</span>') + (bk ? '<span class="why" style="font-style:normal;color:var(--good);font-weight:600">' + bk + ' booked</span>' : '') + (why ? '<span class="why">' + esc(why) + '</span>' : '') + '</td>';
     }
     var grid = '<div class="card"><h2>Who dialed what &mdash; ' + esc(P.label) + '</h2><div class="tablewrap"><table class="grid"><thead><tr><th>List</th>'
       + reps.map(function (r) { return '<th>' + esc(r) + '</th>'; }).join('') + '</tr></thead><tbody>'
@@ -1038,14 +1054,16 @@
       var rows = tl.map(function (l, i) {
         var a = agg[r + '|' + l.tier + '|' + l.list_name] || { d: 0, c: 0 };
         var miss = a.d === 0, why = noteFor(r, P.key, l.tier, l.list_name);
-        var head = (i === 0 || tl[i - 1].tier !== l.tier) ? '<tr><td class="tierhead" colspan="5">' + esc(l.tier) + '</td></tr>' : '';
+        var head = (i === 0 || tl[i - 1].tier !== l.tier) ? '<tr><td class="tierhead" colspan="6">' + esc(l.tier) + '</td></tr>' : '';
         var input = '<input class="note' + (miss && !why && ed ? ' need' : '') + '" list="why-opts" maxlength="500" data-rep="' + esc(r) + '" data-tier="' + esc(l.tier) + '" data-list="' + esc(l.list_name) + '"'
           + ' value="' + esc(why) + '" placeholder="' + (ed ? (miss ? 'Why wasn’t this dialed?' : 'Optional note') : '') + '"' + (ed ? '' : ' disabled') + '>';
         return head + '<tr><td>' + esc(l.list_name) + '</td><td>' + f0(a.d) + '</td><td>' + (a.d ? pct(a.c, a.d) : '&mdash;') + '</td>'
-          + '<td><span class="st ' + (miss ? 'miss' : 'ok') + '">' + (miss ? 'Not dialed' : 'Dialed') + '</span></td><td class="whycell">' + input + '</td></tr>';
+          + '<td>' + (booked(r, l) || '0') + '</td><td><span class="st ' + (miss ? 'miss' : 'ok') + '">' + (miss ? 'Not dialed' : 'Dialed') + '</span></td><td class="whycell">' + input + '</td></tr>';
       }).join('');
-      return '<div class="card"><h2>' + esc(r) + ' &mdash; ' + esc(P.label) + '</h2><div class="tablewrap"><table><thead><tr><th>List</th><th>Dials</th><th>Connect rate</th><th>Status</th><th style="text-align:left">Why</th></tr></thead><tbody>'
-        + rows + '</tbody></table></div>' + (ed ? '<p class="hint">Reasons save when you leave the box and stay on the whole month (' + esc(P.key) + ').</p>' : '') + '</div>';
+      return '<div class="card"><h2>' + esc(r) + ' &mdash; ' + esc(P.label) + '</h2><div class="tablewrap"><table><thead><tr><th>List</th><th>Dials</th><th>Connect rate</th><th>Booked</th><th>Status</th><th style="text-align:left">Why</th></tr></thead><tbody>'
+        + rows + '<tr><td class="tierhead" colspan="6">Other</td></tr><tr><td>No list tag (booked, not tied to a list)</td><td class="dim">&mdash;</td><td class="dim">&mdash;</td><td>' + (otherBooked[r] || 0) + '</td><td></td><td></td></tr>'
+        + '<tr class="total"><td>Total meetings booked</td><td></td><td></td><td>' + bookedTotal(r) + '</td><td></td><td></td></tr></tbody></table></div>'
+        + '<p class="hint">Booked = meetings booked from HubSpot, credited to the list the lead was dialed from. It follows the weekly books sync.</p>' + (ed ? '<p class="hint">Reasons save when you leave the box and stay on the whole month (' + esc(P.key) + ').</p>' : '') + '</div>';
     }).join('<div style="height:20px"></div>');
 
     v.innerHTML = bar + tiles + (mode === 'rep' ? '' : grid + '<div style="height:20px"></div>') + (mode === 'rep' ? cards : '') + datalist;

@@ -942,6 +942,17 @@
   function mondayOf(we) { var d = parse(we); d.setDate(d.getDate() - 5); return d; }
   function monthKey(d) { return d.getFullYear() + '-' + ('0' + (d.getMonth() + 1)).slice(-2); }
   function shortDate(d) { return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }); }
+  // Month / Quarter are real calendar periods. Nooks only reports whole weeks, so a week that straddles two periods is split by its
+  // weekdays (Mon-Fri) for dials and connects; books are split exactly by call date for those weeks (see bookRatio below).
+  function wdKeys(we, kind) {   // {periodKey: share of the week's weekdays}
+    var m = mondayOf(we), o = {};
+    for (var i = 0; i < 5; i++) {
+      var d = new Date(m.getFullYear(), m.getMonth(), m.getDate() + i);
+      var k = kind === 'quarter' ? 'Q' + d.getFullYear() + '-' + (Math.floor(d.getMonth() / 3) + 1) : monthKey(d);
+      o[k] = (o[k] || 0) + 0.2;
+    }
+    return o;
+  }
   function listPeriod() {
     var weeks = [];
     state.lists.rows.forEach(function (r) { if (weeks.indexOf(r.week_ending) === -1) weeks.push(r.week_ending); });
@@ -949,37 +960,35 @@
     if (!weeks.length) return null;
     var items;
     if (lv.kind === 'all') {
-      var oldest = weeks[weeks.length - 1];
-      items = [{ key: 'all', label: 'All time · ' + shortDate(mondayOf(oldest)) + ' – ' + shortDate(parse(weeks[0])), weeks: weeks.slice() }];
-    } else if (lv.kind === 'quarter') {
-      items = [];
-      weeks.forEach(function (we) {
-        var m = mondayOf(we), q = Math.floor(m.getMonth() / 3) + 1, k = 'Q' + m.getFullYear() + '-' + q;
-        var it = items.find(function (x) { return x.key === k; });
-        if (!it) { it = { key: k, label: 'Q' + q + ' ' + m.getFullYear(), weeks: [] }; items.push(it); }
-        it.weeks.push(we);
-      });
+      var oldest = weeks[weeks.length - 1], w1 = {};
+      weeks.forEach(function (we) { w1[we] = 1; });
+      items = [{ key: 'all', label: 'All time \u00b7 ' + shortDate(mondayOf(oldest)) + ' \u2013 ' + shortDate(parse(weeks[0])), weeks: weeks.slice(), wts: w1 }];
     } else if (lv.kind === 'week') {
       items = weeks.map(function (we) {
-        var m = mondayOf(we);
-        return { key: monthKey(m), label: shortDate(m) + ' – ' + shortDate(parse(we)), weeks: [we] };
+        var m = mondayOf(we), w1 = {}; w1[we] = 1;
+        return { key: monthKey(m), label: shortDate(m) + ' \u2013 ' + shortDate(parse(we)), weeks: [we], wts: w1 };
       });
     } else {
       items = [];
       weeks.forEach(function (we) {
-        var k = monthKey(mondayOf(we));
-        var it = items.find(function (x) { return x.key === k; });
-        if (!it) {
-          var p = k.split('-');
-          it = { key: k, label: new Date(+p[0], +p[1] - 1, 1).toLocaleDateString('en-US', { month: 'long', year: 'numeric' }), weeks: [] };
-          items.push(it);
-        }
-        it.weeks.push(we);
+        var wk = wdKeys(we, lv.kind);
+        Object.keys(wk).forEach(function (k) {
+          var it = items.find(function (x) { return x.key === k; });
+          if (!it) {
+            var label;
+            if (lv.kind === 'quarter') label = 'Q' + k.split('-')[1] + ' ' + k.slice(1, 5);
+            else { var pp = k.split('-'); label = new Date(+pp[0], +pp[1] - 1, 1).toLocaleDateString('en-US', { month: 'long', year: 'numeric' }); }
+            it = { key: k, label: label, weeks: [], wts: {} };
+            items.push(it);
+          }
+          it.weeks.push(we); it.wts[we] = wk[k];
+        });
       });
+      items.sort(function (x, y) { return x.key < y.key ? 1 : -1; });
     }
     var i = Math.max(0, Math.min(lv.offset, items.length - 1));
     lv.offset = i;
-    return { key: items[i].key, label: items[i].label, weeks: items[i].weeks, hasOlder: i < items.length - 1, hasNewer: i > 0 };
+    return { key: items[i].key, label: items[i].label, weeks: items[i].weeks, wts: items[i].wts, hasOlder: i < items.length - 1, hasNewer: i > 0 };
   }
   function inQuarter(pk, qkey) {   // pk 'YYYY-MM', qkey 'QYYYY-N'
     var y = pk.slice(0, 4), q = Math.floor((Number(pk.slice(5, 7)) - 1) / 3) + 1;
@@ -1012,17 +1021,38 @@
       if (P.weeks.indexOf(r.week_ending) === -1) return;
       var k = r.bdr + '|' + r.tier + '|' + r.list_name;
       var a = agg[k] || (agg[k] = { d: 0, c: 0 });
-      a.d += Number(r.dials || 0); a.c += Number(r.connects || 0);
+      var wgt = P.wts[r.week_ending] == null ? 1 : P.wts[r.week_ending];
+      a.d += Number(r.dials || 0) * wgt; a.c += Number(r.connects || 0) * wgt;
     });
-    // booked meetings per list (HubSpot, credited to the list the lead was dialed from); tier 'None' = no list tag
-    var otherBooked = {};
+    Object.keys(agg).forEach(function (k) { agg[k].d = Math.round(agg[k].d); agg[k].c = Math.round(agg[k].c); });
+    // booked meetings per list (HubSpot books, same numbers as the RevOps L10 page, credited to the list the lead was dialed from);
+    // tier 'None' = no list tag. For a week that straddles two months the share is exact by call date (month split), else by weekdays.
+    var wkTot = {}, splitMap = {}, otherBooked = {};
+    (state.lists.discos || []).forEach(function (r) { wkTot[r.week_ending + '|' + r.bdr] = Number(r.discos_booked || 0); });
+    (state.lists.monthSplit || []).forEach(function (r) { var k = r.week_ending + '|' + r.bdr; (splitMap[k] = splitMap[k] || []).push(r); });
+    function bookRatio(we, bdr) {
+      if (lv.kind === 'all' || lv.kind === 'week') return 1;
+      var sp = splitMap[we + '|' + bdr], tot = wkTot[we + '|' + bdr];
+      if (sp && tot) {
+        var t = 0;
+        sp.forEach(function (x) { if (lv.kind === 'month' ? x.month === P.key : inQuarter(x.month, P.key)) t += Number(x.outbound || 0); });
+        return t / tot;
+      }
+      return P.wts[we] == null ? 1 : P.wts[we];
+    }
+    var rawBooked = {};
     (state.lists.books || []).forEach(function (r) {
       if (P.weeks.indexOf(r.week_ending) === -1) return;
-      var n = Number(r.outbound_books || 0);
+      var n = Number(r.outbound_books || 0) * bookRatio(r.week_ending, r.bdr);
       if (r.tier === 'None') { otherBooked[r.bdr] = (otherBooked[r.bdr] || 0) + n; return; }
-      var a = agg[r.bdr + '|' + r.tier + '|' + r.list_name] || (agg[r.bdr + '|' + r.tier + '|' + r.list_name] = { d: 0, c: 0 });
-      a.b = (a.b || 0) + n;
+      var k = r.bdr + '|' + r.tier + '|' + r.list_name;
+      rawBooked[k] = (rawBooked[k] || 0) + n;
     });
+    Object.keys(rawBooked).forEach(function (k) {
+      var a = agg[k] || (agg[k] = { d: 0, c: 0 });
+      a.b = Math.round(rawBooked[k]);
+    });
+    Object.keys(otherBooked).forEach(function (k) { otherBooked[k] = Math.round(otherBooked[k]); });
     function dials(rep, l) { return (agg[rep + '|' + l.tier + '|' + l.list_name] || { d: 0 }).d; }
     function team(l) {   // all current BDRs together on one list
       var t = { d: 0, c: 0, b: 0 };

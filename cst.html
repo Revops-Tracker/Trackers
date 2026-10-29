@@ -183,8 +183,8 @@
       return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c];
     });
   }
-  function f0(x) { return Math.round(x).toLocaleString(); }
-  function f1(x) { return (Math.round(x * 10) / 10).toLocaleString(undefined, { minimumFractionDigits: 1 }); }
+  function f0(x) { return Math.round(x).toLocaleString('en-US'); }
+  function f1(x) { return (Math.round(x * 10) / 10).toLocaleString('en-US', { minimumFractionDigits: 1 }); }
   function pct(n, d) { return d > 0 ? f1(n / d * 100) + '%' : '&mdash;'; }
   function iso(d) {
     return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');

@@ -190,8 +190,8 @@
       return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c];
     });
   }
-  function f0(x) { return Math.round(x).toLocaleString(); }
-  function f1(x) { return (Math.round(x * 10) / 10).toLocaleString(undefined, { minimumFractionDigits: 1 }); }
+  function f0(x) { return Math.round(x).toLocaleString('en-US'); }
+  function f1(x) { return (Math.round(x * 10) / 10).toLocaleString('en-US', { minimumFractionDigits: 1 }); }
   function pct(n, d) { return d > 0 ? f1(n / d * 100) + '%' : '&mdash;'; }
   function iso(d) {
     return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
@@ -941,14 +941,25 @@
   var WHY_OPTS = ['List was empty', 'Nooks tasks not loaded', 'Ran out of time', 'Prioritized other lists', 'Blocked / tool issue', 'Out of office'];
   function mondayOf(we) { var d = parse(we); d.setDate(d.getDate() - 5); return d; }
   function monthKey(d) { return d.getFullYear() + '-' + ('0' + (d.getMonth() + 1)).slice(-2); }
-  function shortDate(d) { return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' }); }
+  function shortDate(d) { return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }); }
   function listPeriod() {
     var weeks = [];
     state.lists.rows.forEach(function (r) { if (weeks.indexOf(r.week_ending) === -1) weeks.push(r.week_ending); });
     weeks.sort().reverse();
     if (!weeks.length) return null;
     var items;
-    if (lv.kind === 'week') {
+    if (lv.kind === 'all') {
+      var oldest = weeks[weeks.length - 1];
+      items = [{ key: 'all', label: 'All time · ' + shortDate(mondayOf(oldest)) + ' – ' + shortDate(parse(weeks[0])), weeks: weeks.slice() }];
+    } else if (lv.kind === 'quarter') {
+      items = [];
+      weeks.forEach(function (we) {
+        var m = mondayOf(we), q = Math.floor(m.getMonth() / 3) + 1, k = 'Q' + m.getFullYear() + '-' + q;
+        var it = items.find(function (x) { return x.key === k; });
+        if (!it) { it = { key: k, label: 'Q' + q + ' ' + m.getFullYear(), weeks: [] }; items.push(it); }
+        it.weeks.push(we);
+      });
+    } else if (lv.kind === 'week') {
       items = weeks.map(function (we) {
         var m = mondayOf(we);
         return { key: monthKey(m), label: shortDate(m) + ' – ' + shortDate(parse(we)), weeks: [we] };
@@ -960,7 +971,7 @@
         var it = items.find(function (x) { return x.key === k; });
         if (!it) {
           var p = k.split('-');
-          it = { key: k, label: new Date(+p[0], +p[1] - 1, 1).toLocaleDateString(undefined, { month: 'long', year: 'numeric' }), weeks: [] };
+          it = { key: k, label: new Date(+p[0], +p[1] - 1, 1).toLocaleDateString('en-US', { month: 'long', year: 'numeric' }), weeks: [] };
           items.push(it);
         }
         it.weeks.push(we);
@@ -970,9 +981,13 @@
     lv.offset = i;
     return { key: items[i].key, label: items[i].label, weeks: items[i].weeks, hasOlder: i < items.length - 1, hasNewer: i > 0 };
   }
+  function inQuarter(pk, qkey) {   // pk 'YYYY-MM', qkey 'QYYYY-N'
+    var y = pk.slice(0, 4), q = Math.floor((Number(pk.slice(5, 7)) - 1) / 3) + 1;
+    return 'Q' + y + '-' + q === qkey;
+  }
   function noteFor(rep, key, tier, list) {
-    var n = state.lists.notes.find(function (x) {
-      return x.rep === rep && x.period_key === key && x.tier === tier && x.list_name === list;
+    var n = state.lists.notes.find(function (x) {   // notes arrive newest first, so 'all' picks the latest reason
+      return x.rep === rep && (key === 'all' || (key.charAt(0) === 'Q' ? inQuarter(x.period_key, key) : x.period_key === key)) && x.tier === tier && x.list_name === list;
     });
     return n ? n.note : '';
   }
@@ -1009,6 +1024,14 @@
       a.b = (a.b || 0) + n;
     });
     function dials(rep, l) { return (agg[rep + '|' + l.tier + '|' + l.list_name] || { d: 0 }).d; }
+    function team(l) {   // all current BDRs together on one list
+      var t = { d: 0, c: 0, b: 0 };
+      reps.forEach(function (r) {
+        var a = agg[r + '|' + l.tier + '|' + l.list_name];
+        if (a) { t.d += a.d; t.c += a.c; t.b += a.b || 0; }
+      });
+      return t;
+    }
     function booked(rep, l) { return (agg[rep + '|' + l.tier + '|' + l.list_name] || {}).b || 0; }
     function bookedTotal(rep) {
       var t = otherBooked[rep] || 0;
@@ -1019,7 +1042,7 @@
     state.lists.rows.forEach(function (r) { if (P.weeks.indexOf(r.week_ending) !== -1) hasData[r.bdr] = true; });
 
     var bar = '<div class="ls-bar"><div class="seg">'
-      + [['month', 'Month'], ['week', 'Week']].map(function (k) { return "<button data-kind='" + k[0] + "' class='" + (lv.kind === k[0] ? 'on' : '') + "'>" + k[1] + '</button>'; }).join('')
+      + [['all', 'All time'], ['quarter', 'Quarter'], ['month', 'Month'], ['week', 'Week']].map(function (k) { return "<button data-kind='" + k[0] + "' class='" + (lv.kind === k[0] ? 'on' : '') + "'>" + k[1] + '</button>'; }).join('')
       + '</div><button class="ls-nav" id="ls-older" aria-label="Older"' + (P.hasOlder ? '' : ' disabled') + '>&lsaquo;</button>'
       + '<div class="label">' + esc(P.label) + '</div>'
       + '<button class="ls-nav" id="ls-newer" aria-label="Newer"' + (P.hasNewer ? '' : ' disabled') + '>&rsaquo;</button></div>';
@@ -1039,18 +1062,25 @@
       return '<td>' + (d > 0 ? f0(d) : '<span class="nd">Not dialed</span>') + (bk ? '<span class="why" style="font-style:normal;color:var(--good);font-weight:600">' + bk + ' booked</span>' : '') + (why ? '<span class="why">' + esc(why) + '</span>' : '') + '</td>';
     }
     var grid = '<div class="card"><h2>Who dialed what &mdash; ' + esc(P.label) + '</h2><div class="tablewrap"><table class="grid"><thead><tr><th>List</th>'
-      + reps.map(function (r) { return '<th>' + esc(r) + '</th>'; }).join('') + '</tr></thead><tbody>'
+      + reps.map(function (r) { return '<th>' + esc(r) + '</th>'; }).join('') + '<th>Team dials</th><th>Team CR</th><th>Team booked</th></tr></thead><tbody>'
       + tl.map(function (l, i) {
-        var head = (i === 0 || tl[i - 1].tier !== l.tier) ? '<tr><td class="tierhead" colspan="' + (reps.length + 1) + '">' + esc(l.tier) + '</td></tr>' : '';
-        return head + '<tr><td>' + esc(l.list_name) + '</td>' + reps.map(function (r) { return cell(r, l); }).join('') + '</tr>';
+        var head = (i === 0 || tl[i - 1].tier !== l.tier) ? '<tr><td class="tierhead" colspan="' + (reps.length + 4) + '">' + esc(l.tier) + '</td></tr>' : '';
+        return head + '<tr><td>' + esc(l.list_name) + '</td>' + reps.map(function (r) { return cell(r, l); }).join('')
+          + (function () { var t = team(l); return '<td>' + f0(t.d) + '</td><td>' + (t.d ? '<b>' + pct(t.c, t.d) + '</b>' : '&mdash;') + '</td><td>' + (Math.round(t.b * 10) / 10) + '</td>'; })() + '</tr>';
       }).join('')
-      + '</tbody></table></div><p class="hint">Dials per list from the weekly Nooks upload. Each BDR writes the reasons in their own tab; they show here for the whole team.</p></div>';
+      + (function () {
+        var T = { d: 0, c: 0, b: 0 };
+        tl.forEach(function (l) { var t = team(l); T.d += t.d; T.c += t.c; T.b += t.b; });
+        return '<tr class="total"><td>All tier lists</td>' + reps.map(function () { return '<td></td>'; }).join('') + '<td>' + f0(T.d) + '</td><td>' + (T.d ? pct(T.c, T.d) : '&mdash;') + '</td><td>' + (Math.round(T.b * 10) / 10) + '</td></tr>';
+      })()
+      + '</tbody></table></div><p class="hint">Dials per list from the weekly Nooks upload. Team CR = connects ÷ dials across all BDRs on that list. Each BDR writes the reasons in their own tab; they show here for the whole team.</p></div>';
 
     var datalist = '<datalist id="why-opts">' + WHY_OPTS.map(function (o) { return '<option value="' + esc(o) + '">'; }).join('') + '</datalist>';
 
     var cards = shown.map(function (r) {
       if (!hasData[r]) return '';
-      var ed = canEditNotes(r);
+      var rollup = P.key === 'all' || P.key.charAt(0) === 'Q';
+      var ed = canEditNotes(r) && !rollup;
       var rows = tl.map(function (l, i) {
         var a = agg[r + '|' + l.tier + '|' + l.list_name] || { d: 0, c: 0 };
         var miss = a.d === 0, why = noteFor(r, P.key, l.tier, l.list_name);
@@ -1063,7 +1093,7 @@
       return '<div class="card"><h2>' + esc(r) + ' &mdash; ' + esc(P.label) + '</h2><div class="tablewrap"><table><thead><tr><th>List</th><th>Dials</th><th>Connect rate</th><th>Booked</th><th>Status</th><th style="text-align:left">Why</th></tr></thead><tbody>'
         + rows + '<tr><td class="tierhead" colspan="6">Other</td></tr><tr><td>No list tag (booked, not tied to a list)</td><td class="dim">&mdash;</td><td class="dim">&mdash;</td><td>' + (otherBooked[r] || 0) + '</td><td></td><td></td></tr>'
         + '<tr class="total"><td>Total meetings booked</td><td></td><td></td><td>' + bookedTotal(r) + '</td><td></td><td></td></tr></tbody></table></div>'
-        + '<p class="hint">Booked = meetings booked from HubSpot, credited to the list the lead was dialed from. It follows the weekly books sync.</p>' + (ed ? '<p class="hint">Reasons save when you leave the box and stay on the whole month (' + esc(P.key) + ').</p>' : '') + '</div>';
+        + '<p class="hint">Booked = meetings booked from HubSpot, credited to the list the lead was dialed from. It follows the weekly books sync.</p>' + (rollup ? '<p class="hint">' + (P.key === 'all' ? 'All-time' : 'Quarter') + ' totals. The Why column shows each list’s most recent reason' + (P.key === 'all' ? '' : ' this quarter') + '; switch to Month or Week to add or edit one.</p>' : ed ? '<p class="hint">Reasons save when you leave the box and stay on the whole month (' + esc(P.key) + ').</p>' : '') + '</div>';
     }).join('<div style="height:20px"></div>');
 
     v.innerHTML = bar + tiles + (mode === 'rep' ? '' : grid + '<div style="height:20px"></div>') + (mode === 'rep' ? cards : '') + datalist;

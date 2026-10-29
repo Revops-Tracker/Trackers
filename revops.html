@@ -239,6 +239,9 @@ html.view-reporting .lb-only{display:none!important}
 .cr-tbl tr.tier td:first-child{padding-left:30px}
 .cr-tbl tr.list td{color:var(--muted)}
 .cr-tbl tr.list td:first-child{padding-left:52px}
+.nobooks th:nth-last-child(-n+2),.nobooks td:nth-last-child(-n+2){display:none}
+.cl-note{font-size:12px;color:var(--muted);margin:6px 2px 10px}
+.cl-zero{color:var(--behind);font-weight:600}
 .nd{margin:14px 0 4px;border:1px solid var(--line,#e5e7eb);border-radius:10px;padding:12px 14px}
 .nd h3{margin:0 0 8px;font-size:14px;font-weight:700}
 .nd .nd-row{display:flex;gap:10px;align-items:flex-start;padding:6px 0;border-top:1px solid var(--line,#e5e7eb)}
@@ -280,6 +283,7 @@ section[hidden]{display:none}
     <div class="sec-head">
       <h2 id="crTitle">Connect rate</h2>
       <div class="nav">
+        <div class="seg" id="crTeam" role="group" aria-label="Team"><button type="button" data-t="jf" aria-pressed="true">JF</button><button type="button" data-t="cst" aria-pressed="false">CST</button></div>
         <div class="seg" id="crView" role="group" aria-label="View"><button type="button" data-v="week" aria-pressed="true">Weekly</button><button type="button" data-v="month" aria-pressed="false">Monthly</button><button type="button" data-v="quarter" aria-pressed="false">Quarterly</button></div>
         <button type="button" id="crPrev" aria-label="Previous week">‹</button>
         <div class="period" id="crWeekLabel" aria-live="polite"></div>
@@ -296,6 +300,10 @@ section[hidden]{display:none}
         <div class="table-wrap"><table class="cr-tbl" id="crTable"></table></div>
         <div id="crNotDialed"></div>
         <div class="legend" id="crLegend"></div>
+        <details id="clBox" open hidden>
+          <summary>Leads currently in each list</summary>
+          <div class="table-wrap" id="clLeads"></div>
+        </details>
         <details id="q3Box" open>
           <summary>7 Day TVL leads per week, Q3</summary>
           <div class="table-wrap" id="q3Leads"></div>
@@ -336,14 +344,16 @@ const $ = id => document.getElementById(id);
 const h = s => String(s??"").replace(/[&<>"']/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const MON = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
 const ORDER = ["Brandon","Issa","Erich","Jules"];
-const TIERS = ["Tier 1","Tier 2","Tier 3","None"];
-const S = { data:null, week:null, view:"week", p:null, open:{}, parsed:null, file:"", saving:false };
+const cst = () => S.team === "cst";
+/* tiers come from the tier scheme of whichever team is showing (JF: Tier 1-3, CST: Cold call / RTB / TOFU / BOFU); "None" = books not tied to a list */
+const tierOrder = () => { const o = []; ((S.data && S.data.tierLists) || []).forEach(t => { if(o.indexOf(t.tier) < 0) o.push(t.tier); }); return o.concat(["None"]); };
+const S = { team:"jf", data:null, week:null, view:"week", p:null, open:{}, parsed:null, file:"", saving:false };
 
 const token = () => { try{ return localStorage.getItem("jf_token"); }catch(e){ return null; } };
 async function call(path, opts){
   opts = opts || {};
   opts.headers = Object.assign({ Authorization: "Bearer " + token() }, opts.headers || {});
-  const r = await fetch(API + path, opts);
+  const r = await fetch(API + path + (cst() ? (path.indexOf("?") < 0 ? "?" : "&") + "team=cst" : ""), opts);
   const j = await r.json().catch(()=>({}));
   if(!r.ok || j.ok === false) throw new Error(j.error || ("Request failed (" + r.status + ")"));
   return j;
@@ -445,6 +455,10 @@ function render(){
   const D = S.data;
   if(!D){ return; }
   const isP = S.view !== "week";   // month or quarter: every week in the period is added up
+  document.querySelectorAll("#crTeam button").forEach(b=>b.setAttribute("aria-pressed", String(b.dataset.t === S.team)));
+  $("crTitle").textContent = cst() ? "Connect rate · CST" : "Connect rate";
+  $("q3Box").hidden = $("q4Box").hidden = cst(); $("clBox").hidden = !cst();
+  $("crTable").className = "cr-tbl" + (cst() ? " nobooks" : "");
   document.querySelectorAll("#crView button").forEach(b=>b.setAttribute("aria-pressed", String(b.dataset.v === S.view)));
   const unit = S.view === "month" ? "month" : (S.view === "quarter" ? "quarter" : "week");
   $("crPrev").setAttribute("aria-label", "Previous " + unit);
@@ -460,17 +474,20 @@ function render(){
   if(!S.week){
     $("crWeekLabel").textContent = "No data yet";
     $("crTiles").innerHTML = ""; $("crTable").innerHTML = '<tbody><tr><td class="empty">Drop a Nooks CSV above to add the first week.</td></tr></tbody>';
+    $("crNotDialed").innerHTML = "";
+    if(cst()) renderCstLists(null, []);
     return;
   }
   const Q = isP ? periods[i] : null;
   $("crWeekLabel").textContent = isP ? periodLabel(S.view, Q) : weekLabel(S.week);
   const W = buildWeek(isP ? Q.weeks : S.week, isP ? { view:S.view, key:Q.key, wts:Q.wts } : null);
   const T = W.team;
-  $("crTiles").innerHTML =
+  const tilesHtml =
     tile("Team connect rate", T.d ? '<span class="'+((T.c/T.d)>=target()?"ahead":"behind")+'">'+pct(T.c,T.d)+'</span>' : "–", "target "+(target()*100).toFixed(1)+"%") +
     tile("Dials", num(T.d), "") + tile("Connects", num(T.c), "") + tile("Conversations", num(T.v), "") +
     tile("Outbound books", num(T.books), "") + tile("Inbound books", num(T.inb), "") + tile("7 Day TVL", T.leadN ? num(Math.round(T.leads/T.leadN)) : "–", T.leadN ? (isP ? "avg cold leads per BDR per week (parallel + power)" : "avg cold leads per BDR (parallel + power), across "+T.leadN+" BDRs") : "") +
     tile("RTB leads", num(T.rtb), T.leadN ? "avg "+num(Math.round(T.rtb/T.leadN))+" per BDR"+(isP ? " per week" : "") : "") + tile("Inbound leads", num(T.inl), T.leadN ? "avg "+num(Math.round(T.inl/T.leadN))+" per BDR"+(isP ? " per week" : "") : "");
+  $("crTiles").innerHTML = cst() ? cstTiles(T) : tilesHtml;
 
   let rows = '<thead><tr><th></th><th>Dials</th><th>Connects</th><th>Connect rate</th><th>Conversations</th><th>Outbound books</th><th>Inbound books</th></tr></thead><tbody>';
   rows += '<tr class="team"><td>Team</td><td>'+num(T.d)+'</td><td>'+num(T.c)+'</td><td>'+rateCell(T.c,T.d)+'</td><td>'+num(T.v)+'</td><td>'+num(T.books)+'</td><td>'+num(T.inb)+'</td></tr>';
@@ -478,7 +495,7 @@ function render(){
     const kb = "b:"+b.bdr, ob = !!S.open[kb];
     rows += '<tr class="bdr"><td><button type="button" class="cr-tgl" data-k="'+h(kb)+'" aria-expanded="'+ob+'"><i>▸</i>'+h(b.bdr)+'</button></td><td>'+num(b.d)+'</td><td>'+num(b.c)+'</td><td>'+rateCell(b.c,b.d)+'</td><td>'+num(b.v)+'</td><td>'+num(b.books)+'</td><td>'+num(b.inb)+'</td></tr>';
     if(!ob) return;
-    TIERS.forEach(tn=>{
+    tierOrder().forEach(tn=>{
       const t = b.tiers[tn]; if(!t) return;
       const kt = "t:"+b.bdr+":"+tn, ot = !!S.open[kt];
       const name = tn === "None" ? '<span class="cr-none">Books not tied to a tier list</span>' : h(tn);
@@ -492,15 +509,52 @@ function render(){
   rows += '</tbody>';
   $("crTable").innerHTML = rows;
 
-  $("crLegend").innerHTML = '<b>Connect rate</b> = connects ÷ dials, green at or above the '+(target()*100).toFixed(1)+'% target. Click a BDR to see tiers, then a tier to see its lists. <b>Conversations</b> are the Nooks "meaningful" dispositions. Weeks run Monday to Saturday. Outbound books count a Discovery Booked call, or a Meeting Rebook 30+ days after the last Discovery Booked, in the week of the call.'+(isP ? ' <b>'+(S.view === 'month' ? 'Monthly' : 'Quarterly')+' view</b> covers the full calendar '+unit+'. Nooks only reports whole weeks, so a week that straddles two '+unit+'s is split by weekdays for dials, connects and conversations. Books are split exactly by the day of the call, and leads given out count in the '+unit+' of the Monday they were delivered. The connect rate for a BDR, tier or list is its total connects ÷ its total dials. Tiers and lists are the same as the weekly view.' : '');
+  $("crLegend").innerHTML = cst() ? ('<b>Connect rate</b> = connects ÷ dials, green at or above the '+(target()*100).toFixed(1)+'% target. Click Ali to see the lists by group (Pure Cold Calling, RTB Cold Calling, TOFU, BOFU, Pipeline Stages). <b>Conversations</b> are the Nooks "meaningful" dispositions. Weeks run Monday to Saturday.'+(isP ? ' <b>'+(S.view === 'month' ? 'Monthly' : 'Quarterly')+' view</b> adds up every week in the '+unit+'.' : '')) : '<b>Connect rate</b> = connects ÷ dials, green at or above the '+(target()*100).toFixed(1)+'% target. Click a BDR to see tiers, then a tier to see its lists. <b>Conversations</b> are the Nooks "meaningful" dispositions. Weeks run Monday to Saturday. Outbound books count a Discovery Booked call, or a Meeting Rebook 30+ days after the last Discovery Booked, in the week of the call.'+(isP ? ' <b>'+(S.view === 'month' ? 'Monthly' : 'Quarterly')+' view</b> covers the full calendar '+unit+'. Nooks only reports whole weeks, so a week that straddles two '+unit+'s is split by weekdays for dials, connects and conversations. Books are split exactly by the day of the call, and leads given out count in the '+unit+' of the Monday they were delivered. The connect rate for a BDR, tier or list is its total connects ÷ its total dials. Tiers and lists are the same as the weekly view.' : '');
   try{ renderNotDialed(W, isP ? 'this '+unit : 'this week'); }catch(e){ console.error('Not dialed', e); }
-  try{ renderQ3(); }catch(e){ console.error('Q3 section', e); }
+  try{ if(cst()) renderCstLists(W, isP ? Q.weeks : [S.week]); else renderQ3(); }catch(e){ console.error('Leads section', e); }
   const up = (D.uploads||[])[0];
   const synced = D.booksSyncedAt ? new Date(D.booksSyncedAt).toLocaleString("en-US",{month:"short",day:"numeric",hour:"numeric",minute:"2-digit"}) : null;
   $("crFoot").innerHTML = (up ? 'Last Nooks upload: week ending '+h(up.week_ending)+', by '+h(up.uploaded_by)+' on '+h(new Date(up.uploaded_at).toLocaleDateString("en-US",{month:"short",day:"numeric"}))+'. ' : '') +
-    'Books, inbound books and leads delivered come from the Weekly BDR Report sheet'+(synced ? ' (last synced '+h(synced)+')' : '')+'.';
+    (cst() ? 'List sizes come straight from HubSpot and refresh every morning around 7am ET.' : 'Books, inbound books and leads delivered come from the Weekly BDR Report sheet'+(synced ? ' (last synced '+h(synced)+')' : '')+'.');
 }
 const tile = (k,v,s) => '<div class="cr-tile"><div class="k">'+h(k)+'</div><div class="v">'+v+'</div>'+(s?'<div class="s">'+h(s)+'</div>':'')+'</div>';
+
+/* ---------- CST: tiles + leads currently in each list (Ali's lead counts change all the time, so this is a live count, not leads distributed) ---------- */
+function cstTiles(T){
+  const sz = (S.data.listSizes||[]), total = sz.reduce((a,r)=>a+r.size,0);
+  return tile("Team connect rate", T.d ? '<span class="'+((T.c/T.d)>=target()?"ahead":"behind")+'">'+pct(T.c,T.d)+'</span>' : "–", "target "+(target()*100).toFixed(1)+"%") +
+    tile("Dials", num(T.d), "") + tile("Connects", num(T.c), "") + tile("Conversations", num(T.v), "") +
+    tile("Leads in lists now", num(total), "across "+sz.length+" lists, live from HubSpot");
+}
+function renderCstLists(W, weeks){
+  const D = S.data, tl = D.tierLists || [], sizes = {};
+  (D.listSizes||[]).forEach(r=>{ sizes[r.hubspot_list_id] = r; });
+  const dials = {};
+  if(W) W.bdrs.forEach(b=>Object.keys(b.tiers).forEach(tn=>Object.values(b.tiers[tn].lists).forEach(l=>{ const k = tn+"|"+l.name; dials[k] = (dials[k]||0) + l.d; })));
+  const last = weeks && weeks.length ? weeks[weeks.length-1] : null;
+  const latest = !last || last >= (weekList()[0] || "");
+  const hist = {}; (D.sizeHistory||[]).forEach(r=>{ if(last && r.snapshot_date <= add(last,1) && (!hist[r.hubspot_list_id] || r.snapshot_date > hist[r.hubspot_list_id].d)) hist[r.hubspot_list_id] = { d:r.snapshot_date, n:r.size }; });
+  const sizeOf = l => latest ? (sizes[l.hubspot_list_id] ? sizes[l.hubspot_list_id].size : null) : (hist[l.hubspot_list_id] ? hist[l.hubspot_list_id].n : null);
+  let t = '<table class="cr-tbl"><thead><tr><th>List</th><th>Leads in list</th><th>Dials</th><th>Dials per lead</th></tr></thead><tbody>';
+  const tiers = []; tl.forEach(x=>{ if(tiers.indexOf(x.tier) < 0) tiers.push(x.tier); });
+  let totN = 0, totD = 0;
+  tiers.forEach(tn=>{
+    const ls = tl.filter(x=>x.tier === tn);
+    const n = ls.reduce((a,l)=>a+(sizeOf(l)||0),0), d = ls.reduce((a,l)=>a+(dials[tn+"|"+l.list_name]||0),0);
+    totN += n; totD += d;
+    t += '<tr class="bdr"><td>'+h(tn)+'</td><td>'+num(n)+'</td><td>'+num(d)+'</td><td>'+(n ? (d/n).toFixed(1) : "–")+'</td></tr>';
+    ls.forEach(l=>{
+      const s = sizeOf(l), dd = dials[tn+"|"+l.list_name] || 0;
+      t += '<tr class="list"><td>'+h(l.list_name)+'</td><td>'+(s == null ? "–" : num(s))+'</td><td>'+(dd ? num(dd) : '<span class="'+(s ? 'cl-zero' : '')+'">0</span>')+'</td><td>'+(s ? (dd/s).toFixed(1) : "–")+'</td></tr>';
+    });
+  });
+  t += '<tr class="team"><td>All lists</td><td>'+num(totN)+'</td><td>'+num(totD)+'</td><td>'+(totN ? (totD/totN).toFixed(1) : "–")+'</td></tr></tbody></table>';
+  const asOf = (D.listSizes||[]).reduce((a,r)=>r.as_of > a ? r.as_of : a, "");
+  const note = latest
+    ? 'Live count of contacts in each list'+(asOf ? ', as of '+new Date(asOf).toLocaleString("en-US",{month:"short",day:"numeric",hour:"numeric",minute:"2-digit"}) : '')+'. Dials are for the period shown above.'
+    : 'Size of each list at the end of the period shown (the last daily snapshot). A dash means no snapshot was taken yet for that date.';
+  $("clLeads").innerHTML = '<div class="cl-note">'+h(note)+'</div>'+t;
+}
 
 /* ---------- lists not dialed: every tier list a BDR logged zero dials on in the period ---------- */
 function renderNotDialed(W, when){
@@ -569,7 +623,8 @@ function canonList(raw){
   if(/do not use|direct dial|\(cloned\)/i.test(s)) return null;      // never counted
   s = s.replace(/\s*-\s*temporary$/i, "").replace(/^7\s*day\b/i, "7 Day");
   const low = s.toLowerCase();
-  return (S.data.tierLists||[]).find(t=>t.list_name.toLowerCase() === low) || null;
+  const norm = x => String(x).replace(/\s+/g, " ").trim().toLowerCase();
+  return (S.data.tierLists||[]).find(t=>t.list_name.toLowerCase() === low || (t.aliases||[]).some(a=>norm(a) === low)) || null;
 }
 function mapCsv(rows){
   const head = rows[0].map(x=>String(x).trim().toLowerCase());
@@ -586,7 +641,7 @@ function mapCsv(rows){
     const first = name.split(/\s+/)[0], rest = name.slice(first.length).trim();
     const bdr = roster[first.toLowerCase()];
     if(!bdr){ skipped.push({ name, dials, why:"not on the BDR roster" }); return; }
-    const hit = canonList(rest);
+    const hit = canonList(rest) || canonList(name);
     if(!hit){ skipped.push({ name, dials, why:"list is not in the tier scheme" }); return; }
     const k = bdr+"|"+hit.tier+"|"+hit.list_name;
     const a = agg[k] || (agg[k] = { bdr, tier:hit.tier, list:hit.list_name, dials:0, connects:0, conversations:0, from:[] });
@@ -700,6 +755,22 @@ function wire(){
   sec.addEventListener("dragover", e=>{ e.preventDefault(); });
   sec.addEventListener("drop", e=>{ if(e.target.closest("#crDrop")) return; e.preventDefault(); const f = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0]; onFile(f); });
 }
+function syncTeam(){
+  document.querySelectorAll("#crTeam button").forEach(b=>b.setAttribute("aria-pressed", String(b.dataset.t === S.team)));
+  $("crTitle").textContent = cst() ? "Connect rate · CST" : "Connect rate";
+}
+document.querySelectorAll("#crTeam button").forEach(b=>{ b.onclick = async () => {
+  if(S.team === b.dataset.t) return;
+  S.team = b.dataset.t;
+  try{ localStorage.setItem("rev_team", S.team); }catch(e){}
+  S.data = null; S.week = null; S.p = null; S.open = {}; S.parsed = null; S.file = ""; $("crFile").value = "";
+  $("crPreview").innerHTML = ""; syncTeam();
+  $("crTiles").innerHTML = ""; $("crTable").innerHTML = '<tbody><tr><td class="empty">Loading…</td></tr></tbody>';
+  try{ await load(); render(); }
+  catch(e){ $("crTable").innerHTML = '<tbody><tr><td class="empty">Could not load the connect rate data: '+h(e.message)+'</td></tr></tbody>'; }
+}; });
+try{ S.team = localStorage.getItem("rev_team") === "cst" ? "cst" : "jf"; }catch(e){}
+syncTeam();
 wire();
 load().then(()=>{ render(); }).catch(e=>{
   $("crTable").innerHTML = '<tbody><tr><td class="empty">Could not load the connect rate data: '+h(e.message)+'</td></tr></tbody>';

@@ -470,20 +470,20 @@ function render(){
     tile("Outbound books", num(T.books), "") + tile("Inbound books", num(T.inb), "") + tile("7 Day TVL", T.leadN ? num(Math.round(T.leads/T.leadN)) : "–", T.leadN ? (isP ? "avg cold leads per BDR per week (parallel + power)" : "avg cold leads per BDR (parallel + power), across "+T.leadN+" BDRs") : "") +
     tile("RTB leads", num(T.rtb), T.leadN ? "avg "+num(Math.round(T.rtb/T.leadN))+" per BDR"+(isP ? " per week" : "") : "") + tile("Inbound leads", num(T.inl), T.leadN ? "avg "+num(Math.round(T.inl/T.leadN))+" per BDR"+(isP ? " per week" : "") : "");
 
-  let rows = '<thead><tr><th></th><th>Dials</th><th>Connects</th><th>Connect rate</th><th>Conversations</th><th>Outbound books</th></tr></thead><tbody>';
-  rows += '<tr class="team"><td>Team</td><td>'+num(T.d)+'</td><td>'+num(T.c)+'</td><td>'+rateCell(T.c,T.d)+'</td><td>'+num(T.v)+'</td><td>'+num(T.books)+'</td></tr>';
+  let rows = '<thead><tr><th></th><th>Dials</th><th>Connects</th><th>Connect rate</th><th>Conversations</th><th>Outbound books</th><th>Inbound books</th></tr></thead><tbody>';
+  rows += '<tr class="team"><td>Team</td><td>'+num(T.d)+'</td><td>'+num(T.c)+'</td><td>'+rateCell(T.c,T.d)+'</td><td>'+num(T.v)+'</td><td>'+num(T.books)+'</td><td>'+num(T.inb)+'</td></tr>';
   W.bdrs.forEach(b=>{
     const kb = "b:"+b.bdr, ob = !!S.open[kb];
-    rows += '<tr class="bdr"><td><button type="button" class="cr-tgl" data-k="'+h(kb)+'" aria-expanded="'+ob+'"><i>▸</i>'+h(b.bdr)+'</button></td><td>'+num(b.d)+'</td><td>'+num(b.c)+'</td><td>'+rateCell(b.c,b.d)+'</td><td>'+num(b.v)+'</td><td>'+num(b.books)+'</td></tr>';
+    rows += '<tr class="bdr"><td><button type="button" class="cr-tgl" data-k="'+h(kb)+'" aria-expanded="'+ob+'"><i>▸</i>'+h(b.bdr)+'</button></td><td>'+num(b.d)+'</td><td>'+num(b.c)+'</td><td>'+rateCell(b.c,b.d)+'</td><td>'+num(b.v)+'</td><td>'+num(b.books)+'</td><td>'+num(b.inb)+'</td></tr>';
     if(!ob) return;
     TIERS.forEach(tn=>{
       const t = b.tiers[tn]; if(!t) return;
       const kt = "t:"+b.bdr+":"+tn, ot = !!S.open[kt];
       const name = tn === "None" ? '<span class="cr-none">Books not tied to a tier list</span>' : h(tn);
-      rows += '<tr class="tier"><td><button type="button" class="cr-tgl" data-k="'+h(kt)+'" aria-expanded="'+ot+'"><i>▸</i>'+name+'</button></td><td>'+(tn==="None"?"":num(t.d))+'</td><td>'+(tn==="None"?"":num(t.c))+'</td><td>'+(tn==="None"?"":rateCell(t.c,t.d))+'</td><td>'+(tn==="None"?"":num(t.v))+'</td><td>'+num(t.books)+'</td></tr>';
+      rows += '<tr class="tier"><td><button type="button" class="cr-tgl" data-k="'+h(kt)+'" aria-expanded="'+ot+'"><i>▸</i>'+name+'</button></td><td>'+(tn==="None"?"":num(t.d))+'</td><td>'+(tn==="None"?"":num(t.c))+'</td><td>'+(tn==="None"?"":rateCell(t.c,t.d))+'</td><td>'+(tn==="None"?"":num(t.v))+'</td><td>'+num(t.books)+'</td><td></td></tr>';
       if(!ot) return;
       Object.values(t.lists).sort((x,y)=>y.d-x.d || y.books-x.books || x.name.localeCompare(y.name)).forEach(l=>{
-        rows += '<tr class="list"><td>'+h(l.name)+'</td><td>'+num(l.d)+'</td><td>'+num(l.c)+'</td><td>'+rateCell(l.c,l.d)+'</td><td>'+num(l.v)+'</td><td>'+num(l.books)+'</td></tr>';
+        rows += '<tr class="list"><td>'+h(l.name)+'</td><td>'+num(l.d)+'</td><td>'+num(l.c)+'</td><td>'+rateCell(l.c,l.d)+'</td><td>'+num(l.v)+'</td><td>'+num(l.books)+'</td><td></td></tr>';
       });
     });
   });

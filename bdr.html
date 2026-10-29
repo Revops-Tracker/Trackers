@@ -4,39 +4,44 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>BDR Shortfall Tracker</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Barlow:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
   :root {
-    --paper: #FAF9F7; --panel: #FFFFFF; --ink: #211E1D; --muted: #6E6660;
-    --line: #E4DFDA; --accent: #B4292F; --accent-soft: #F7E9E9;
-    --good: #2E7D4F; --good-soft: #E7F2EB; --bad: #B4292F; --bad-soft: #F7E9E9;
-    --input-bg: #FFFDF4; --input-line: #D8CFA8;
+    --paper: #EEF1F6; --panel: #FFFFFF; --ink: #14213D; --muted: #5B6782;
+    --line: #D9DFE9; --accent: #2F5BEA; --accent-soft: #E4EAFB;
+    --good: #1F8A5B; --good-soft: #E3F3EB; --bad: #C2410C; --bad-soft: #FBEAE2;
+    --input-bg: #FFFFFF; --input-line: #C5CEDF; --chip: #E4E9F1;
+    --display: "Barlow Condensed", "Arial Narrow", Arial, sans-serif;
+    --body: "Barlow", "Segoe UI", Helvetica, Arial, sans-serif;
   }
   @media (prefers-color-scheme: dark) {
     :root {
-      --paper: #171514; --panel: #201D1C; --ink: #EDE8E4; --muted: #9C948D;
-      --line: #383331; --accent: #E06A6E; --accent-soft: #3A2425;
-      --good: #6FBF8F; --good-soft: #21352A; --bad: #E06A6E; --bad-soft: #3A2425;
-      --input-bg: #262320; --input-line: #55503E;
+      --paper: #0F1626; --panel: #172036; --ink: #E8ECF5; --muted: #97A3BD;
+      --line: #26324D; --accent: #6E8EFF; --accent-soft: #2E3D66;
+      --good: #4CC38A; --good-soft: #1B3A31; --bad: #F08A5D; --bad-soft: #3D2A24;
+      --input-bg: #1E2A44; --input-line: #3A4A70; --chip: #222D45;
     }
   }
   * { box-sizing: border-box; }
   body { margin: 0; background: var(--paper); color: var(--ink);
-    font: 15px/1.5 "Seravek", "Segoe UI", system-ui, sans-serif; }
+    font: 16px/1.45 var(--body); }
   .wrap { max-width: 1060px; margin: 0 auto; padding: 28px 20px 60px; }
-  header h1 { font-size: 26px; margin: 0 0 2px; letter-spacing: -0.01em; }
+  header h1 { font-family: var(--display); font-weight: 700; font-size: clamp(34px, 5vw, 48px); line-height: 1; margin: 0 0 4px; letter-spacing: -0.01em; }
   header p { margin: 0 0 20px; color: var(--muted); font-size: 14px; }
   .tabs { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 20px; }
-  .tab { border: 1px solid var(--line); background: var(--panel); color: var(--ink);
+  .tab { border: 1px solid var(--line); background: var(--panel); color: var(--muted);
     padding: 7px 16px; border-radius: 999px; cursor: pointer; font: inherit; font-size: 14px; }
   .tab:hover { border-color: var(--accent); }
-  .tab.active { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 600; }
+  .tab.active { background: var(--ink); border-color: var(--ink); color: var(--paper); font-weight: 600; }
   .tab:focus-visible, button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
   .cols { display: grid; grid-template-columns: 340px 1fr; gap: 20px; align-items: start; }
   @media (max-width: 840px) { .cols { grid-template-columns: 1fr; } }
-  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 18px; }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 18px; }
   .card + .card { margin-top: 20px; }
-  .card h2 { margin: 0 0 12px; font-size: 11.5px; text-transform: uppercase; letter-spacing: 0.09em;
-    color: var(--accent); font-weight: 700; }
+  .card h2 { margin: 0 0 12px; font-family: var(--display); font-size: 22px; font-weight: 700;
+    color: var(--ink); letter-spacing: 0; }
   .row { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 5px 0; }
   input[type="number"], input[type="date"] { font: inherit; color: var(--ink); background: var(--input-bg);
     border: 1px solid var(--input-line); border-radius: 6px; padding: 5px 9px; width: 110px;
@@ -45,7 +50,7 @@
   .stat { background: var(--panel); border: 1px solid var(--line); border-radius: 10px;
     padding: 12px 18px; min-width: 128px; flex: 1; }
   .stat .k { font-size: 11.5px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); }
-  .stat .v { font-size: 25px; font-weight: 700; font-variant-numeric: tabular-nums; line-height: 1.25; }
+  .stat .v { font-family: var(--display); font-size: 32px; font-weight: 700; font-variant-numeric: tabular-nums; line-height: 1.25; }
   .stat .sub { font-size: 12.5px; color: var(--muted); }
   .pill { display: inline-block; padding: 3px 12px; border-radius: 999px; font-size: 13px; font-weight: 700; }
   .pill.good { background: var(--good-soft); color: var(--good); }
@@ -80,7 +85,7 @@
     font-size: 14px; opacity: 0; transition: opacity 0.25s; pointer-events: none; }
   .toast.show { opacity: 1; }
   .ratebig { font-size: 19px; font-weight: 700; font-variant-numeric: tabular-nums; }
-  .big-total { font-size: 24px; font-weight: 700; font-variant-numeric: tabular-nums; color: var(--accent); }
+  .big-total { font-family: var(--display); font-size: 30px; font-weight: 700; font-variant-numeric: tabular-nums; color: var(--accent); }
   .loading { color: var(--muted); padding: 40px 0; text-align: center; }
   .subhead { font-size: 12px; text-transform: uppercase; letter-spacing: 0.07em; color: var(--muted);
     font-weight: 600; margin: 14px 0 2px; padding-top: 10px; border-top: 1px dashed var(--line); }
@@ -97,7 +102,7 @@
   .seg { display: inline-flex; border: 1px solid var(--line); border-radius: 999px; overflow: hidden; background: var(--panel); }
   .seg button { font: inherit; font-size: 13.5px; border: none; background: none; color: var(--ink); padding: 6px 16px; cursor: pointer; }
   .seg button + button { border-left: 1px solid var(--line); }
-  .seg button.on { background: var(--accent); color: #fff; font-weight: 600; }
+  .seg button.on { background: var(--ink); color: var(--paper); font-weight: 600; }
   .hbar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 4px; }
   .hbar .label { font-size: 17px; font-weight: 700; min-width: 190px; text-align: center; }
   .trend { display: flex; align-items: flex-end; gap: 8px; height: 150px; margin-top: 12px; }
@@ -108,6 +113,24 @@
   .trend .n { font-size: 12px; font-variant-numeric: tabular-nums; color: var(--muted); margin-bottom: 3px; }
   .trend .col.sel .n { color: var(--ink); font-weight: 700; }
   .trend .l { font-size: 11px; color: var(--muted); margin-top: 5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+  .ls-bar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 16px; }
+  .ls-bar .label { font-family: var(--display); font-size: 22px; font-weight: 700; min-width: 170px; text-align: center; }
+  .ls-nav { width: 36px; height: 36px; border-radius: 8px; border: 1px solid var(--line); background: var(--panel); color: var(--ink); cursor: pointer; font-size: 18px; line-height: 1; }
+  .ls-nav[disabled] { opacity: 0.35; cursor: default; }
+  td.tierhead { text-align: left; font-weight: 700; font-size: 12px; text-transform: uppercase; letter-spacing: 0.07em; color: var(--muted); background: var(--paper); }
+  .st { display: inline-block; padding: 2px 10px; border-radius: 999px; font-size: 12.5px; font-weight: 700; white-space: nowrap; }
+  .st.ok { background: var(--good-soft); color: var(--good); }
+  .st.miss { background: var(--bad-soft); color: var(--bad); }
+  td.whycell { text-align: left; min-width: 260px; }
+  input.note { width: 100%; font: inherit; font-size: 14px; color: var(--ink); background: var(--input-bg); border: 1px solid var(--input-line); border-radius: 8px; padding: 6px 10px; }
+  input.note.need { border-color: var(--bad); }
+  input.note[disabled] { background: none; border-color: transparent; padding-left: 0; }
+  .grid td, .grid th { text-align: center; }
+  .grid td:first-child, .grid th:first-child { text-align: left; }
+  .grid .why { display: block; font-size: 12px; color: var(--muted); font-style: italic; margin-top: 2px; white-space: normal; max-width: 220px; margin-left: auto; margin-right: auto; }
+  .grid .nd { color: var(--bad); font-weight: 700; }
+  .ls-sum { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 14px; }
+  .ls-sum .stat { min-width: 150px; flex: 0 1 200px; }
   .pctu { display: block; font-size: 11.5px; color: var(--muted); font-weight: 400; line-height: 1.3; }
 </style>
 </head>
@@ -128,6 +151,7 @@
   // this when a rep is converting well — the floor still stands, so it overrides the calculation.
   var DIAL_FLOOR = 780;
   var state = null;
+  var me = null; // signed-in person: { email, rep, role }
   // Reps who have left: hidden from the live tabs and summary, but their entries stay in History.
   var RETIRED = ['Jules', 'Erich'];
   var horizons = {};
@@ -303,7 +327,12 @@
     return api('/api/state').then(function (s) {
       s.retired = s.settings.filter(function (x) { return RETIRED.indexOf(x.rep) !== -1; });
       s.settings = s.settings.filter(function (x) { return RETIRED.indexOf(x.rep) === -1; });
-      state = s; render();
+      state = s;
+      // List data + who I am are extras: if they fail the rest of the tracker still works.
+      return Promise.all([
+        api('/api/lists').then(function (l) { state.lists = l; }).catch(function (e) { state.lists = null; state.listsErr = e.message; }),
+        me ? null : fetch('/auth/me').then(function (r) { return r.json(); }).then(function (u) { me = u; }).catch(function () {})
+      ]).then(render);
     })
       .catch(function (e) {
         document.getElementById('view').innerHTML =
@@ -905,13 +934,148 @@
     };
   }
 
+  // ---------- Lists tab: which tier lists each BDR dialed, and why not ----------
+  // Dials per list come from the weekly Nooks upload (same data as the RevOps L10 "Lists not dialed").
+  // A week belongs to the month its Monday falls in. Reasons are saved per rep + month + list.
+  var lv = { kind: 'month', offset: 0 };
+  var WHY_OPTS = ['List was empty', 'Nooks tasks not loaded', 'Ran out of time', 'Prioritized other lists', 'Blocked / tool issue', 'Out of office'];
+  function mondayOf(we) { var d = parse(we); d.setDate(d.getDate() - 5); return d; }
+  function monthKey(d) { return d.getFullYear() + '-' + ('0' + (d.getMonth() + 1)).slice(-2); }
+  function shortDate(d) { return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' }); }
+  function listPeriod() {
+    var weeks = [];
+    state.lists.rows.forEach(function (r) { if (weeks.indexOf(r.week_ending) === -1) weeks.push(r.week_ending); });
+    weeks.sort().reverse();
+    if (!weeks.length) return null;
+    var items;
+    if (lv.kind === 'week') {
+      items = weeks.map(function (we) {
+        var m = mondayOf(we);
+        return { key: monthKey(m), label: shortDate(m) + ' – ' + shortDate(parse(we)), weeks: [we] };
+      });
+    } else {
+      items = [];
+      weeks.forEach(function (we) {
+        var k = monthKey(mondayOf(we));
+        var it = items.find(function (x) { return x.key === k; });
+        if (!it) {
+          var p = k.split('-');
+          it = { key: k, label: new Date(+p[0], +p[1] - 1, 1).toLocaleDateString(undefined, { month: 'long', year: 'numeric' }), weeks: [] };
+          items.push(it);
+        }
+        it.weeks.push(we);
+      });
+    }
+    var i = Math.max(0, Math.min(lv.offset, items.length - 1));
+    lv.offset = i;
+    return { key: items[i].key, label: items[i].label, weeks: items[i].weeks, hasOlder: i < items.length - 1, hasNewer: i > 0 };
+  }
+  function noteFor(rep, key, tier, list) {
+    var n = state.lists.notes.find(function (x) {
+      return x.rep === rep && x.period_key === key && x.tier === tier && x.list_name === list;
+    });
+    return n ? n.note : '';
+  }
+  function canEditNotes(rep) { return !!me && (me.role === 'admin' || me.rep === rep); }
+
+  function renderLists(host, mode, who) {
+    var v = document.createElement('div');
+    v.className = 'lists-sec';
+    v.style.marginTop = '20px';
+    host.appendChild(v);
+    if (!state.lists) {
+      v.innerHTML = '<div class="card"><h2>Lists</h2><p class="hint">Could not load list data' + (state.listsErr ? ' (' + esc(state.listsErr) + ')' : '') + '. Refresh to retry.</p></div>';
+      return;
+    }
+    var P = listPeriod();
+    if (!P) { v.innerHTML = '<div class="card"><h2>Lists</h2><p class="hint">No list data has been uploaded yet.</p></div>'; return; }
+    var reps = state.settings.map(function (s) { return s.rep; });
+    var shown = mode === 'rep' ? [who] : reps;
+    var tl = state.lists.tierLists.slice().sort(function (a, b) { return a.tier.localeCompare(b.tier) || a.list_name.localeCompare(b.list_name); });
+    var agg = {};
+    state.lists.rows.forEach(function (r) {
+      if (P.weeks.indexOf(r.week_ending) === -1) return;
+      var k = r.bdr + '|' + r.tier + '|' + r.list_name;
+      var a = agg[k] || (agg[k] = { d: 0, c: 0 });
+      a.d += Number(r.dials || 0); a.c += Number(r.connects || 0);
+    });
+    function dials(rep, l) { return (agg[rep + '|' + l.tier + '|' + l.list_name] || { d: 0 }).d; }
+    var hasData = {};
+    state.lists.rows.forEach(function (r) { if (P.weeks.indexOf(r.week_ending) !== -1) hasData[r.bdr] = true; });
+
+    var bar = '<div class="ls-bar"><div class="seg">'
+      + [['month', 'Month'], ['week', 'Week']].map(function (k) { return "<button data-kind='" + k[0] + "' class='" + (lv.kind === k[0] ? 'on' : '') + "'>" + k[1] + '</button>'; }).join('')
+      + '</div><button class="ls-nav" id="ls-older" aria-label="Older"' + (P.hasOlder ? '' : ' disabled') + '>&lsaquo;</button>'
+      + '<div class="label">' + esc(P.label) + '</div>'
+      + '<button class="ls-nav" id="ls-newer" aria-label="Newer"' + (P.hasNewer ? '' : ' disabled') + '>&rsaquo;</button></div>';
+
+    var tiles = '<div class="ls-sum">' + shown.map(function (r) {
+      if (!hasData[r]) return '<div class="stat"><div class="k">' + esc(r) + '</div><div class="v">&mdash;</div><div class="sub">No upload for this period</div></div>';
+      var missed = tl.filter(function (l) { return dials(r, l) === 0; });
+      var t1 = missed.filter(function (l) { return l.tier === 'Tier 1'; }).length;
+      return '<div class="stat"><div class="k">' + esc(r) + ' &mdash; lists dialed</div><div class="v">' + (tl.length - missed.length) + ' / ' + tl.length + '</div>'
+        + '<div class="sub">' + (missed.length ? '<span class="pill bad">' + missed.length + ' not dialed' + (t1 ? ' (' + t1 + ' in Tier 1)' : '') + '</span>' : '<span class="pill good">Dialed every list</span>') + '</div></div>';
+    }).join('') + '</div>';
+
+    function cell(rep, l) {
+      if (!hasData[rep]) return '<td class="dim">&mdash;</td>';
+      var d = dials(rep, l), why = noteFor(rep, P.key, l.tier, l.list_name);
+      return '<td>' + (d > 0 ? f0(d) : '<span class="nd">Not dialed</span>') + (why ? '<span class="why">' + esc(why) + '</span>' : '') + '</td>';
+    }
+    var grid = '<div class="card"><h2>Who dialed what &mdash; ' + esc(P.label) + '</h2><div class="tablewrap"><table class="grid"><thead><tr><th>List</th>'
+      + reps.map(function (r) { return '<th>' + esc(r) + '</th>'; }).join('') + '</tr></thead><tbody>'
+      + tl.map(function (l, i) {
+        var head = (i === 0 || tl[i - 1].tier !== l.tier) ? '<tr><td class="tierhead" colspan="' + (reps.length + 1) + '">' + esc(l.tier) + '</td></tr>' : '';
+        return head + '<tr><td>' + esc(l.list_name) + '</td>' + reps.map(function (r) { return cell(r, l); }).join('') + '</tr>';
+      }).join('')
+      + '</tbody></table></div><p class="hint">Dials per list from the weekly Nooks upload. Each BDR writes the reasons in their own tab; they show here for the whole team.</p></div>';
+
+    var datalist = '<datalist id="why-opts">' + WHY_OPTS.map(function (o) { return '<option value="' + esc(o) + '">'; }).join('') + '</datalist>';
+
+    var cards = shown.map(function (r) {
+      if (!hasData[r]) return '';
+      var ed = canEditNotes(r);
+      var rows = tl.map(function (l, i) {
+        var a = agg[r + '|' + l.tier + '|' + l.list_name] || { d: 0, c: 0 };
+        var miss = a.d === 0, why = noteFor(r, P.key, l.tier, l.list_name);
+        var head = (i === 0 || tl[i - 1].tier !== l.tier) ? '<tr><td class="tierhead" colspan="5">' + esc(l.tier) + '</td></tr>' : '';
+        var input = '<input class="note' + (miss && !why && ed ? ' need' : '') + '" list="why-opts" maxlength="500" data-rep="' + esc(r) + '" data-tier="' + esc(l.tier) + '" data-list="' + esc(l.list_name) + '"'
+          + ' value="' + esc(why) + '" placeholder="' + (ed ? (miss ? 'Why wasn’t this dialed?' : 'Optional note') : '') + '"' + (ed ? '' : ' disabled') + '>';
+        return head + '<tr><td>' + esc(l.list_name) + '</td><td>' + f0(a.d) + '</td><td>' + (a.d ? pct(a.c, a.d) : '&mdash;') + '</td>'
+          + '<td><span class="st ' + (miss ? 'miss' : 'ok') + '">' + (miss ? 'Not dialed' : 'Dialed') + '</span></td><td class="whycell">' + input + '</td></tr>';
+      }).join('');
+      return '<div class="card"><h2>' + esc(r) + ' &mdash; ' + esc(P.label) + '</h2><div class="tablewrap"><table><thead><tr><th>List</th><th>Dials</th><th>Connect rate</th><th>Status</th><th style="text-align:left">Why</th></tr></thead><tbody>'
+        + rows + '</tbody></table></div>' + (ed ? '<p class="hint">Reasons save when you leave the box and stay on the whole month (' + esc(P.key) + ').</p>' : '') + '</div>';
+    }).join('<div style="height:20px"></div>');
+
+    v.innerHTML = bar + tiles + (mode === 'rep' ? '' : grid + '<div style="height:20px"></div>') + (mode === 'rep' ? cards : '') + datalist;
+
+    v.querySelectorAll('.seg button').forEach(function (b) { b.onclick = function () { lv.kind = b.dataset.kind; lv.offset = 0; render(); }; });
+    var o = document.getElementById('ls-older'), n = document.getElementById('ls-newer');
+    if (o) o.onclick = function () { lv.offset++; render(); };
+    if (n) n.onclick = function () { lv.offset = Math.max(0, lv.offset - 1); render(); };
+    v.querySelectorAll('input.note').forEach(function (inp) {
+      inp.onchange = function () {
+        var body = { rep: inp.dataset.rep, period_key: P.key, tier: inp.dataset.tier, list_name: inp.dataset.list, note: inp.value, by: me ? me.email : inp.dataset.rep };
+        api('/api/list-note', body).then(function () {
+          state.lists.notes = state.lists.notes.filter(function (x) {
+            return !(x.rep === body.rep && x.period_key === body.period_key && x.tier === body.tier && x.list_name === body.list_name);
+          });
+          if (body.note.trim()) state.lists.notes.push({ rep: body.rep, period_key: body.period_key, tier: body.tier, list_name: body.list_name, note: body.note.trim() });
+          inp.classList.remove('need');
+          toast(body.note.trim() ? 'Reason saved' : 'Reason cleared');
+        }).catch(function (e) { toast('Save failed: ' + e.message); });
+      };
+    });
+  }
+
   function render() {
     renderTabs();
     var v = document.getElementById('view');
     if (active !== 'summary' && active !== 'history' && !state.settings.some(function (s) { return s.rep === active; })) active = 'summary';
-    if (active === 'summary') renderSummary(v);
+    if (active === 'summary') { renderSummary(v); renderLists(v, 'team'); }
     else if (active === 'history') renderHistory(v);
-    else renderRep(v, active);
+    else { renderRep(v, active); renderLists(v, 'rep', active); }
   }
 
   load();

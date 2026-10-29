@@ -1029,20 +1029,23 @@
       var d = dials(rep, l), why = noteFor(rep, P.key, l.tier, l.list_name);
       return '<td>' + (d > 0 ? f0(d) : '<span class="nd">Not dialed</span>') + (why ? '<span class="why">' + esc(why) + '</span>' : '') + '</td>';
     }
+    // one rep on the CST line: just Dials and CR (no separate team columns that would repeat the same numbers)
+    var single = reps.length === 1;
     var grid = '<div class="card"><h2>Who dialed what &mdash; ' + esc(P.label) + '</h2><div class="tablewrap"><table class="grid"><thead><tr><th>List</th>'
-      + reps.map(function (r) { return '<th>' + esc(r) + '</th>'; }).join('') + '<th>Team dials</th><th>Team CR</th></tr></thead><tbody>'
+      + (single ? '<th>Dials</th><th>CR</th>' : reps.map(function (r) { return '<th>' + esc(r) + '</th>'; }).join('') + '<th>Team dials</th><th>Team CR</th>') + '</tr></thead><tbody>'
       + tl.map(function (l, i) {
-        var head = (i === 0 || tl[i - 1].tier !== l.tier) ? '<tr><td class="tierhead" colspan="' + (reps.length + 3) + '">' + esc(l.tier) + '</td></tr>' : '';
+        var head = (i === 0 || tl[i - 1].tier !== l.tier) ? '<tr><td class="tierhead" colspan="' + (single ? 3 : reps.length + 3) + '">' + esc(l.tier) + '</td></tr>' : '';
         var t = team(l);
+        var crc = '<td>' + (t.d ? '<b>' + pct(t.c, t.d) + '</b>' : '&mdash;') + '</td>';
         return head + '<tr><td>' + esc(l.list_name) + '</td>' + reps.map(function (r) { return cell(r, l); }).join('')
-          + '<td>' + f0(t.d) + '</td><td>' + (t.d ? '<b>' + pct(t.c, t.d) + '</b>' : '&mdash;') + '</td></tr>';
+          + (single ? '' : '<td>' + f0(t.d) + '</td>') + crc + '</tr>';
       }).join('')
       + (function () {
         var T = { d: 0, c: 0 };
         tl.forEach(function (l) { var t = team(l); T.d += t.d; T.c += t.c; });
-        return '<tr class="total"><td>All lists</td>' + reps.map(function () { return '<td></td>'; }).join('') + '<td>' + f0(T.d) + '</td><td>' + (T.d ? pct(T.c, T.d) : '&mdash;') + '</td></tr>';
+        return '<tr class="total"><td>All lists</td>' + (single ? '<td>' + f0(T.d) + '</td>' : reps.map(function () { return '<td></td>'; }).join('') + '<td>' + f0(T.d) + '</td>') + '<td>' + (T.d ? pct(T.c, T.d) : '&mdash;') + '</td></tr>';
       })()
-      + '</tbody></table></div><p class="hint">Dials per list from the weekly Nooks upload. Team CR = connects &divide; dials on that list. Each rep writes the reasons in their own tab; they show here for the whole team.</p></div>';
+      + '</tbody></table></div><p class="hint">Dials per list from the weekly Nooks upload. CR = connects &divide; dials on that list. Each rep writes the reasons in their own tab; they show here for the whole team.</p></div>';
 
     var datalist = '<datalist id="why-opts">' + WHY_OPTS.map(function (o) { return '<option value="' + esc(o) + '">'; }).join('') + '</datalist>';
 

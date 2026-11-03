@@ -1089,7 +1089,7 @@
     // call outcomes per list (Nooks Calls Library upload), split like dials for weeks that straddle two months
     var dsp = {};
     (state.lists.dispositions || []).forEach(function (r) {
-      if (P.weeks.indexOf(r.week_ending) === -1) return;
+      if (P.weeks.indexOf(r.week_ending) === -1 || /wrong\s*number/i.test(r.disposition)) return;   // wrong numbers are not connects
       var wgt = P.wts[r.week_ending] == null ? 1 : P.wts[r.week_ending];
       var o = dsp[r.tier + '|' + r.list_name] || (dsp[r.tier + '|' + r.list_name] = {});
       var d = o[r.disposition] || (o[r.disposition] = {});

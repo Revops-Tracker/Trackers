@@ -116,6 +116,9 @@
   .flag-section-title { font-size: 11.5px; text-transform: uppercase; letter-spacing: .08em; color: var(--accent);
     font-weight: 700; margin: 18px 0 8px; }
   .flag-section-title:first-child { margin-top: 0; }
+  .flag-section-title.collapsible { cursor: pointer; display: flex; align-items: center; gap: 7px; user-select: none; }
+  .flag-section-title.collapsible:hover { color: var(--ink); }
+  .section-arrow { display: inline-block; width: 10px; font-size: 10px; }
 </style>
 </head>
 <body>
@@ -443,10 +446,28 @@ function bulkReassignControl(flags) {
   };
 }
 
-function flagSectionTitle(type, count) {
+var collapsedSections = {};
+
+function flagSectionTitle(type, count, section) {
   var h = document.createElement("div");
-  h.className = "flag-section-title";
-  h.textContent = FLAG_TYPE_LABELS[type] + " (" + count + ")";
+  h.className = "flag-section-title collapsible";
+  var arrow = document.createElement("span");
+  arrow.className = "section-arrow";
+  var label = document.createElement("span");
+  label.textContent = FLAG_TYPE_LABELS[type] + " (" + count + ")";
+  h.appendChild(arrow);
+  h.appendChild(label);
+
+  function applyState() {
+    var collapsed = !!collapsedSections[type];
+    section.style.display = collapsed ? "none" : "";
+    arrow.textContent = collapsed ? "▸" : "▾";
+  }
+  applyState();
+  h.onclick = function () {
+    collapsedSections[type] = !collapsedSections[type];
+    applyState();
+  };
   return h;
 }
 
@@ -466,8 +487,8 @@ function loadFlags() {
 
     typesPresent.forEach(function (type) {
       var list = byType[type];
-      if (typesPresent.length > 1) box.appendChild(flagSectionTitle(type, list.length));
       var section = document.createElement("div");
+      if (typesPresent.length > 1) box.appendChild(flagSectionTitle(type, list.length, section));
       box.appendChild(section);
 
       if (type === "duplicate") {

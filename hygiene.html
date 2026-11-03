@@ -1,0 +1,730 @@
+<!doctype html>
+<html lang="en">
+<head>
+<script>window.JF_PAGE='hygiene'</script><script src="config.js"></script><script src="sso.js"></script>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CRM Hygiene</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+<style>
+  :root {
+    --paper: #FAF9F7; --panel: #FFFFFF; --ink: #211E1D; --muted: #6E6660;
+    --line: #E4DFDA; --accent: #B4292F; --accent-soft: #F7E9E9;
+    --good: #2E7D4F; --good-soft: #E7F2EB; --bad: #B4292F; --bad-soft: #F7E9E9;
+    --warn: #B4802F; --warn-soft: #F7F0E9;
+    --input-bg: #FFFDF4; --input-line: #D8CFA8;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --paper: #171514; --panel: #201D1C; --ink: #EDE8E4; --muted: #9C948D;
+      --line: #383331; --accent: #E06A6E; --accent-soft: #3A2425;
+      --good: #6FBF8F; --good-soft: #21352A; --bad: #E06A6E; --bad-soft: #3A2425;
+      --warn: #D9A355; --warn-soft: #362C1C;
+      --input-bg: #262320; --input-line: #55503E;
+    }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--paper); color: var(--ink);
+    font: 15px/1.5 "Seravek", "Segoe UI", system-ui, sans-serif; }
+  .wrap { max-width: 1100px; margin: 0 auto; padding: 28px 20px 80px; }
+  header h1 { font-size: 26px; margin: 0 0 2px; letter-spacing: -0.01em; }
+  header p { margin: 0 0 20px; color: var(--muted); font-size: 14px; }
+  .statusbar { display: flex; gap: 14px; flex-wrap: wrap; margin-bottom: 20px; }
+  .stat { background: var(--panel); border: 1px solid var(--line); border-radius: 10px;
+    padding: 12px 18px; min-width: 128px; flex: 1; cursor: pointer; }
+  .stat.active { border-color: var(--accent); }
+  .stat .k { font-size: 11.5px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); }
+  .stat .v { font-size: 25px; font-weight: 700; font-variant-numeric: tabular-nums; line-height: 1.25; }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 18px; }
+  .card + .card { margin-top: 20px; }
+  .card h2 { margin: 0 0 12px; font-size: 11.5px; text-transform: uppercase; letter-spacing: 0.09em;
+    color: var(--accent); font-weight: 700; }
+  .toolbar { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-bottom: 14px; }
+  select, input[type=text] { font: inherit; color: var(--ink); background: var(--input-bg);
+    border: 1px solid var(--input-line); border-radius: 6px; padding: 5px 9px; }
+  button { font: inherit; border: 1px solid var(--line); background: var(--panel); color: var(--ink);
+    padding: 6px 14px; border-radius: 7px; cursor: pointer; }
+  button:hover { border-color: var(--accent); }
+  button.primary { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 600; }
+  button:disabled { opacity: .5; cursor: default; }
+  .flag { border: 1px solid var(--line); border-radius: 9px; padding: 12px 14px; margin-bottom: 10px; }
+  .flag .top { display: flex; justify-content: space-between; gap: 10px; align-items: center; }
+  .flag .name { font-weight: 600; }
+  .flag .meta { color: var(--muted); font-size: 13px; margin-top: 2px; }
+  .flag .actions { display: flex; gap: 8px; margin-top: 10px; align-items: center; }
+  .pill { display: inline-block; padding: 2px 10px; border-radius: 999px; font-size: 12px; font-weight: 700; }
+  .pill.pending { background: var(--warn-soft); color: var(--warn); }
+  .pill.dismissed, .pill.auto_resolved { background: var(--line); color: var(--muted); }
+  .pill.applied { background: var(--good-soft); color: var(--good); }
+  .empty { color: var(--muted); padding: 20px 0; text-align: center; }
+  .roster-row { display: flex; gap: 10px; align-items: center; padding: 6px 0; border-bottom: 1px solid var(--line); }
+  .roster-row:last-child { border-bottom: none; }
+  .muted { color: var(--muted); font-size: 13px; }
+  a { color: var(--accent); }
+  .msg { font-size: 13px; margin-left: 8px; }
+  .msg.err { color: var(--bad); }
+  .msg.ok { color: var(--good); }
+  .kpi-row { display: flex; gap: 14px; flex-wrap: wrap; margin-bottom: 20px; }
+  .kpi { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 14px 18px; min-width: 150px; flex: 1; }
+  .kpi .k { font-size: 11.5px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); }
+  .kpi .v { font-size: 26px; font-weight: 700; font-variant-numeric: tabular-nums; line-height: 1.3; }
+  .kpi .d { font-size: 12.5px; margin-top: 2px; }
+  .kpi .d.up { color: var(--good); }
+  .kpi .d.down { color: var(--bad); }
+  .chart-wrap { position: relative; height: 260px; }
+  .table-wrap { overflow-x: auto; }
+  table.deals { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+  table.deals th { text-align: left; color: var(--muted); font-size: 11.5px; text-transform: uppercase; letter-spacing: 0.06em; padding: 6px 10px; border-bottom: 1px solid var(--line); }
+  table.deals td { padding: 7px 10px; border-bottom: 1px solid var(--line); }
+  table.deals tr:last-child td { border-bottom: none; }
+  .daypill { padding: 2px 9px; border-radius: 999px; font-weight: 700; font-size: 12px; }
+  .daypill.ok { background: var(--good-soft); color: var(--good); }
+  .daypill.warn { background: var(--warn-soft); color: var(--warn); }
+  .daypill.bad { background: var(--bad-soft); color: var(--bad); }
+
+  .quicknav { display: flex; gap: 20px; margin-bottom: 24px; border-bottom: 1px solid var(--line); padding-bottom: 12px; }
+  .quicknav a { color: var(--muted); font-size: 12.5px; font-weight: 700; text-decoration: none; text-transform: uppercase; letter-spacing: .06em; }
+  .quicknav a:hover { color: var(--accent); }
+  .section-title { font-size: 12px; text-transform: uppercase; letter-spacing: .11em; color: var(--muted);
+    font-weight: 700; margin: 44px 0 16px; display: flex; align-items: center; gap: 12px; }
+  .section-title::after { content: ""; flex: 1; height: 1px; background: var(--line); }
+  .section-title:first-child { margin-top: 0; }
+  .section-sub { margin: -10px 0 16px; color: var(--muted); font-size: 13px; }
+
+  .flag { border-left: 3px solid var(--line); }
+  .flag[data-type="unowned"] { border-left-color: var(--warn); }
+  .flag[data-type="stale_owner"] { border-left-color: var(--warn); }
+  .flag[data-type="stale"] { border-left-color: var(--muted); }
+  .flag[data-type="duplicate"] { border-left-color: var(--accent); }
+  .flag[data-type="distribution"] { border-left-color: var(--good); }
+  .flag.nested { margin: 8px 0 0; border-radius: 7px; }
+  .dup-group { padding-bottom: 10px; }
+  .dup-list { margin-top: 10px; padding-left: 2px; }
+  button.small { padding: 4px 10px; font-size: 12.5px; }
+  button.danger:hover { border-color: var(--bad); color: var(--bad); }
+
+  .reason-row { display: flex; justify-content: space-between; gap: 10px; padding: 8px 2px; border-bottom: 1px solid var(--line); }
+  .reason-row:last-child { border-bottom: none; }
+  .reason-row .rk { font-size: 14px; }
+  .reason-row .rv { font-weight: 700; font-variant-numeric: tabular-nums; }
+  .reason-row.clickable { cursor: pointer; }
+  .reason-row.clickable:hover .rk { color: var(--accent); }
+  .reason-row.active .rk { color: var(--accent); font-weight: 600; }
+  .excl-prompt { color: var(--muted); padding: 24px 0; text-align: center; font-size: 13.5px; }
+  .excl-note { font-size: 12.5px; color: var(--muted); margin-top: 10px; }
+
+  .flag-section-title { font-size: 11.5px; text-transform: uppercase; letter-spacing: .08em; color: var(--accent);
+    font-weight: 700; margin: 18px 0 8px; }
+  .flag-section-title:first-child { margin-top: 0; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>CRM Hygiene</h1>
+    <p id="scanInfo">Loading…</p>
+  </header>
+
+  <nav class="quicknav">
+    <a href="#flags-section">Flags</a>
+    <a href="#msp-section">MSP Analytics</a>
+    <a href="#excl-section">Excluded Companies</a>
+  </nav>
+
+  <div id="flagsTab">
+    <h2 id="flags-section" class="section-title">Flags</h2>
+    <div class="statusbar" id="stats"></div>
+
+    <div class="card" id="adminCard" style="display:none">
+      <h2>Admin</h2>
+      <div class="toolbar">
+        <button class="primary" id="runScanBtn">Run scan now</button>
+        <span class="msg" id="scanMsg"></span>
+        <button id="rosterToggle" style="margin-left:auto">BDR roster</button>
+      </div>
+      <div id="rosterBox" style="display:none;margin-top:10px">
+        <div id="rosterList"></div>
+        <div class="toolbar" style="margin-top:10px">
+          <input type="text" id="newOwnerId" placeholder="HubSpot owner id" style="width:160px">
+          <input type="text" id="newOwnerName" placeholder="Name" style="width:160px">
+          <button id="addRosterBtn">Add</button>
+          <span class="msg" id="rosterMsg"></span>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="toolbar">
+        <select id="statusFilter">
+          <option value="pending" selected>Pending</option>
+          <option value="dismissed">Dismissed</option>
+          <option value="applied">Applied</option>
+          <option value="auto_resolved">Auto-resolved</option>
+          <option value="">All statuses</option>
+        </select>
+        <select id="typeFilter">
+          <option value="">All types</option>
+          <option value="unowned">Unowned</option>
+          <option value="stale_owner">Stale owner</option>
+          <option value="distribution">Distribution</option>
+          <option value="stale">Stale</option>
+          <option value="duplicate">Duplicate</option>
+        </select>
+        <button id="refreshBtn" style="margin-left:auto">Refresh</button>
+      </div>
+      <div id="flags"></div>
+    </div>
+  </div>
+
+  <div id="mspTab">
+    <h2 id="msp-section" class="section-title">MSP Analytics</h2>
+    <p id="mspInfo" class="section-sub">Loading…</p>
+    <div class="kpi-row" id="mspKpis"></div>
+    <div class="card">
+      <h2>New MSP companies per week</h2>
+      <div class="chart-wrap"><canvas id="mspTrendChart"></canvas></div>
+    </div>
+    <div class="card">
+      <h2>Retainer pipeline — deals by stage</h2>
+      <div class="chart-wrap"><canvas id="mspStageChart"></canvas></div>
+    </div>
+    <div class="card">
+      <h2>MSP deals in the retainer pipeline</h2>
+      <div class="toolbar">
+        <label style="display:flex;gap:6px;align-items:center"><input type="checkbox" id="mspShowClosed"> show closed deals</label>
+        <button id="mspRefreshBtn" style="margin-left:auto">Refresh</button>
+      </div>
+      <div class="table-wrap"><table class="deals" id="mspDealsTable">
+        <thead><tr><th>Company</th><th>Deal</th><th>Stage</th><th>Days in stage</th><th>Amount</th></tr></thead>
+        <tbody></tbody>
+      </table></div>
+    </div>
+  </div>
+
+  <div id="exclTab">
+    <h2 id="excl-section" class="section-title">Excluded Companies</h2>
+    <p id="exclInfo" class="section-sub">Loading…</p>
+    <div class="card">
+      <h2>By reason</h2>
+      <div id="exclReasons"></div>
+    </div>
+    <div class="card">
+      <div class="toolbar">
+        <input type="text" id="exclSearch" placeholder="search name or domain" style="width:220px">
+        <button id="exclClearBtn" style="display:none">Clear filter</button>
+        <span class="muted" id="exclCount" style="margin-left:auto"></span>
+      </div>
+      <div id="exclResults"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+var PORTAL = "1905790";
+var statusFilter = document.getElementById("statusFilter");
+var typeFilter = document.getElementById("typeFilter");
+var roster = [];
+
+function hsCompanyUrl(id) { return "https://app.hubspot.com/contacts/" + PORTAL + "/record/0-2/" + id; }
+function fmtDate(s) { return s ? new Date(s).toLocaleString() : "—"; }
+function esc(s) { return String(s == null ? "" : s).replace(/[&<>"]/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]; }); }
+
+function loadRoster() {
+  return fetch("/api/hygiene/roster").then(function (r) { return r.json(); }).then(function (d) {
+    roster = (d.roster || []).filter(function (r) { return r.active; });
+    renderRosterBox(d.roster || []);
+  });
+}
+
+function renderRosterBox(all) {
+  var box = document.getElementById("rosterList");
+  box.innerHTML = all.map(function (r) {
+    return '<div class="roster-row"><strong>' + esc(r.name) + '</strong>' +
+      '<span class="muted">' + esc(r.owner_id) + '</span>' +
+      '<label style="margin-left:auto;display:flex;gap:6px;align-items:center"><input type="checkbox" ' + (r.active ? "checked" : "") + ' data-owner="' + esc(r.owner_id) + '" class="activeToggle">active</label></div>';
+  }).join("") || '<p class="empty">No roster entries yet.</p>';
+  box.querySelectorAll(".activeToggle").forEach(function (cb) {
+    cb.onchange = function () {
+      var name = all.find(function (r) { return r.owner_id === cb.dataset.owner; }).name;
+      fetch("/api/hygiene/roster", { method: "POST", body: JSON.stringify({ owner_id: cb.dataset.owner, name: name, active: cb.checked }) })
+        .then(function () { return loadRoster(); });
+    };
+  });
+}
+
+function loadRuns() {
+  return fetch("/api/hygiene/runs").then(function (r) { return r.json(); }).then(function (d) {
+    var run = (d.runs || [])[0];
+    var el = document.getElementById("scanInfo");
+    if (!run) { el.textContent = "No scans run yet."; return; }
+    el.textContent = "Last scan: " + fmtDate(run.started_at) + " — " + run.status +
+      " (" + run.companies_scanned + " companies, " + run.flags_created + " flags)" + (run.error ? " — " + run.error : "");
+  });
+}
+
+function loadStats() {
+  return fetch("/api/hygiene/flags?status=pending").then(function (r) { return r.json(); }).then(function (d) {
+    var counts = {};
+    (d.flags || []).forEach(function (f) { counts[f.flag_type] = (counts[f.flag_type] || 0) + 1; });
+    var types = ["unowned", "stale_owner", "distribution", "stale", "duplicate"];
+    var labels = { unowned: "Unowned", stale_owner: "Stale owner", distribution: "Distribution", stale: "Stale", duplicate: "Duplicate" };
+    document.getElementById("stats").innerHTML = types.map(function (t) {
+      return '<div class="stat" data-type="' + t + '"><div class="k">' + labels[t] + '</div><div class="v">' + (counts[t] || 0) + '</div></div>';
+    }).join("");
+    document.querySelectorAll(".stat").forEach(function (el) {
+      el.onclick = function () { typeFilter.value = el.dataset.type; statusFilter.value = "pending"; loadFlags(); };
+    });
+  });
+}
+
+function assignPicker(flagId) {
+  var sel = document.createElement("select");
+  sel.innerHTML = roster.map(function (r) { return '<option value="' + esc(r.owner_id) + '">' + esc(r.name) + '</option>'; }).join("");
+  var btn = document.createElement("button");
+  btn.textContent = "Assign";
+  btn.className = "primary";
+  btn.onclick = function () {
+    btn.disabled = true;
+    fetch("/api/hygiene/apply", { method: "POST", body: JSON.stringify({ flag_id: flagId, new_owner_id: sel.value }) })
+      .then(function (r) { return r.json(); })
+      .then(function (d) { if (d.ok) loadFlags(); else { alert(d.error || "failed"); btn.disabled = false; } });
+  };
+  var wrap = document.createElement("span");
+  wrap.className = "actions";
+  wrap.appendChild(sel);
+  wrap.appendChild(btn);
+  return wrap;
+}
+
+function dismissBtn(flagId) {
+  var btn = document.createElement("button");
+  btn.textContent = "Dismiss";
+  btn.onclick = function () {
+    btn.disabled = true;
+    fetch("/api/hygiene/flags/" + flagId + "/status", { method: "POST", body: JSON.stringify({ status: "dismissed" }) })
+      .then(function () { loadFlags(); });
+  };
+  return btn;
+}
+
+function describe(f) {
+  var d = f.details || {};
+  if (f.flag_type === "unowned") return (d.name || d.domain || f.object_id) + (d.domain ? " · " + d.domain : "");
+  if (f.flag_type === "stale_owner") return (d.name || d.domain || f.object_id) + " — owned by " + (d.owner_name || d.owner_id) + " (not an active BDR)";
+  if (f.flag_type === "stale") return (d.name || d.domain || f.object_id) + " — " + d.days_inactive + " days inactive" +
+    (d.last_activity_at ? " (last activity " + new Date(d.last_activity_at).toLocaleDateString() + (d.last_activity_source === "createdate" ? ", never logged since creation" : "") + ")" : "");
+  if (f.flag_type === "duplicate") return (d.name || d.domain || f.object_id) + " — matches " + (d.other_ids || []).length + " other compan" + ((d.other_ids || []).length === 1 ? "y" : "ies") + " by " + d.method;
+  if (f.flag_type === "distribution") return (d.owner_name || f.object_id) + " — " + d.count + " companies vs. mean " + d.mean + " (" + (d.deviation_pct > 0 ? "+" : "") + d.deviation_pct + "%)";
+  return JSON.stringify(d);
+}
+
+function renderFlag(f, nested) {
+  var row = document.createElement("div");
+  row.className = "flag" + (nested ? " nested" : "");
+  row.dataset.type = f.flag_type;
+  var top = document.createElement("div");
+  top.className = "top";
+  top.innerHTML = '<div><div class="name">' + esc(describe(f)) + '</div>' +
+    '<div class="meta">' + f.flag_type + ' · ' + f.severity + ' · last seen ' + fmtDate(f.last_seen_at) +
+    (f.object_type === "company" ? ' · <a href="' + hsCompanyUrl(f.object_id) + '" target="_blank">open in HubSpot</a>' : '') + '</div></div>' +
+    '<span class="pill ' + f.status + '">' + f.status + '</span>';
+  row.appendChild(top);
+  if (f.status === "pending" && document.getElementById("adminCard").style.display !== "none") {
+    var actions = document.createElement("div");
+    actions.className = "actions";
+    if (f.object_type === "company" && (f.flag_type === "unowned" || f.flag_type === "stale_owner")) {
+      actions.appendChild(assignPicker(f.id));
+    }
+    actions.appendChild(dismissBtn(f.id));
+    row.appendChild(actions);
+  }
+  return row;
+}
+
+var PAGE_SIZE = 50;
+var FLAG_TYPE_ORDER = ["unowned", "stale_owner", "distribution", "stale", "duplicate"];
+var FLAG_TYPE_LABELS = { unowned: "Unowned", stale_owner: "Stale owner", distribution: "Distribution", stale: "Stale", duplicate: "Duplicate" };
+
+function dupGroupKey(f) { return (f.details && f.details.match_key) || f.object_id; }
+function ownerGroupKey(f) { return (f.details && f.details.owner_id) || f.object_id; }
+function staleBucket(days) {
+  if (days < 90) return { key: "60-90", label: "60–90 days inactive" };
+  if (days < 180) return { key: "90-180", label: "90–180 days inactive" };
+  if (days < 365) return { key: "180-365", label: "180–365 days inactive" };
+  return { key: "365+", label: "365+ days inactive" };
+}
+
+// Renders `flags` into `container`, PAGE_SIZE at a time with a "show more" button — used both for a
+// group's expanded company list and for flag types with no natural grouping key (unowned, distribution).
+function renderPaginatedList(container, flags, pageSize) {
+  var shown = pageSize;
+  function draw() {
+    container.innerHTML = "";
+    flags.slice(0, shown).forEach(function (f) { container.appendChild(renderFlag(f, true)); });
+    if (shown < flags.length) {
+      var more = document.createElement("button");
+      more.className = "small";
+      more.textContent = "Show " + Math.min(pageSize, flags.length - shown) + " more (" + (flags.length - shown) + " left)";
+      more.onclick = function () { shown += pageSize; draw(); };
+      container.appendChild(more);
+    }
+  }
+  draw();
+}
+
+// Generic collapsed group row: a title line, an optional bulk-action button, and an expand toggle that
+// lazily paginates the member flags in — shared by duplicate/owner/stale-bucket grouping.
+function renderFlagGroup(opts) {
+  var wrap = document.createElement("div");
+  wrap.className = "flag dup-group";
+  wrap.dataset.type = opts.type;
+  var isAdmin = document.getElementById("adminCard").style.display !== "none";
+  var allPending = opts.flags.every(function (f) { return f.status === "pending"; });
+
+  var top = document.createElement("div");
+  top.className = "top";
+  top.innerHTML = '<div><div class="name">' + esc(opts.title) + ' — ' + opts.flags.length + ' companies</div>' +
+    '<div class="meta">' + esc(opts.meta) + '</div></div>';
+  var btns = document.createElement("div");
+  btns.style.display = "flex"; btns.style.gap = "8px"; btns.style.alignItems = "center";
+  var expandBtn = document.createElement("button");
+  expandBtn.className = "small";
+  expandBtn.textContent = "Show companies";
+  btns.appendChild(expandBtn);
+  if (isAdmin && allPending && opts.bulkAction) btns.appendChild(opts.bulkAction());
+  top.appendChild(btns);
+  wrap.appendChild(top);
+
+  var list = document.createElement("div");
+  list.className = "dup-list";
+  list.style.display = "none";
+  wrap.appendChild(list);
+  expandBtn.onclick = function () {
+    var open = list.style.display !== "none";
+    if (!open && !list.dataset.rendered) { renderPaginatedList(list, opts.flags, PAGE_SIZE); list.dataset.rendered = "1"; }
+    list.style.display = open ? "none" : "block";
+    expandBtn.textContent = open ? "Show companies" : "Hide companies";
+  };
+  return wrap;
+}
+
+function bulkDismissBtn(flags) {
+  return function () {
+    var btn = document.createElement("button");
+    btn.className = "small danger";
+    btn.textContent = "Dismiss all " + flags.length;
+    btn.onclick = function () {
+      btn.disabled = true;
+      fetch("/api/hygiene/flags/dismiss-many", { method: "POST", body: JSON.stringify({ ids: flags.map(function (f) { return f.id; }) }) })
+        .then(function () { loadStats(); loadFlags(); });
+    };
+    return btn;
+  };
+}
+
+function bulkReassignControl(flags) {
+  return function () {
+    var span = document.createElement("span");
+    span.style.display = "flex"; span.style.gap = "8px"; span.style.alignItems = "center";
+    var sel = document.createElement("select");
+    sel.innerHTML = roster.map(function (r) { return '<option value="' + esc(r.owner_id) + '">' + esc(r.name) + '</option>'; }).join("");
+    var btn = document.createElement("button");
+    btn.className = "small primary";
+    btn.textContent = "Reassign all " + flags.length;
+    btn.onclick = function () {
+      btn.disabled = true;
+      fetch("/api/hygiene/flags/apply-many", { method: "POST", body: JSON.stringify({ flag_ids: flags.map(function (f) { return f.id; }), new_owner_id: sel.value }) })
+        .then(function (r) { return r.json(); })
+        .then(function () { loadStats(); loadFlags(); });
+    };
+    span.appendChild(sel);
+    span.appendChild(btn);
+    return span;
+  };
+}
+
+function flagSectionTitle(type, count) {
+  var h = document.createElement("div");
+  h.className = "flag-section-title";
+  h.textContent = FLAG_TYPE_LABELS[type] + " (" + count + ")";
+  return h;
+}
+
+function loadFlags() {
+  var q = [];
+  if (statusFilter.value) q.push("status=" + encodeURIComponent(statusFilter.value));
+  if (typeFilter.value) q.push("type=" + encodeURIComponent(typeFilter.value));
+  fetch("/api/hygiene/flags" + (q.length ? "?" + q.join("&") : "")).then(function (r) { return r.json(); }).then(function (d) {
+    var box = document.getElementById("flags");
+    box.innerHTML = "";
+    var flags = d.flags || [];
+    if (!flags.length) { box.innerHTML = '<p class="empty">No flags here.</p>'; return; }
+
+    var byType = {};
+    flags.forEach(function (f) { (byType[f.flag_type] = byType[f.flag_type] || []).push(f); });
+    var typesPresent = FLAG_TYPE_ORDER.filter(function (t) { return byType[t] && byType[t].length; });
+
+    typesPresent.forEach(function (type) {
+      var list = byType[type];
+      if (typesPresent.length > 1) box.appendChild(flagSectionTitle(type, list.length));
+      var section = document.createElement("div");
+      box.appendChild(section);
+
+      if (type === "duplicate") {
+        var dupGroups = {};
+        list.forEach(function (f) { (dupGroups[dupGroupKey(f)] = dupGroups[dupGroupKey(f)] || []).push(f); });
+        Object.keys(dupGroups).sort(function (a, b) { return dupGroups[b].length - dupGroups[a].length; }).forEach(function (k) {
+          var g = dupGroups[k];
+          if (g.length < 2) { section.appendChild(renderFlag(g[0])); return; }
+          var method = (g[0].details && g[0].details.method) || "domain";
+          section.appendChild(renderFlagGroup({ type: "duplicate", flags: g, title: k, meta: "duplicate · matched by " + method, bulkAction: bulkDismissBtn(g) }));
+        });
+      } else if (type === "stale_owner") {
+        var ownerGroups = {};
+        list.forEach(function (f) { (ownerGroups[ownerGroupKey(f)] = ownerGroups[ownerGroupKey(f)] || []).push(f); });
+        Object.keys(ownerGroups).sort(function (a, b) { return ownerGroups[b].length - ownerGroups[a].length; }).forEach(function (k) {
+          var g = ownerGroups[k];
+          if (g.length < 2) { section.appendChild(renderFlag(g[0])); return; }
+          var d0 = g[0].details || {};
+          var label = d0.owner_name || d0.owner_id || "no owner on file";
+          section.appendChild(renderFlagGroup({ type: "stale_owner", flags: g, title: label, meta: "stale_owner · owner is not an active BDR", bulkAction: bulkReassignControl(g) }));
+        });
+      } else if (type === "stale") {
+        var buckets = {};
+        list.forEach(function (f) {
+          var b = staleBucket((f.details && f.details.days_inactive) || 0);
+          (buckets[b.key] = buckets[b.key] || { label: b.label, flags: [] }).flags.push(f);
+        });
+        ["60-90", "90-180", "180-365", "365+"].forEach(function (k) {
+          if (!buckets[k]) return;
+          var g = buckets[k].flags;
+          section.appendChild(renderFlagGroup({ type: "stale", flags: g, title: buckets[k].label, meta: "stale", bulkAction: bulkDismissBtn(g) }));
+        });
+      } else {
+        renderPaginatedList(section, list, PAGE_SIZE);
+      }
+    });
+  });
+}
+
+// ---- MSP analytics ----
+var mspSnapshot = null, trendChart = null, stageChart = null;
+function cssVar(name) { return getComputedStyle(document.body).getPropertyValue(name).trim(); }
+function fmtMoney(n) { return n == null ? "—" : "$" + Number(n).toLocaleString(undefined, { maximumFractionDigits: 0 }); }
+function dayPillClass(d) { return d == null ? "ok" : d > 30 ? "bad" : d > 14 ? "warn" : "ok"; }
+
+function renderMspKpis(s) {
+  var deltaQ = s.new_prev_quarter ? Math.round(((s.new_this_quarter - s.new_prev_quarter) / s.new_prev_quarter) * 1000) / 10 : null;
+  var kpis = [
+    { k: "Total MSP companies in CRM", v: s.total_msp_companies },
+    { k: "New this quarter (" + s.quarter_label + ")", v: s.new_this_quarter, d: deltaQ == null ? null : (deltaQ >= 0 ? "+" : "") + deltaQ + "% vs last quarter (" + s.new_prev_quarter + ")" },
+    { k: "MSP companies in an open deal", v: s.in_deals_count },
+    { k: "MSP companies not in a deal", v: s.not_in_deals_count },
+  ];
+  document.getElementById("mspKpis").innerHTML = kpis.map(function (x) {
+    var d = x.d ? '<div class="d ' + (x.d.indexOf("+") === 0 ? "up" : "down") + '">' + esc(x.d) + '</div>' : "";
+    return '<div class="kpi"><div class="k">' + esc(x.k) + '</div><div class="v">' + x.v + '</div>' + d + '</div>';
+  }).join("");
+}
+
+function renderMspTrendChart(weeklyTrend) {
+  var ctx = document.getElementById("mspTrendChart").getContext("2d");
+  var labels = weeklyTrend.map(function (w) { return w.week_start.slice(5); });
+  var accent = cssVar("--accent"), ink = cssVar("--ink"), line = cssVar("--line");
+  if (trendChart) trendChart.destroy();
+  trendChart = new Chart(ctx, {
+    data: {
+      labels: labels,
+      datasets: [
+        { type: "bar", label: "New MSP companies", data: weeklyTrend.map(function (w) { return w.new_count; }), backgroundColor: accent, order: 2, yAxisID: "y" },
+        { type: "line", label: "Cumulative total", data: weeklyTrend.map(function (w) { return w.cumulative_total; }), borderColor: ink, backgroundColor: "transparent", tension: 0.25, order: 1, yAxisID: "y1" },
+      ],
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      interaction: { mode: "index", intersect: false },
+      scales: {
+        x: { grid: { color: line }, ticks: { color: ink } },
+        y: { position: "left", beginAtZero: true, grid: { color: line }, ticks: { color: ink, precision: 0 }, title: { display: true, text: "New / week", color: ink } },
+        y1: { position: "right", beginAtZero: true, grid: { display: false }, ticks: { color: ink, precision: 0 }, title: { display: true, text: "Cumulative", color: ink } },
+      },
+      plugins: { legend: { labels: { color: ink } } },
+    },
+  });
+}
+
+function renderMspStageChart(stageDist, showClosed) {
+  var rows = stageDist.filter(function (s) { return showClosed || (s.stage_id !== "closedwon" && s.stage_id !== "closedlost"); });
+  var ctx = document.getElementById("mspStageChart").getContext("2d");
+  var accent = cssVar("--accent"), ink = cssVar("--ink"), line = cssVar("--line");
+  if (stageChart) stageChart.destroy();
+  stageChart = new Chart(ctx, {
+    type: "bar",
+    data: { labels: rows.map(function (s) { return s.stage_label; }), datasets: [{ label: "Deals", data: rows.map(function (s) { return s.count; }), backgroundColor: accent }] },
+    options: {
+      indexAxis: "y", responsive: true, maintainAspectRatio: false,
+      scales: { x: { beginAtZero: true, grid: { color: line }, ticks: { color: ink, precision: 0 } }, y: { grid: { display: false }, ticks: { color: ink } } },
+      plugins: { legend: { display: false } },
+    },
+  });
+}
+
+function renderMspDeals() {
+  if (!mspSnapshot) return;
+  var showClosed = document.getElementById("mspShowClosed").checked;
+  var rows = mspSnapshot.deals.filter(function (d) { return showClosed || !d.is_closed; });
+  var tbody = document.querySelector("#mspDealsTable tbody");
+  tbody.innerHTML = rows.length ? rows.map(function (d) {
+    return "<tr><td>" + esc(d.company_name) + "</td><td>" + esc(d.deal_name) + "</td><td>" + esc(d.stage_label) + "</td>" +
+      "<td><span class=\"daypill " + dayPillClass(d.days_in_stage) + "\">" + (d.days_in_stage == null ? "—" : d.days_in_stage + "d") + "</span></td>" +
+      "<td>" + fmtMoney(d.amount) + "</td></tr>";
+  }).join("") : '<tr><td colspan="5" class="empty">No deals here.</td></tr>';
+}
+
+function loadMsp() {
+  return fetch("/api/hygiene/msp/summary").then(function (r) { return r.json(); }).then(function (d) {
+    var info = document.getElementById("mspInfo");
+    if (!d.ok || !d.snapshot) { info.textContent = "No MSP scan yet — run a scan to populate this."; return; }
+    mspSnapshot = d.snapshot;
+    info.textContent = "Last scan: " + fmtDate(mspSnapshot.scanned_at);
+    renderMspKpis(mspSnapshot);
+    renderMspTrendChart(mspSnapshot.weekly_trend);
+    renderMspStageChart(mspSnapshot.stage_distribution, document.getElementById("mspShowClosed").checked);
+    renderMspDeals();
+  });
+}
+
+document.getElementById("mspShowClosed").onchange = function () {
+  if (mspSnapshot) { renderMspStageChart(mspSnapshot.stage_distribution, this.checked); renderMspDeals(); }
+};
+document.getElementById("mspRefreshBtn").onclick = loadMsp;
+
+statusFilter.onchange = loadFlags;
+typeFilter.onchange = loadFlags;
+document.getElementById("refreshBtn").onclick = function () { loadStats(); loadFlags(); loadRuns(); };
+document.getElementById("rosterToggle").onclick = function () {
+  var box = document.getElementById("rosterBox");
+  box.style.display = box.style.display === "none" ? "block" : "none";
+};
+document.getElementById("addRosterBtn").onclick = function () {
+  var id = document.getElementById("newOwnerId").value.trim();
+  var name = document.getElementById("newOwnerName").value.trim();
+  var msg = document.getElementById("rosterMsg");
+  if (!id || !name) { msg.textContent = "owner id and name required"; msg.className = "msg err"; return; }
+  fetch("/api/hygiene/roster", { method: "POST", body: JSON.stringify({ owner_id: id, name: name, active: true }) })
+    .then(function (r) { return r.json(); }).then(function (d) {
+      if (d.ok) { msg.textContent = "added"; msg.className = "msg ok"; document.getElementById("newOwnerId").value = ""; document.getElementById("newOwnerName").value = ""; loadRoster(); }
+      else { msg.textContent = d.error || "failed"; msg.className = "msg err"; }
+    });
+};
+document.getElementById("runScanBtn").onclick = function () {
+  var btn = this, msg = document.getElementById("scanMsg");
+  btn.disabled = true; msg.textContent = "Scanning…"; msg.className = "msg";
+  fetch("/api/hygiene/scan", { method: "POST", body: "{}" }).then(function (r) { return r.json(); }).then(function (d) {
+    btn.disabled = false;
+    if (d.ok) {
+      msg.textContent = "Done — " + d.run.flags_created + " flags from " + d.run.companies_scanned + " companies." +
+        (d.msp && d.msp.error ? " MSP analytics failed: " + d.msp.error : "") +
+        (d.exclusions && d.exclusions.error ? " Exclusions scan failed: " + d.exclusions.error : "");
+      msg.className = (d.msp && d.msp.error) || (d.exclusions && d.exclusions.error) ? "msg err" : "msg ok";
+    } else { msg.textContent = d.error || "failed"; msg.className = "msg err"; }
+    loadStats(); loadFlags(); loadRuns(); loadMsp(); loadExclusions();
+  }).catch(function (e) { btn.disabled = false; msg.textContent = String(e); msg.className = "msg err"; });
+};
+
+// ---- Excluded companies ----
+var exclSnapshot = null, exclActiveReason = null;
+
+function renderExclReasons() {
+  var box = document.getElementById("exclReasons");
+  if (!exclSnapshot || !exclSnapshot.by_reason.length) { box.innerHTML = '<p class="empty">No excluded companies found.</p>'; return; }
+  box.innerHTML = exclSnapshot.by_reason.map(function (r) {
+    var active = exclActiveReason === r.reason;
+    return '<div class="reason-row clickable' + (active ? " active" : "") + '" data-reason="' + esc(r.reason) + '">' +
+      '<span class="rk">' + esc(r.reason) + '</span><span class="rv">' + r.count + '</span></div>';
+  }).join("");
+  box.querySelectorAll(".reason-row").forEach(function (row) {
+    row.onclick = function () {
+      exclActiveReason = exclActiveReason === row.dataset.reason ? null : row.dataset.reason;
+      document.getElementById("exclSearch").value = "";
+      renderExclReasons();
+      renderExclResults();
+    };
+  });
+}
+
+function renderExclResults() {
+  var resultsBox = document.getElementById("exclResults");
+  var countEl = document.getElementById("exclCount");
+  var clearBtn = document.getElementById("exclClearBtn");
+  var search = document.getElementById("exclSearch").value.trim().toLowerCase();
+  if (!exclSnapshot) { resultsBox.innerHTML = ""; countEl.textContent = ""; return; }
+
+  if (!exclActiveReason && !search) {
+    resultsBox.innerHTML = '<p class="excl-prompt">Pick a reason above, or search by name/domain, to list companies.</p>';
+    countEl.textContent = exclSnapshot.total_excluded + " excluded total";
+    clearBtn.style.display = "none";
+    return;
+  }
+
+  var rows = exclSnapshot.companies.filter(function (c) {
+    if (exclActiveReason && c.reason !== exclActiveReason) return false;
+    if (search && !((c.name || "").toLowerCase().indexOf(search) > -1 || (c.domain || "").toLowerCase().indexOf(search) > -1)) return false;
+    return true;
+  });
+  clearBtn.style.display = (exclActiveReason || search) ? "inline-block" : "none";
+  countEl.textContent = rows.length + " compan" + (rows.length === 1 ? "y" : "ies");
+
+  var capped = rows.slice(0, 300);
+  if (!capped.length) { resultsBox.innerHTML = '<p class="empty">No matches.</p>'; return; }
+  resultsBox.innerHTML = '<div class="table-wrap"><table class="deals"><thead><tr><th>Company</th><th>Domain</th><th>Employees</th><th>Country</th><th>Reason</th><th></th></tr></thead><tbody>' +
+    capped.map(function (c) {
+      return "<tr><td>" + esc(c.name) + "</td><td>" + esc(c.domain) + "</td><td>" + (c.employee_count == null ? "—" : c.employee_count) + "</td><td>" + esc(c.country || "—") + "</td><td>" + esc(c.reason) + "</td>" +
+        '<td><a href="' + hsCompanyUrl(c.company_id) + '" target="_blank">open in HubSpot</a></td></tr>';
+    }).join("") + "</tbody></table></div>" +
+    (rows.length > capped.length ? '<p class="excl-note">Showing first ' + capped.length + " of " + rows.length + " — narrow with a reason or search to see the rest.</p>" : "");
+}
+
+function loadExclusions() {
+  return fetch("/api/hygiene/exclusions/summary").then(function (r) { return r.json(); }).then(function (d) {
+    var info = document.getElementById("exclInfo");
+    if (!d.ok || !d.snapshot) { info.textContent = "No exclusions scan yet — run a scan to populate this."; return; }
+    exclSnapshot = d.snapshot;
+    info.textContent = "Last scan: " + fmtDate(exclSnapshot.scanned_at) + " — " + exclSnapshot.total_excluded + " companies marked excluded in HubSpot";
+    renderExclReasons();
+    renderExclResults();
+  });
+}
+
+document.getElementById("exclSearch").oninput = function () { renderExclResults(); };
+document.getElementById("exclClearBtn").onclick = function () {
+  exclActiveReason = null;
+  document.getElementById("exclSearch").value = "";
+  renderExclReasons();
+  renderExclResults();
+};
+
+function whenUserReady(cb) {
+  if (window.JF_USER) { cb(window.JF_USER); return; }
+  var tries = 0;
+  var iv = setInterval(function () {
+    tries++;
+    if (window.JF_USER) { clearInterval(iv); cb(window.JF_USER); }
+    else if (tries > 100) { clearInterval(iv); } // ~10s, give up quietly
+  }, 100);
+}
+
+document.addEventListener("DOMContentLoaded", function () {
+  whenUserReady(function (u) {
+    if (u.role === "admin") { document.getElementById("adminCard").style.display = "block"; loadFlags(); }
+  });
+  loadRoster();
+  loadStats();
+  loadFlags();
+  loadRuns();
+  loadMsp();
+  loadExclusions();
+});
+</script>
+</body>
+</html>

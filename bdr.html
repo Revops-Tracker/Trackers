@@ -140,7 +140,6 @@
   .dsp-t th:first-child, .dsp-t td:first-child { text-align: left; padding-left: 0; }
   .dsp-t td:last-child { color: var(--ink); font-weight: 600; }
   .dsp-t th { font-size: 11px; }
-  .dsp-t .pc { font-size: 11px; font-weight: 400; color: var(--muted); margin-left: 3px; }
   .ls-sum { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 14px; }
   .ls-sum .stat { min-width: 150px; flex: 0 1 200px; }
   .pctu { display: block; font-size: 11.5px; color: var(--muted); font-weight: 400; line-height: 1.3; }
@@ -1105,11 +1104,9 @@
       }).filter(function (x) { return x.tot > 0; }).sort(function (a, b) { return b.tot - a.tot || a.name.localeCompare(b.name); });
       if (!items.length) return '';
       var all = items.reduce(function (a, x) { return a + x.tot; }, 0), multi = who.length > 1;
-      var repTot = who.map(function (r, i) { return items.reduce(function (a, x) { return a + x.per[i]; }, 0); });
-      function share(n, of) { return n ? n + ' <span class="pc">' + Math.round(n / of * 100) + '%</span>' : '&mdash;'; }
       return '<details class="dsp"><summary>Outcomes &middot; ' + f0(all) + ' calls</summary><table class="dsp-t">'
         + (multi ? '<tr><th></th>' + who.map(function (r) { return '<th>' + esc(r) + '</th>'; }).join('') + '<th>Team</th></tr>' : '')
-        + items.map(function (x) { return '<tr><td>' + esc(x.name) + '</td>' + (multi ? x.per.map(function (n, i) { return '<td>' + share(n, repTot[i]) + '</td>'; }).join('') : '') + '<td>' + share(x.tot, all) + '</td></tr>'; }).join('')
+        + items.map(function (x) { return '<tr><td>' + esc(x.name) + '</td>' + (multi ? x.per.map(function (n) { return '<td>' + (n || '&mdash;') + '</td>'; }).join('') : '') + '<td>' + x.tot + '</td></tr>'; }).join('')
         + '</table></details>';
     }
 

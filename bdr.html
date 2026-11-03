@@ -1105,11 +1105,11 @@
       }).filter(function (x) { return x.tot > 0; }).sort(function (a, b) { return b.tot - a.tot || a.name.localeCompare(b.name); });
       if (!items.length) return '';
       var all = items.reduce(function (a, x) { return a + x.tot; }, 0), multi = who.length > 1;
-      var repTot = who.map(function (r, i) { return items.reduce(function (a, x) { return a + x.per[i]; }, 0); });
-      function share(n, of) { return n ? n + ' <span class="pc">' + Math.round(n / of * 100) + '%</span>' : '&mdash;'; }
+      var repTot = who.map(function (r) { return dials(r, l); }), teamTot = who.reduce(function (a, r) { return a + dials(r, l); }, 0);   // % = share of the dials made on this list
+      function share(n, of) { return n ? n + (of ? ' <span class="pc">' + (n / of * 100 < 10 ? (n / of * 100).toFixed(1) : Math.round(n / of * 100)) + '%</span>' : '') : '&mdash;'; }
       return '<details class="dsp"><summary>Outcomes &middot; ' + f0(all) + ' calls</summary><table class="dsp-t">'
         + (multi ? '<tr><th></th>' + who.map(function (r) { return '<th>' + esc(r) + '</th>'; }).join('') + '<th>Team</th></tr>' : '')
-        + items.map(function (x) { return '<tr><td>' + esc(x.name) + '</td>' + (multi ? x.per.map(function (n, i) { return '<td>' + share(n, repTot[i]) + '</td>'; }).join('') : '') + '<td>' + share(x.tot, all) + '</td></tr>'; }).join('')
+        + items.map(function (x) { return '<tr><td>' + esc(x.name) + '</td>' + (multi ? x.per.map(function (n, i) { return '<td>' + share(n, repTot[i]) + '</td>'; }).join('') : '') + '<td>' + share(x.tot, teamTot) + '</td></tr>'; }).join('')
         + '</table></details>';
     }
 
@@ -1145,7 +1145,7 @@
         tl.forEach(function (l) { var t = team(l); T.d += t.d; T.c += t.c; T.b += t.b; });
         return '<tr class="total"><td>All tier lists</td>' + reps.map(function () { return '<td></td>'; }).join('') + '<td>' + f0(T.d) + '</td><td>' + (T.d ? pct(T.c, T.d) : '&mdash;') + '</td><td>' + (Math.round(T.b * 10) / 10) + '</td></tr>';
       })()
-      + '</tbody></table></div><p class="hint">Dials per list from the weekly Nooks upload. Team CR = connects ÷ dials across all BDRs on that list. Open Outcomes under a list to see how its calls ended. Each BDR writes the reasons in their own tab; they show here for the whole team.</p></div>';
+      + '</tbody></table></div><p class="hint">Dials per list from the weekly Nooks upload. Team CR = connects ÷ dials across all BDRs on that list. Open Outcomes under a list to see how its calls ended, with each outcome as a % of the dials made on that list. Each BDR writes the reasons in their own tab; they show here for the whole team.</p></div>';
 
     var datalist = '<datalist id="why-opts">' + WHY_OPTS.map(function (o) { return '<option value="' + esc(o) + '">'; }).join('') + '</datalist>';
 

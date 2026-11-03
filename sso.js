@@ -4,8 +4,8 @@
    - Sends people to a page they're allowed on, and adds the small "signed in as" bar. */
 (function () {
   var C = window.JF_CONFIG, KEY = 'jf_token';
-  var PAGES = { bdr: ['bdr.html', 'BDR tracker'], ae: ['ae.html', 'AE tracker'], cst: ['cst.html', 'CST tracker'], leaderboard: ['leaderboard-auto.html', 'Leaderboard'], reporting: ['reporting.html', 'Sales L10'], revops: ['revops.html', 'RevOps L10'] }; // auto leaderboard (HubSpot-driven, daily); Max's leaderboard.html still reachable by URL
-  var ORDER = ['bdr', 'ae', 'cst', 'leaderboard', 'reporting', 'revops']; // reporting = admins only (granted by jf-sso)
+  var PAGES = { bdr: ['bdr.html', 'BDR tracker'], ae: ['ae.html', 'AE tracker'], cst: ['cst.html', 'CST tracker'], leaderboard: ['leaderboard-auto.html', 'Leaderboard'], reporting: ['reporting.html', 'Sales L10'], revops: ['revops.html', 'RevOps L10'], hygiene: ['hygiene.html', 'CRM Hygiene'] }; // auto leaderboard (HubSpot-driven, daily); Max's leaderboard.html still reachable by URL
+  var ORDER = ['bdr', 'ae', 'cst', 'leaderboard', 'reporting', 'revops', 'hygiene']; // reporting = admins only (granted by jf-sso); hygiene = only whoever jf-sso's roster grants 'hygiene' to
   var NEEDS = { revops: 'reporting' }; // pages that ride on another page's access (RevOps L10 = same admins as Sales L10)
   function can(u, k) { return u.access.indexOf(NEEDS[k] || k) !== -1; }
 

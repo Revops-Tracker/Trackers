@@ -1110,6 +1110,27 @@
         + '</table></details>';
     }
 
+    function dspByDisp(who, title) {   // one row per outcome; open it to see which lists those calls came from
+      var byD = {};
+      Object.keys(dsp).forEach(function (lk) {
+        Object.keys(dsp[lk]).forEach(function (d) {
+          var n = Math.round(who.reduce(function (a, r) { return a + (dsp[lk][d][r] || 0); }, 0));
+          if (!n) return;
+          var o = byD[d] || (byD[d] = { tot: 0, lists: [] });
+          o.tot += n; o.lists.push({ list: lk.split('|')[1], n: n });
+        });
+      });
+      var names = Object.keys(byD).sort(function (x, y) { return byD[y].tot - byD[x].tot || x.localeCompare(y); });
+      if (!names.length) return '';
+      return '<div class="card"><h2>' + title + '</h2><div class="tablewrap"><table class="grid"><thead><tr><th>Outcome</th><th>Calls</th></tr></thead><tbody>'
+        + names.map(function (d) {
+          var o = byD[d];
+          return '<tr><td><details class="dsp"><summary style="font-size:inherit;color:inherit">' + esc(d) + '</summary><table class="dsp-t">'
+            + o.lists.sort(function (x, y) { return y.n - x.n || x.list.localeCompare(y.list); }).map(function (x) { return '<tr><td>' + esc(x.list) + '</td><td>' + x.n + '</td></tr>'; }).join('')
+            + '</table></details></td><td>' + o.tot + '</td></tr>';
+        }).join('') + '</tbody></table></div><p class="hint">Open an outcome to see which lists those calls came from. Counts come from the Calls Library upload.</p></div>';
+    }
+
     var bar = '<div class="ls-bar"><div class="seg">'
       + [['all', 'All time'], ['quarter', 'Quarter'], ['month', 'Month'], ['week', 'Week']].map(function (k) { return "<button data-kind='" + k[0] + "' class='" + (lv.kind === k[0] ? 'on' : '') + "'>" + k[1] + '</button>'; }).join('')
       + '</div><button class="ls-nav" id="ls-older" aria-label="Older"' + (P.hasOlder ? '' : ' disabled') + '>&lsaquo;</button>'
@@ -1165,7 +1186,7 @@
         + '<p class="hint">Booked = meetings booked from HubSpot, credited to the list the lead was dialed from. It follows the weekly books sync.</p>' + (rollup ? '<p class="hint">' + (P.key === 'all' ? 'All-time' : 'Quarter') + ' totals. The Why column shows each list’s most recent reason' + (P.key === 'all' ? '' : ' this quarter') + '; switch to Month or Week to add or edit one.</p>' : ed ? '<p class="hint">Reasons save when you leave the box and stay on the whole month (' + esc(P.key) + ').</p>' : '') + '</div>';
     }).join('<div style="height:20px"></div>');
 
-    v.innerHTML = bar + tiles + (mode === 'rep' ? '' : grid + '<div style="height:20px"></div>') + (mode === 'rep' ? cards : '') + datalist;
+    v.innerHTML = bar + tiles + (mode === 'rep' ? '' : grid + '<div style="height:20px"></div>' + (dspByDisp(reps, 'Call outcomes &mdash; ' + esc(P.label)) ? dspByDisp(reps, 'Call outcomes &mdash; ' + esc(P.label)) + '<div style="height:20px"></div>' : '')) + (mode === 'rep' ? cards + (dspByDisp([who], 'Call outcomes &mdash; ' + esc(P.label)) ? '<div style="height:20px"></div>' + dspByDisp([who], 'Call outcomes &mdash; ' + esc(P.label)) : '') : '') + datalist;
 
     v.querySelectorAll('.seg button').forEach(function (b) { b.onclick = function () { lv.kind = b.dataset.kind; lv.offset = 0; render(); }; });
     var o = document.getElementById('ls-older'), n = document.getElementById('ls-newer');

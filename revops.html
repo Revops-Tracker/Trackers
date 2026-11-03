@@ -242,6 +242,8 @@ html.view-reporting .lb-only{display:none!important}
 .nobooks th:nth-last-child(-n+2),.nobooks td:nth-last-child(-n+2){display:none}
 .cl-note{font-size:12px;color:var(--muted);margin:6px 2px 10px}
 .cl-zero{color:var(--behind);font-weight:600}
+.dx-drop{margin-top:14px;padding:14px 12px}
+.dx-drop b{font-size:13px}
 .nd{margin:14px 0 4px;border:1px solid var(--line,#e5e7eb);border-radius:10px;padding:12px 14px}
 .nd h3{margin:0 0 8px;font-size:14px;font-weight:700}
 .nd .nd-row{display:flex;gap:10px;align-items:flex-start;padding:6px 0;border-top:1px solid var(--line,#e5e7eb)}
@@ -293,6 +295,7 @@ section[hidden]{display:none}
     </div>
 
     <div id="crPreview"></div>
+    <div id="dxPreview"></div>
 
     <div class="cr-layout">
       <div class="cr-main">
@@ -326,6 +329,11 @@ section[hidden]{display:none}
           <label for="crSunday">File is for the week starting (Sunday)</label>
           <input type="date" id="crSunday">
           <span class="wk" id="crWeekLbl"></span>
+        </div>
+        <div class="cr-drop dx-drop" id="dxDrop" tabindex="0" role="button" title="Use the Calls Library export from Nooks (one row per call). It adds the call outcomes by list to the BDR tracker. The week comes from each call's date.">
+          <b>Drop Calls Library CSV</b>
+          <div class="hint">call outcomes by list &middot; click to choose</div>
+          <input type="file" id="dxFile" accept=".csv,text/csv" hidden>
         </div>
       </aside>
     </div>
@@ -724,6 +732,94 @@ function onFile(f){
   rd.readAsText(f);
 }
 
+/* ---------- Nooks Calls Library CSV: call outcomes (disposition) per list ---------- */
+function satOfCall(iso){   // Sun-Sat week the call falls in, in Toronto time, keyed by its Saturday (same weeks as the connect-rate upload)
+  const t = Date.parse(String(iso).replace(/\[[^\]]*\]\s*$/, ""));
+  if(isNaN(t)) return null;
+  const day = new Intl.DateTimeFormat("en-CA", { timeZone:"America/Toronto", year:"numeric", month:"2-digit", day:"2-digit" }).format(new Date(t));
+  const d = new Date(day+"T00:00:00Z"); d.setUTCDate(d.getUTCDate() + (6 - d.getUTCDay()));
+  return d.toISOString().slice(0,10);
+}
+function mapCalls(rows){
+  const head = rows[0].map(x=>String(x).trim().toLowerCase());
+  const ix = n => head.indexOf(n);
+  const iN = ix("sequence name"), iT = ix("call time");
+  const iD = ix("disposition name") >= 0 ? ix("disposition name") : ix("disposition / sentiment");
+  if(iN < 0 || iD < 0 || iT < 0) throw new Error("This does not look like the Nooks Calls Library export (it needs Sequence Name, Disposition Name and Call Time columns).");
+  const roster = {}; (S.data.bdrs||[]).forEach(b=>{ roster[b.bdr.toLowerCase()] = b.bdr; });
+  const agg = {}, skipped = {}, weeks = {};
+  let total = 0, used = 0, first = "", last = "";
+  rows.slice(1).forEach(r=>{
+    const name = String(r[iN]||"").trim(); if(!name) return;
+    total++;
+    const when = String(r[iT]||"").replace(/\[[^\]]*\]\s*$/, ""), wk = satOfCall(r[iT]);
+    if(wk){ if(!first || when < first) first = when; if(!last || when > last) last = when; }
+    const sk = why => { const o = skipped[name+"|"+why] || (skipped[name+"|"+why] = { name, why, calls:0 }); o.calls++; };
+    if(!wk){ sk("call date not readable"); return; }
+    const f = name.split(/\s+/)[0], rest = name.slice(f.length).trim();
+    const bdr = roster[f.toLowerCase()];
+    if(!bdr){ sk("not on the BDR roster"); return; }
+    const hit = canonList(rest) || canonList(name);
+    if(!hit){ sk("list is not in the tier scheme"); return; }
+    const disp = String(r[iD]||"").trim() || "No disposition";
+    const k = [wk, bdr, hit.tier, hit.list_name, disp].join("|");
+    const a = agg[k] || (agg[k] = { week_ending:wk, bdr, tier:hit.tier, list:hit.list_name, disposition:disp, calls:0 });
+    a.calls++; used++; weeks[wk] = true;
+  });
+  const out = Object.values(agg);
+  if(!out.length) throw new Error("No calls matched a BDR and a tier list, so nothing would be saved. Check that this is the right file.");
+  return { rows:out, skipped:Object.values(skipped), total, used, weeks:Object.keys(weeks).sort(), first, last };
+}
+function renderPreviewD(){
+  const box = $("dxPreview");
+  const P = S.parsedD;
+  if(!P){ box.innerHTML = ""; return; }
+  const bdrs = Array.from(new Set(P.rows.map(r=>r.bdr))).sort((a,b)=>{ const ia=ORDER.indexOf(a), ib=ORDER.indexOf(b); return (ia<0?99:ia)-(ib<0?99:ib); });
+  const byDisp = {};
+  P.rows.forEach(r=>{ const o = byDisp[r.disposition] || (byDisp[r.disposition] = {}); o[r.bdr] = (o[r.bdr]||0) + r.calls; });
+  const names = Object.keys(byDisp).sort((a,b)=>Object.values(byDisp[b]).reduce((x,y)=>x+y,0) - Object.values(byDisp[a]).reduce((x,y)=>x+y,0));
+  let tb = '<table><thead><tr><th>Outcome</th>'+bdrs.map(b=>'<th>'+h(b)+'</th>').join("")+'<th>Team</th></tr></thead><tbody>';
+  names.forEach(n=>{ tb += '<tr><td>'+h(n)+'</td>'+bdrs.map(b=>'<td>'+(byDisp[n][b] ? num(byDisp[n][b]) : "–")+'</td>').join("")+'<td>'+num(Object.values(byDisp[n]).reduce((x,y)=>x+y,0))+'</td></tr>'; });
+  tb += '</tbody></table>';
+  const skipN = P.skipped.reduce((a,r)=>a+r.calls,0);
+  const skip = P.skipped.length ? '<details><summary>'+num(skipN)+' calls left out: not on the roster or not in the tier scheme</summary><div class="table-wrap"><table><thead><tr><th>Sequence</th><th>Calls</th><th>Why</th></tr></thead><tbody>'+
+    P.skipped.slice().sort((a,b)=>b.calls-a.calls).map(r=>'<tr><td>'+h(r.name)+'</td><td>'+num(r.calls)+'</td><td>'+h(r.why)+'</td></tr>').join("")+'</tbody></table></div></details>' : "";
+  const wl = P.weeks.map(w=>'week ending Sat '+lbl(w)).join(" and ");
+  box.innerHTML = '<div class="cr-prev"><h3>Call outcomes ready to save</h3>'+
+    '<div class="sub">'+h(S.fileD)+' · '+num(P.used)+' of '+num(P.total)+' calls counted · '+h(wl)+'</div>'+
+    '<div class="cr-warn">Saving replaces the outcomes already stored for '+h(bdrs.join(", "))+' in '+(P.weeks.length > 1 ? 'those weeks' : 'that week')+'. Export the whole week (Sunday to Saturday) so nothing is dropped.</div>'+
+    '<div class="table-wrap">'+tb+'</div>'+skip+
+    '<div class="row"><button class="btn ghost" type="button" id="dxCancel">Cancel</button><button class="btn" type="button" id="dxSave"'+(S.savingD?" disabled":"")+'>Save call outcomes</button></div></div>';
+  $("dxCancel").onclick = () => { S.parsedD = null; S.fileD = ""; $("dxFile").value = ""; renderPreviewD(); };
+  $("dxSave").onclick = saveD;
+}
+async function saveD(){
+  if(!S.parsedD || S.savingD) return;
+  S.savingD = true; renderPreviewD();
+  try{
+    const P = S.parsedD;
+    await call("/dispositions", { method:"POST", headers:{ "Content-Type":"application/json" }, body: JSON.stringify({ rows: P.rows }) });
+    S.parsedD = null; S.fileD = ""; $("dxFile").value = "";
+    renderPreviewD();
+    say("Call outcomes saved ("+num(P.used)+" calls)");
+  }catch(e){
+    $("dxPreview").insertAdjacentHTML("afterbegin", '<div class="cr-bad">Could not save: '+h(e.message)+'</div>');
+  }finally{ S.savingD = false; if(S.parsedD) renderPreviewD(); }
+}
+function onFileD(f){
+  if(!f) return;
+  if(cst()){ say("Call outcomes are tracked for the JF team only. Switch to JF first."); return; }
+  if(!/\.csv$/i.test(f.name) && !/csv/i.test(f.type)){ say("Choose the Calls Library CSV from Nooks"); return; }
+  if(f.size > 12_000_000){ say("That file is too big to be the Calls Library export"); return; }
+  if(!S.data){ say("Still loading, try again in a second"); return; }
+  const rd = new FileReader();
+  rd.onload = () => {
+    try{ S.parsedD = mapCalls(parseCSV(String(rd.result))); S.fileD = f.name; renderPreviewD(); $("dxPreview").scrollIntoView({ behavior:"smooth", block:"nearest" }); }
+    catch(e){ S.parsedD = null; $("dxPreview").innerHTML = '<div class="cr-bad">'+h(e.message)+'</div>'; }
+  };
+  rd.readAsText(f);
+}
+
 async function load(){
   const j = await call("/state");
   S.data = j;
@@ -736,6 +832,13 @@ function wire(){
   ["dragenter","dragover"].forEach(ev=>drop.addEventListener(ev, e=>{ e.preventDefault(); drop.classList.add("over"); }));
   ["dragleave","drop"].forEach(ev=>drop.addEventListener(ev, e=>{ e.preventDefault(); drop.classList.remove("over"); }));
   drop.addEventListener("drop", e=>{ const f = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0]; onFile(f); });
+  const dx = $("dxDrop"), dxf = $("dxFile");
+  dx.onclick = () => dxf.click();
+  dx.onkeydown = e => { if(e.key === "Enter" || e.key === " "){ e.preventDefault(); dxf.click(); } };
+  dxf.onchange = () => onFileD(dxf.files[0]);
+  ["dragenter","dragover"].forEach(ev=>dx.addEventListener(ev, e=>{ e.preventDefault(); dx.classList.add("over"); }));
+  ["dragleave","drop"].forEach(ev=>dx.addEventListener(ev, e=>{ e.preventDefault(); dx.classList.remove("over"); }));
+  dx.addEventListener("drop", e=>{ e.stopPropagation(); const f = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0]; onFileD(f); });
   $("crSunday").onchange = () => { updateWeekLbl(); renderPreview(); };
   $("crSunday").value = sundayOnOrBefore(todayStr()); updateWeekLbl();
   $("crPrev").onclick = () => {

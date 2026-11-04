@@ -559,8 +559,10 @@ function dayPillClass(d) { return d == null ? "ok" : d > 30 ? "bad" : d > 14 ? "
 function renderMspKpis(s) {
   var deltaQ = s.new_prev_quarter ? Math.round(((s.new_this_quarter - s.new_prev_quarter) / s.new_prev_quarter) * 1000) / 10 : null;
   var kpis = [
-    { k: "MSP companies (JF TVL Viable + RTB TVL)", v: s.tvl_rtb_union_total != null ? s.tvl_rtb_union_total : "—" },
+    { k: "Confirmed MSP domains matched in HubSpot", v: s.hubspot_domain_matches != null ? s.hubspot_domain_matches : "—" },
     { k: "Passes ICP filter (20-500 employees, US/Canada)", v: s.total_msp_companies },
+    { k: "JF TVL Viable Companies (HubSpot list, verified)", v: s.tvl_viable_count != null ? s.tvl_viable_count : "—" },
+    { k: "JF RTB TVL Companies (HubSpot list, verified)", v: s.rtb_tvl_count != null ? s.rtb_tvl_count : "—" },
     { k: "Distributed this quarter (" + s.quarter_label + ")", v: s.new_this_quarter, d: deltaQ == null ? null : (deltaQ >= 0 ? "+" : "") + deltaQ + "% vs last quarter (" + s.new_prev_quarter + ")" },
     { k: "MSP companies in an open deal", v: s.in_deals_count },
     { k: "MSP companies not in a deal", v: s.not_in_deals_count },

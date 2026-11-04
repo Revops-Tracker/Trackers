@@ -559,7 +559,8 @@ function dayPillClass(d) { return d == null ? "ok" : d > 30 ? "bad" : d > 14 ? "
 function renderMspKpis(s) {
   var deltaQ = s.new_prev_quarter ? Math.round(((s.new_this_quarter - s.new_prev_quarter) / s.new_prev_quarter) * 1000) / 10 : null;
   var kpis = [
-    { k: "Total MSP companies in CRM", v: s.total_msp_companies },
+    { k: "Confirmed MSP domains matched in HubSpot", v: s.hubspot_domain_matches != null ? s.hubspot_domain_matches : "—" },
+    { k: "Total MSP companies in CRM (passes ICP filter)", v: s.total_msp_companies },
     { k: "Distributed this quarter (" + s.quarter_label + ")", v: s.new_this_quarter, d: deltaQ == null ? null : (deltaQ >= 0 ? "+" : "") + deltaQ + "% vs last quarter (" + s.new_prev_quarter + ")" },
     { k: "MSP companies in an open deal", v: s.in_deals_count },
     { k: "MSP companies not in a deal", v: s.not_in_deals_count },

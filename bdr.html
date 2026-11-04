@@ -1097,12 +1097,13 @@
     });
     function dspBlock(l, who) {   // collapsed 'Outcomes' dropdown under a list name: how its calls ended, by disposition
       var o = dsp[l.tier + '|' + l.list_name];
-      if (!o) return '';
+      var none = who.some(function (r) { return dials(r, l) > 0; }) ? '<div style="font-size:12px;color:var(--muted);margin-top:4px;font-weight:400">No outcomes in the Calls Library upload for this period</div>' : '';
+      if (!o) return none;
       var items = Object.keys(o).map(function (name) {
         var per = who.map(function (r) { return Math.round(o[name][r] || 0); });
         return { name: name, per: per, tot: per.reduce(function (a, b) { return a + b; }, 0) };
       }).filter(function (x) { return x.tot > 0; }).sort(function (a, b) { return b.tot - a.tot || a.name.localeCompare(b.name); });
-      if (!items.length) return '';
+      if (!items.length) return none;
       var all = items.reduce(function (a, x) { return a + x.tot; }, 0), multi = who.length > 1;
       return '<details class="dsp"><summary>Outcomes &middot; ' + f0(all) + ' calls</summary><table class="dsp-t">'
         + (multi ? '<tr><th></th>' + who.map(function (r) { return '<th>' + esc(r) + '</th>'; }).join('') + '<th>Team</th></tr>' : '')

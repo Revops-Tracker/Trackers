@@ -577,22 +577,30 @@ function renderMspTrendChart(weeklyTrend) {
   var accent = cssVar("--accent"), ink = cssVar("--ink"), line = cssVar("--line");
   var title = document.getElementById("mspTrendTitle"), note = document.getElementById("mspTrendNote");
   if (trendChart) trendChart.destroy();
-  title.textContent = "New MSP companies per week (by date of distribution)";
-  note.textContent = "All ICP-filtered MSP companies in this dashboard, by Date of Distribution. For JF TVL Viable / JF RTB TVL list growth over time, use each list's own Performance tab in HubSpot (links below).";
+  var hasTvlSplit = weeklyTrend.length && weeklyTrend[0].tvl_new != null;
+  title.textContent = hasTvlSplit ? "New TVL + RTB TVL companies per week (by date of distribution)" : "New MSP companies per week (by date of distribution)";
+  note.textContent = hasTvlSplit
+    ? "Weekly growth of JF TVL Viable + JF RTB TVL list membership, by Date of Distribution. Cumulative total is the combined size of both lists today."
+    : "All ICP-filtered MSP companies in this dashboard, by Date of Distribution. For JF TVL Viable / JF RTB TVL list growth over time, use each list's own Performance tab in HubSpot (links below).";
+  var barDatasets = hasTvlSplit
+    ? [
+        { type: "bar", label: "TVL Viable", data: weeklyTrend.map(function (w) { return w.tvl_new; }), backgroundColor: accent, stack: "new", order: 2, yAxisID: "y" },
+        { type: "bar", label: "RTB TVL", data: weeklyTrend.map(function (w) { return w.rtb_new; }), backgroundColor: ink, stack: "new", order: 2, yAxisID: "y" },
+      ]
+    : [{ type: "bar", label: "New MSP companies", data: weeklyTrend.map(function (w) { return w.new_count; }), backgroundColor: accent, order: 2, yAxisID: "y" }];
   trendChart = new Chart(ctx, {
     data: {
       labels: labels,
-      datasets: [
-        { type: "bar", label: "New MSP companies", data: weeklyTrend.map(function (w) { return w.new_count; }), backgroundColor: accent, order: 2, yAxisID: "y" },
+      datasets: barDatasets.concat([
         { type: "line", label: "Cumulative total", data: weeklyTrend.map(function (w) { return w.cumulative_total; }), borderColor: ink, backgroundColor: "transparent", tension: 0.25, order: 1, yAxisID: "y1" },
-      ],
+      ]),
     },
     options: {
       responsive: true, maintainAspectRatio: false,
       interaction: { mode: "index", intersect: false },
       scales: {
-        x: { grid: { color: line }, ticks: { color: ink } },
-        y: { position: "left", beginAtZero: true, grid: { color: line }, ticks: { color: ink, precision: 0 }, title: { display: true, text: "New / week", color: ink } },
+        x: { stacked: hasTvlSplit, grid: { color: line }, ticks: { color: ink } },
+        y: { stacked: hasTvlSplit, position: "left", beginAtZero: true, grid: { color: line }, ticks: { color: ink, precision: 0 }, title: { display: true, text: "New / week", color: ink } },
         y1: { position: "right", beginAtZero: true, grid: { display: false }, ticks: { color: ink, precision: 0 }, title: { display: true, text: "Cumulative", color: ink } },
       },
       plugins: { legend: { labels: { color: ink } } },

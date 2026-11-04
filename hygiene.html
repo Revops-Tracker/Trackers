@@ -202,6 +202,12 @@
       <h2 id="mspTrendTitle">New MSP companies per week</h2>
       <p id="mspTrendNote" class="section-sub"></p>
       <div class="chart-wrap"><canvas id="mspTrendChart"></canvas></div>
+      <p class="section-sub">
+        List growth over time (HubSpot's own Performance tab):
+        <a href="https://app.hubspot.com/contacts/1905790/objectLists/19203" target="_blank" rel="noopener">JF TVL Viable Companies</a>
+        &middot;
+        <a href="https://app.hubspot.com/contacts/1905790/objectLists/20130" target="_blank" rel="noopener">JF RTB TVL Companies</a>
+      </p>
     </div>
     <div class="card">
       <h2>Retainer pipeline — deals by stage</h2>
@@ -567,38 +573,11 @@ function renderMspKpis(s) {
 function renderMspTrendChart(weeklyTrend) {
   var ctx = document.getElementById("mspTrendChart").getContext("2d");
   var labels = weeklyTrend.map(function (w) { return w.week_start.slice(5); });
-  var accent = cssVar("--accent"), ink = cssVar("--ink"), line = cssVar("--line"), warn = cssVar("--warn");
+  var accent = cssVar("--accent"), ink = cssVar("--ink"), line = cssVar("--line");
   var title = document.getElementById("mspTrendTitle"), note = document.getElementById("mspTrendNote");
   if (trendChart) trendChart.destroy();
-  // New snapshots carry TVL Viable / RTB TVL list growth on each weekly entry; older ones only have the
-  // MSP createdate counts, so keep drawing those until the next scan writes the new fields.
-  if (weeklyTrend.length && weeklyTrend[0].tvl_new != null) {
-    var last = weeklyTrend[weeklyTrend.length - 1];
-    title.textContent = "TVL Viable & RTB TVL companies added per week";
-    note.textContent = "Current members of each HubSpot list, grouped by the company's Date of Distribution. Week starts Monday (UTC); the latest week is partial.";
-    trendChart = new Chart(ctx, {
-      data: {
-        labels: labels,
-        datasets: [
-          { type: "bar", label: "JF TVL Viable — added (list total " + last.tvl_cumulative.toLocaleString() + ")", data: weeklyTrend.map(function (w) { return w.tvl_new; }), backgroundColor: accent, order: 2, yAxisID: "y" },
-          { type: "line", label: "JF RTB TVL — added (list total " + last.rtb_cumulative.toLocaleString() + ")", data: weeklyTrend.map(function (w) { return w.rtb_new; }), borderColor: warn, backgroundColor: warn, pointRadius: 4, tension: 0, order: 1, yAxisID: "y1" },
-        ],
-      },
-      options: {
-        responsive: true, maintainAspectRatio: false,
-        interaction: { mode: "index", intersect: false },
-        scales: {
-          x: { grid: { color: line }, ticks: { color: ink } },
-          y: { position: "left", beginAtZero: true, grid: { color: line }, ticks: { color: ink, precision: 0 }, title: { display: true, text: "TVL Viable added / week", color: ink } },
-          y1: { position: "right", beginAtZero: true, grid: { display: false }, ticks: { color: ink, precision: 0 }, title: { display: true, text: "RTB TVL added / week", color: ink } },
-        },
-        plugins: { legend: { labels: { color: ink } } },
-      },
-    });
-    return;
-  }
-  title.textContent = "New MSP companies per week";
-  note.textContent = "Legacy view (HubSpot create date). Run a scan to switch to TVL Viable / RTB TVL growth.";
+  title.textContent = "New MSP companies per week (by date of distribution)";
+  note.textContent = "All ICP-filtered MSP companies in this dashboard, by Date of Distribution. For JF TVL Viable / JF RTB TVL list growth over time, use each list's own Performance tab in HubSpot (links below).";
   trendChart = new Chart(ctx, {
     data: {
       labels: labels,
@@ -692,7 +671,6 @@ document.getElementById("runScanBtn").onclick = function () {
     if (d.ok) {
       msg.textContent = "Done — " + d.run.flags_created + " flags from " + d.run.companies_scanned + " companies." +
         (d.msp && d.msp.error ? " MSP analytics failed: " + d.msp.error : "") +
-        (d.msp && d.msp.list_growth_error ? " TVL/RTB list growth failed: " + d.msp.list_growth_error : "") +
         (d.exclusions && d.exclusions.error ? " Exclusions scan failed: " + d.exclusions.error : "");
       msg.className = (d.msp && d.msp.error) || (d.exclusions && d.exclusions.error) ? "msg err" : "msg ok";
     } else { msg.textContent = d.error || "failed"; msg.className = "msg err"; }

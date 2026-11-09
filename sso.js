@@ -6,7 +6,7 @@
   var C = window.JF_CONFIG, KEY = 'jf_token';
   var PAGES = { bdr: ['bdr.html', 'BDR tracker'], ae: ['ae.html', 'AE tracker'], cst: ['cst.html', 'CST tracker'], leaderboard: ['leaderboard-auto.html', 'Leaderboard'], reporting: ['reporting.html', 'Sales L10'], revops: ['revops.html', 'RevOps L10'], hygiene: ['hygiene.html', 'CRM Hygiene'] }; // auto leaderboard (HubSpot-driven, daily); Max's leaderboard.html still reachable by URL
   var ORDER = ['bdr', 'ae', 'cst', 'leaderboard', 'reporting', 'revops', 'hygiene']; // reporting = admins only (granted by jf-sso); hygiene = only whoever jf-sso's roster grants 'hygiene' to
-  var NEEDS = { revops: 'reporting' }; // pages that ride on another page's access (RevOps L10 = same admins as Sales L10)
+  var NEEDS = { revops: 'reporting', access: 'reporting' }; // pages that ride on another page's access (RevOps L10 + Access = admins, same as Sales L10)
   function can(u, k) { return u.access.indexOf(NEEDS[k] || k) !== -1; }
 
   function get() { try { return localStorage.getItem(KEY); } catch (e) { return null; } }
@@ -52,6 +52,8 @@
       '.jfnav-me{display:flex;align-items:center;gap:10px;white-space:nowrap;font-size:13px;color:#97A3BD}' +
       '.jfnav-me button{font:inherit;background:transparent;color:#E8ECF5;border:1px solid rgba(255,255,255,.25);border-radius:7px;padding:5px 10px;cursor:pointer}' +
       '.jfnav-me button:hover{background:rgba(255,255,255,.08)}' +
+      '.jfnav-gear{color:#C9D3EA;text-decoration:none;padding:6px 10px;border-radius:7px;font-weight:600}' +
+      '.jfnav-gear:hover{background:rgba(255,255,255,.08);color:#fff}.jfnav-gear[aria-current="page"]{background:#fff;color:#14213D}' +
       '@media (max-width:1000px){.jfnav-email{display:none}}' +
       '@media (max-width:720px){.jfnav{gap:10px;padding:0 12px}.jfnav-brand{display:none}}';
     document.head.appendChild(css);
@@ -61,7 +63,8 @@
     d.className = 'jfnav';
     d.setAttribute('aria-label', 'Trackers');
     d.innerHTML = '<span class="jfnav-brand">JF Sales</span><div class="jfnav-tabs">' + tabs + '</div>' +
-      '<div class="jfnav-me"><span class="jfnav-email"></span><button type="button">Sign out</button></div>';
+      '<div class="jfnav-me">' + (can(u, 'access') ? '<a class="jfnav-gear" href="access.html"' + (window.JF_PAGE === 'access' ? ' aria-current="page"' : '') + ' title="Who can sign in">&#9881; Access</a>' : '') +
+      '<span class="jfnav-email"></span><button type="button">Sign out</button></div>';
     d.querySelector('.jfnav-email').textContent = u.email;
     d.querySelector('button').title = 'Signed in as ' + u.email;
     d.querySelector('button').onclick = function () { clear(); goLogin(); };

@@ -1,6 +1,8 @@
 <!doctype html>
 <html lang="en">
-<head><script>window.JF_PAGE='reporting';document.documentElement.classList.add('view-reporting')</script><script src="config.js"></script><script src="sso.js?v=20261109a"></script>
+<head><script>window.JF_PAGE='reporting';document.documentElement.classList.add('view-reporting');
+  // Local preview only: ?demo=1 on localhost skips sign-in and reads demo-l10.json (never committed).
+  if (/^(localhost|127.0.0.1)$/.test(location.hostname) && /[?&]demo=1/.test(location.search)) window.JF_DEMO = window.JF_LOGIN = true;</script><script src="config.js"></script><script src="sso.js?v=20261109a"></script>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Sales L10</title>
@@ -247,6 +249,14 @@ section[hidden]{display:none}
 html.view-reporting .l10-tabs{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 22px;border-bottom:1px solid var(--line)}
 .l10-tabs button{border:0;background:transparent;padding:10px 14px;font-weight:600;color:var(--muted);cursor:pointer;border-bottom:3px solid transparent;margin-bottom:-1px;font-size:15px}
 .l10-tabs button[aria-selected="true"]{color:var(--ink);border-bottom-color:var(--fill)}
+.l10-era{display:none}
+html.view-reporting .l10-era{display:flex;flex-wrap:wrap;align-items:center;gap:10px 16px;margin:0 0 14px;padding:12px 14px;border:1px solid var(--line);border-radius:12px;background:var(--panel)}
+.l10-era .lbl{font-weight:700;font-size:14px}
+.era-seg{display:inline-flex;border:1px solid var(--line);border-radius:999px;overflow:hidden}
+.era-seg button{border:0;background:transparent;padding:7px 14px;font:inherit;font-size:13.5px;cursor:pointer;color:var(--ink)}
+.era-seg button+button{border-left:1px solid var(--line)}
+.era-seg button[aria-pressed="true"]{background:var(--ink);color:var(--panel);font-weight:600}
+.l10-era .note{flex:1 1 320px;font-size:12.5px;color:var(--muted)}
 html.view-reporting section[data-tab][hidden]{display:none!important}
 details.how{margin-top:12px;color:var(--muted);font-size:13px}
 details.how summary{cursor:pointer;font-weight:600;color:var(--muted);list-style:none;display:inline-flex;align-items:center;gap:6px}
@@ -341,6 +351,15 @@ details.how > div{margin-top:8px;line-height:1.5}
     </div>
   </section>
 
+  <div class="l10-era" id="l10Era" role="group" aria-label="Sales process">
+    <span class="lbl">Sales process</span>
+    <div class="era-seg" id="eraSeg">
+      <button type="button" data-era="old" aria-pressed="false">Old (before Oct 27)</button>
+      <button type="button" data-era="new" aria-pressed="true">New 3-call close (from Oct 27)</button>
+      <button type="button" data-era="all" aria-pressed="false">Both</button>
+    </div>
+    <span class="note" id="eraNote"></span>
+  </div>
   <nav class="l10-tabs" id="l10Tabs" role="tablist" aria-label="Sales L10 views">
     <button role="tab" data-t="sc" aria-selected="true">Scorecard</button>
     <button role="tab" data-t="bd" aria-selected="false">BDRs</button>
@@ -639,7 +658,8 @@ const LABEL = {
 };
 const SHOWS = new Set(["first_time_show","moved_show","recovered_show","cst_show"]);
 const GOOD = SHOWS, BAD = new Set(["no_show","cst_unverified","closed_no_mtg","awaiting","awaiting_recovery"]);
-const EV_LABEL = {design:"Design created", dheld:"Design held", prop:"Prop update held", diag:"Moved to Diagnosis", contract:"Contract sent", won:"Closed won"};
+const EV_LABEL = {design:"Design created", dheld:"Design held", prop:"Prop update held", diag:"Moved to Diagnosis", contract:"Contract sent", won:"Closed won",
+  abook:"Moved to Design/Audit", arun:"Audit held", ans:"Audit no-show", apend:"Audit: not confirmed yet", pbook:"Moved to Prop Review/Contract", prun:"Prop review held", pns:"Prop review no-show", ppend:"Prop review: not confirmed yet"};
 
 /* ---------- date helpers ---------- */
 const pad = n => String(n).padStart(2,"0");
@@ -680,7 +700,9 @@ function paceFraction(p){
 }
 
 /* ---------- state ---------- */
-const state = { kind:"week", offset:0, rank:"had", aeRank:"cwd", me:null, showup:[], events:[], ov:new Map(), pend:new Map(), reviews:new Map(), lastRun:null };
+const state = { kind:"week", offset:0, rank:"had", aeRank:"cwd", me:null, showup:[], events:[], ov:new Map(), pend:new Map(), reviews:new Map(), lastRun:null,
+  // Sales process era (Sales L10 only). Official switch to the 3-call close = lb_auto_config.process_cutover (2026-10-27).
+  era:(()=>{ try{ return sessionStorage.getItem("l10-era") || "new"; }catch(e){ return "new"; } })(), cutover:"2026-10-27", v2ev:[], cohort:new Map() };
 const REVIEW_SINCE = "2026-10-01";   // reps sign off on everything from here on
 const REPS = ["Brandon","Issa","Dipen"];
 
@@ -711,6 +733,35 @@ function effEvents(){
     return e;
   });
 }
+
+/* ---------- sales process era: Old (before the cutover) vs New 3-call close ---------- */
+// A deal belongs to the process it STARTED in: its first discovery call (held, or first slot) before the cutover = Old,
+// on/after = New. So an October-disco deal that closes in November still counts as Old. Deals with no disco record fall
+// back to the record's own date. REPORTING view only; the leaderboard always shows everything.
+const AE_NAME = {Dipen:"Dipen Mistry", Armin:"Armin"};
+function buildEra(r){
+  state.cutover = r.cutover || "2026-10-27";
+  const c = new Map(), put = (id, iso) => { const d = torDay(iso); if(!id || !d) return; const k = String(id); if(!c.has(k) || d < c.get(k)) c.set(k, d); };
+  state.showup.forEach(x=>put(x.deal_id, x.run_at || x.first_slot));
+  state.cohort = c;
+  // new-process call + stage records from the AE tracker v2 job, with the AE's own corrections applied
+  const ov = new Map((r.v2ov||[]).map(o=>[o.key, o]));
+  const su = new Map(); state.showup.forEach(x=>{ const k=String(x.deal_id); if(!su.has(k) || (x.seg||0) > (su.get(k).seg||0)) su.set(k, x); });
+  const KIND = {audit_booked:{"":"abook"}, prop_booked:{"":"pbook"}, audit_call:{held:"arun", noshow:"ans", pending:"apend"}, prop_call:{held:"prun", noshow:"pns", pending:"ppend"}};
+  state.v2ev = (r.v2||[]).map(x=>{
+    const o = ov.get(x.key); if(o && o.exclude) return null;
+    const st = (o && o.status) || x.status || "";
+    const kind = KIND[x.kind] && KIND[x.kind][x.kind.endsWith("_booked") ? "" : st]; if(!kind) return null;
+    const s0 = su.get(String(x.deal_id)) || {};
+    return {id:"v2:"+x.key, key:"v2:"+x.key, v2:true, kind, deal_id:x.deal_id, deal_name:(x.deal_name||x.title||"Unlinked meeting").replace(/ ?-? ?(New )?Deal 2026 ?/,""), at:x.at,
+      title:x.title||"", ae:AE_NAME[x.rep]||x.rep, booker:s0.booker||"Inbound", utm:s0.utm||null, edited:!!o};
+  }).filter(Boolean);
+}
+const eraOf = r => { const d = state.cohort.get(String(r.deal_id)) || torDay(r.at || r.run_at || r.first_slot); return d && d >= state.cutover ? "new" : "old"; };
+const eraOk = r => !REPORTING || state.era==="all" || eraOf(r)===state.era;
+// metric lists: rows tagged era:"old" / era:"new" only show in that view (both in "Both")
+const eraPick = arr => arr.filter(x=>!x.era || !REPORTING || state.era==="all" || x.era===state.era);
+const v2For = (person, role, p) => state.v2ev.filter(e=>whoMatches(e, person, role) && utmOk(e,p) && inP(e.at,p) && eraOk(e));
 
 /* ---------- rep sign-off ---------- */
 const firstName = s => String(s||"").split(" ")[0];
@@ -779,12 +830,14 @@ const utmOf = r => r.utm===META_UTM ? META_UTM + (META_CH[attrOf(r.deal_id).meta
 const utmOk = (r,p) => !p || p.utm==null || (Array.isArray(p.utm) ? p.utm.includes(utmOf(r)) : utmOf(r)===p.utm);
 const utmName = u => u===NO_UTM ? "No UTM" : u.replace(/^Inbound - /,"");
 function statsFor(person, role, p){
-  const su = effShowup().filter(r=>!r.dropped && whoMatches(r, person, role) && utmOk(r,p));
-  const ev = effEvents().filter(r=>!r.dropped && whoMatches(r, person, role) && utmOk(r,p) && inP(r.at,p));
+  const su = effShowup().filter(r=>!r.dropped && whoMatches(r, person, role) && utmOk(r,p) && eraOk(r));
+  const ev = effEvents().filter(r=>!r.dropped && whoMatches(r, person, role) && utmOk(r,p) && inP(r.at,p) && eraOk(r));
   const s = showupStats(su, p);
   const k = kind => ev.filter(e=>e.kind===kind);
+  const v2 = v2For(person, role, p), k2 = kind => v2.filter(e=>e.kind===kind);
   return {...s, des:k("design"), dheld:k("dheld"), prop:k("prop"), diag:k("diag"), con:k("contract"), won:k("won"),
-    cwd: k("won").reduce((a,e)=>a+(Number(e.amount)||0),0)};
+    cwd: k("won").reduce((a,e)=>a+(Number(e.amount)||0),0),
+    abook:k2("abook"), arun:k2("arun"), ans:k2("ans"), apend:k2("apend"), pbook:k2("pbook"), prun:k2("prun"), pns:k2("pns"), ppend:k2("ppend")};
 }
 const valOf = (t,id) => id==="had"?t.had.length : id==="books"?t.books.length : id==="des"?t.des.length : id==="show"?t.show : id==="dq"?t.dqRate : t.first;
 
@@ -975,8 +1028,9 @@ function dealHTML(r, isEv){
   const what = o => `${o.cat?` to <b>${esc(LABEL[o.cat]||o.cat)}</b> (engine said ${esc(LABEL[r.engineCat]||r.engineCat)})`:""}${o.booker?`, credit to <b>${esc(o.booker)}</b>`:""}${o.exclude?", <b>not counted</b>":""}: “${esc(o.note)}”`;
   const corr = (r.ov ? `<div class="corr">Corrected by ${esc(r.ov.by_email)}${what(r.ov)}${r.ov.decided_by&&r.ov.decided_by!==r.ov.by_email?` · approved by ${esc(r.ov.decided_by)}`:""}</div>` : "")
              + (r.pend ? `<div class="pend">Proposed by ${esc(r.pend.by_email)}${what(r.pend)} · <b>waiting for Vianney or Max to approve</b></div>` : "");
-  const me = state.me || {};
+  const me = r.v2 ? {} : (state.me || {});
   const acts = [];
+  if(r.v2) acts.push(`<span class="prog">${r.edited?"Set by the AE on the AE tracker. ":""}Fix this on the <a href="ae.html">AE tracker</a>.</span>`);
   if(me.rep && reviewOwner(r)===me.rep && happened(r)){
     const st = reviewState(r, me.rep);
     if(st==="true") acts.push(`<span class="ok">✓ You confirmed this</span>`);
@@ -998,10 +1052,11 @@ let lastOpen = null;
 function openList(person, role, metric, title, pOverride){
   lastOpen = {person, role, metric, title, pOverride};
   const p = pOverride || periodFor(state.kind, state.offset);
-  const allSu = effShowup().filter(r=>whoMatches(r, person, role) && utmOk(r,p));
+  const allSu = effShowup().filter(r=>whoMatches(r, person, role) && utmOk(r,p) && eraOk(r));
   const live = allSu.filter(r=>!r.dropped);
   const s = showupStats(live, p);
-  const ev = effEvents().filter(r=>whoMatches(r, person, role) && utmOk(r,p) && inP(r.at,p));
+  const ev = effEvents().filter(r=>whoMatches(r, person, role) && utmOk(r,p) && inP(r.at,p) && eraOk(r));
+  const v2 = v2For(person, role, p), v2Of = (...k) => v2.filter(e=>k.includes(e.kind));
   const dropped = allSu.filter(r=>r.dropped && (inP(r.booked_at,p) || inP(r.first_slot,p) || (r.due_ts||[]).some(t=>inP(t,p))));
   const groups = [];
   const evOf = k => ev.filter(e=>e.kind===k);
@@ -1013,10 +1068,14 @@ function openList(person, role, metric, title, pOverride){
   else if(metric==="fdue") groups.push(["Held at first slot", s.f1], ["First slot came due, not held there", s.fdue.filter(r=>!s.f1.includes(r))]);
   else if(metric==="ns") groups.push(["No-shows (one per missed call)", [...new Set(s.ns)]]);
   else if(metric==="ca") groups.push(["Cancelled / DQ'd ahead", [...new Set(s.ca)]]);
+  else if(["arun","ans","ashow"].includes(metric)) groups.push(["Audits held", v2Of("arun")], ["Audit no-shows", v2Of("ans")], ["Not confirmed yet (the AE answers on the AE tracker)", v2Of("apend")]);
+  else if(["prun","pns","pshow"].includes(metric)) groups.push(["Prop reviews held", v2Of("prun")], ["Prop review no-shows", v2Of("pns")], ["Not confirmed yet (the AE answers on the AE tracker)", v2Of("ppend")]);
+  else if(metric==="pbook") groups.push([null, v2Of("pbook")]);
   else if(["des","dheld","prop","diag","con","won"].includes(metric)) groups.push([null, evOf({des:"design",dheld:"dheld",prop:"prop",diag:"diag",con:"contract",won:"won"}[metric])]);
   else {
     groups.push(["Held", s.had], ["Due but not held", s.notHad], ["Booked, not due yet", s.books.filter(r=>!s.due.includes(r))]);
     if(ev.length) groups.push(["Pipeline", ev]);
+    if(v2.length) groups.push(["New-process calls", v2]);
   }
   if(dropped.length && ["all","books","due","fdue"].includes(metric)) groups.push(["Not counted (corrected out)", dropped]);
   showDialog(title, `${p.label}. Click a deal name to open it in HubSpot.`, groups);
@@ -1081,6 +1140,7 @@ function reopen(){
 /* ---------- data ---------- */
 function token(){ try { return localStorage.getItem("jf_token"); } catch(e){ return null; } }
 async function call(path, body){
+  if(window.JF_DEMO) return path.startsWith("/state") ? {ok:true, ...(await (await fetch("demo-l10.json")).json())} : {ok:false, error:"Demo mode: nothing saved"};
   try{
     const res = await fetch(API+path, body ? {method:"POST", headers:{"Content-Type":"application/json", Authorization:"Bearer "+token()}, body:JSON.stringify(body)}
                                            : {headers:{Authorization:"Bearer "+token()}, cache:"no-store"});
@@ -1097,6 +1157,8 @@ async function refresh(){
   state.pend = new Map((r.overrides||[]).filter(o=>o.status==="pending").map(o=>[o.key,o]));
   state.reviews = new Map((r.reviews||[]).map(v=>[v.key+"|"+v.rep, v]));
   state.attrs = new Map((r.attrs||[]).map(a=>[String(a.deal_id), a.p||{}]));
+  buildEra(r);
+  applyEra();
   render();
   if(REPORTING && !state.act) loadActivity();
 }
@@ -1112,6 +1174,28 @@ async function loadActivity(){
   renderScorecard();
 }
 function toast(msg){ const t=document.getElementById("toast"); t.textContent=msg; t.classList.add("show"); setTimeout(()=>t.classList.remove("show"),2200); }
+
+/* ---------- sales process toggle (Sales L10) ---------- */
+function applyEra(){
+  TR_METRICS = eraPick(TR_METRICS_ALL); BK_COLS = eraPick(BK_COLS_ALL); CL_COLS = eraPick(CL_COLS_ALL); SC_ROWS = eraPick(SC_ROWS_ALL); AX_COLS = eraPick(AX_COLS_ALL);
+  if(!TR_METRICS.some(x=>x.id===trend.metric)) trend.metric = TR_METRICS[0].id;
+  if(typeof AX!=="undefined" && !AX_COLS.some(x=>x.id===AX.metric)) AX.metric = AX_COLS[4].id;
+  const d = new Date(state.cutover+"T12:00:00"), cut = MON[d.getMonth()]+" "+d.getDate()+", "+d.getFullYear();
+  document.querySelectorAll("#eraSeg button").forEach(b=>{
+    b.setAttribute("aria-pressed", b.dataset.era===state.era);
+    if(b.dataset.era==="old") b.textContent = "Old (before "+MON[d.getMonth()]+" "+d.getDate()+")";
+    if(b.dataset.era==="new") b.textContent = "New 3-call close (from "+MON[d.getMonth()]+" "+d.getDate()+")";
+  });
+  const el = document.getElementById("eraNote");
+  if(el) el.textContent = state.era==="all"
+    ? "Showing every deal. Old and new metrics sit side by side; rates mix both processes."
+    : "Official switch to the 3-call close (Disco → Design/Audit → Prop Review/Contract): "+cut+". A deal counts in the process its first discovery call was in, so an older deal that closes after "+cut+" still counts as Old."
+      + (state.era==="new" ? " Audit and prop review calls come from the AE tracker (no-shows the AE confirms there)." : "");
+}
+document.querySelectorAll("#eraSeg button").forEach(b=>b.onclick=()=>{
+  state.era = b.dataset.era; try{ sessionStorage.setItem("l10-era", state.era); }catch(e){}
+  applyEra(); render(); if(typeof renderScorecard==="function" && state.act) renderScorecard();
+});
 
 /* ---------- events ---------- */
 document.querySelectorAll(".seg button").forEach(b=>b.onclick=()=>{state.kind=b.dataset.p; state.offset=0; render();});
@@ -1132,14 +1216,18 @@ document.addEventListener("click", e=>{
   const aq = e.target.closest("[data-approvals]"); if(aq){ openApprovals(); return; }
 });
 /* ---------- team trends: stacked bars by source, any range since Jul 1 ---------- */
-const TR_METRICS = [
+const TR_METRICS_ALL = [
   {id:"books", label:"Books",           f:t=>t.books.length, list:"books"},
   {id:"had",   label:"Runs had",        f:t=>t.had.length,   list:"had"},
-  {id:"des",   label:"Designs created", f:t=>t.des.length,   list:"des"},
-  {id:"dheld", label:"Designs held",    f:t=>t.dheld.length, list:"dheld"},
+  {id:"des",   label:"Designs created", f:t=>t.des.length,   list:"des", era:"old"},
+  {id:"dheld", label:"Designs held",    f:t=>t.dheld.length, list:"dheld", era:"old"},
+  {id:"desn",  label:"Moved to Design/Audit", f:t=>t.des.length, list:"des", era:"new"},
+  {id:"arun",  label:"Audits run",      f:t=>t.arun.length,  list:"arun", era:"new"},
+  {id:"prun",  label:"Prop reviews run", f:t=>t.prun.length, list:"prun", era:"new"},
   {id:"won",   label:"Closes",          f:t=>t.won.length,   list:"won"},
   {id:"mrr",   label:"MRR generated",   f:t=>t.cwd,          list:"won", money:true},
 ];
+let TR_METRICS = eraPick(TR_METRICS_ALL);
 // fixed colour per source (never by rank). Stack order + slots validated for colour-blind separation in light and dark.
 const TR_SOURCES = [
   {key:"Brandon Cameron", name:"Brandon",     g:"bdr",     c:"var(--s1)"},
@@ -1366,7 +1454,7 @@ const isBdrBooked = r => !!r.booker && !NOT_A_BDR.has(r.booker) && !CUR_AE.has(r
 const isInbLead = r => NOT_A_BDR.has(r.booker) || (/^Inbound - /.test(r.utm||"") && r.utm!==RTB_UTM);   // RTB hit = outbound
 const repOf = r => CUR_BDR.has(r.booker) ? r.booker : FORMER;
 const srcName = u => u===NO_UTM ? "No UTM" : u.replace(/^(Inbound|Outbound) - /,"");
-const BK_COLS = [
+const BK_COLS_ALL = [
   {label:"Books",           f:t=>t.books.length, list:"books"},
   {label:"Runs due",        f:t=>t.dueN,         list:"due"},
   {label:"Runs had",        f:t=>t.had.length,   list:"had"},
@@ -1376,10 +1464,13 @@ const BK_COLS = [
   {label:"No-shows",        f:t=>t.ns.length,    list:"ns"},
   {label:"Cancelled ahead", f:t=>t.ca.length,    list:"ca"},
   {label:"Recovery",        f:t=>t.recovery, pct:true, list:"rec", sub:t=>t.rec.length?t.recBack.length+" of "+t.rec.length:""},
-  {label:"Designs",         f:t=>t.des.length,   list:"des"},
+  {label:"Designs",         f:t=>t.des.length,   list:"des", era:"old"},
+  {label:"Design/Audit",    f:t=>t.des.length,   list:"des", era:"new"},
+  {label:"Audits run",      f:t=>t.arun.length,  list:"arun", era:"new"},
   {label:"Closes",          f:t=>t.won.length,   list:"won"},
   {label:"MRR",             f:t=>t.cwd, money:true, list:"won"},
 ];
+let BK_COLS = eraPick(BK_COLS_ALL);
 const bkShown = (c,v) => c.pct ? pctS(v) : c.money ? fmt(v||0,true) : fmt(v||0);
 const L10 = {
   bd: {kind:"month", offset:0, rep:"all", rows:{}},
@@ -1526,7 +1617,7 @@ function clCohort(p){
   const byDeal = k => { const m = new Map(); ev.filter(e=>e.kind===k).forEach(e=>{ if(!m.has(e.deal_id)) m.set(e.deal_id, e); }); return m; };
   const des = byDeal("design"), won = byDeal("won");
   const seen = new Set(), out = [];
-  effShowup().filter(r=>!r.dropped && r.run_at && inP(r.run_at, p)).sort((a,b)=>Date.parse(a.run_at)-Date.parse(b.run_at)).forEach(r=>{
+  effShowup().filter(r=>!r.dropped && r.run_at && inP(r.run_at, p) && eraOk(r)).sort((a,b)=>Date.parse(a.run_at)-Date.parse(b.run_at)).forEach(r=>{
     if(seen.has(r.deal_id)) return; seen.add(r.deal_id);
     out.push({run:r, a:attrOf(r.deal_id), des:des.get(r.deal_id)||null, won:won.get(r.deal_id)||null});
   });
@@ -1547,14 +1638,17 @@ function clFilter(rows, skip){
 }
 const clStats = rows => { const d = rows.filter(x=>x.des), w = rows.filter(x=>x.won); const mrr = w.reduce((s,x)=>s+(Number(x.won.amount)||0),0);
   return {rows, n:rows.length, d, w, mrr, rate: rows.length ? w.length/rows.length : null, drate: rows.length ? d.length/rows.length : null}; };
-const CL_COLS = [
+const CL_COLS_ALL = [
   {label:"Runs", f:t=>fmt(t.n), list:"runs"},
-  {label:"Designs", f:t=>fmt(t.d.length), list:"des"},
-  {label:"Run → design", f:t=>pctS(t.drate), list:"des"},
+  {label:"Designs", f:t=>fmt(t.d.length), list:"des", era:"old"},
+  {label:"Run → design", f:t=>pctS(t.drate), list:"des", era:"old"},
+  {label:"Design/Audit", f:t=>fmt(t.d.length), list:"des", era:"new"},
+  {label:"Run → Design/Audit", f:t=>pctS(t.drate), list:"des", era:"new"},
   {label:"Closes", f:t=>fmt(t.w.length), list:"won"},
   {label:"Close rate", f:t=>pctS(t.rate), list:"won", sub:t=>t.n ? t.w.length+" of "+t.n : ""},
   {label:"MRR", f:t=>fmt(t.mrr,true), list:"won"},
 ];
+let CL_COLS = eraPick(CL_COLS_ALL);
 const clKeys = (dim, g) => { const keys = dim.order ? dim.order.filter(k=>g.has(k)) : [...g.keys()].sort((a,b)=>((a===UNK)-(b===UNK)) || g.get(b).length-g.get(a).length || a.localeCompare(b));
   [...g.keys()].forEach(k=>{ if(!keys.includes(k)) keys.push(k); }); return keys; };   // any value not in the fixed order still shows
 const groupBy = (dim, rows) => { const g = new Map(); rows.forEach(x=>{ const k = dim.f(x.a); if(!g.has(k)) g.set(k, []); g.get(k).push(x); }); return g; };
@@ -1686,7 +1780,7 @@ function scGoal(m, g){
   }
   return null;
 }
-const SC_ROWS = [
+const SC_ROWS_ALL = [
   {grp:"Activity (Nooks)"},
   {id:"dials",    label:"Dials",                 act:true, f:a=>a.d},
   {id:"connects", label:"Connects",              act:true, f:a=>a.c},
@@ -1704,13 +1798,22 @@ const SC_ROWS = [
   {id:"first",    label:"1st-time show",         ratio:true, f:t=>t.first, list:"fdue", sub:t=>t.fdue.length?t.f1.length+" of "+t.fdue.length:""},
   {id:"dq",       label:"Showed, then DQ'd",     ratio:true, lower:true, f:t=>t.dqRate, list:"dq", sub:t=>t.had.length?t.hdq.length+" of "+t.had.length:""},
   {grp:"Pipeline"},
-  {id:"des",      label:"Designs created",       f:t=>t.des.length, list:"des"},
-  {id:"b2d",      label:"Book → design",         ratio:true, f:t=>t.books.length?t.des.length/t.books.length:null, list:"des"},
-  {id:"r2d",      label:"Run → design",          ratio:true, f:t=>t.had.length?t.des.length/t.had.length:null, list:"des"},
-  {id:"dheld",    label:"Designs held",          f:t=>t.dheld.length, list:"dheld"},
-  {id:"diag",     label:"Moved to diagnosis",    f:t=>t.diag.length, list:"diag"},
-  {id:"prop",     label:"Prop updates held",     f:t=>t.prop.length, list:"prop"},
-  {id:"con",      label:"Contracts sent",        f:t=>t.con.length, list:"con"},
+  {id:"des",      label:"Designs created",       f:t=>t.des.length, list:"des", era:"old"},
+  {id:"b2d",      label:"Book → design",         ratio:true, f:t=>t.books.length?t.des.length/t.books.length:null, list:"des", era:"old"},
+  {id:"r2d",      label:"Run → design",          ratio:true, f:t=>t.had.length?t.des.length/t.had.length:null, list:"des", era:"old"},
+  {id:"dheld",    label:"Designs held",          f:t=>t.dheld.length, list:"dheld", era:"old"},
+  {id:"diag",     label:"Moved to diagnosis",    f:t=>t.diag.length, list:"diag", era:"old"},
+  {id:"prop",     label:"Prop updates held",     f:t=>t.prop.length, list:"prop", era:"old"},
+  {id:"con",      label:"Contracts sent",        f:t=>t.con.length, list:"con", era:"old"},
+  {id:"des",      label:"Moved to Design/Audit", f:t=>t.des.length, list:"des", era:"new"},
+  {id:"r2dn",     label:"Run → Design/Audit",    ratio:true, f:t=>t.had.length?t.des.length/t.had.length:null, list:"des", era:"new"},
+  {id:"arun",     label:"Audits run",            f:t=>t.arun.length, list:"arun", era:"new"},
+  {id:"ans",      label:"Audit no-shows",        f:t=>t.ans.length, list:"ans", lower:true, era:"new"},
+  {id:"ashow",    label:"Audit show rate",       ratio:true, f:t=>(t.arun.length+t.ans.length)?t.arun.length/(t.arun.length+t.ans.length):null, list:"ashow", sub:t=>(t.arun.length+t.ans.length)?t.arun.length+" of "+(t.arun.length+t.ans.length):"", era:"new"},
+  {id:"pbook",    label:"Moved to Prop Review/Contract", f:t=>t.pbook.length, list:"pbook", era:"new"},
+  {id:"prun",     label:"Prop reviews run",      f:t=>t.prun.length, list:"prun", era:"new"},
+  {id:"pns",      label:"Prop review no-shows",  f:t=>t.pns.length, list:"pns", lower:true, era:"new"},
+  {id:"pshow",    label:"Prop review show rate", ratio:true, f:t=>(t.prun.length+t.pns.length)?t.prun.length/(t.prun.length+t.pns.length):null, list:"pshow", sub:t=>(t.prun.length+t.pns.length)?t.prun.length+" of "+(t.prun.length+t.pns.length):"", era:"new"},
   {grp:"AE time (slots)"},
   {id:"slots", label:"AE slots that came up", slot:true, f:x=>x.slots},
   {id:"cps",   label:"Calls per slot",        slot:true, dec:true, base:true, f:x=>x.slots?x.calls/x.slots:null, sub:x=>x.slots?x.calls+" calls":""},
@@ -1719,9 +1822,12 @@ const SC_ROWS = [
   {grp:"Revenue"},
   {id:"won",      label:"Closed won",            f:t=>t.won.length, list:"won"},
   {id:"cwd",      label:"MRR closed",            money:true, f:t=>t.cwd, list:"won"},
-  {id:"d2w",      label:"Design → close",        ratio:true, f:t=>t.des.length?t.won.length/t.des.length:null, list:"won"},
-  {id:"c2w",      label:"Contract → close",      ratio:true, f:t=>t.con.length?t.won.length/t.con.length:null, list:"won"},
+  {id:"d2w",      label:"Design → close",        ratio:true, f:t=>t.des.length?t.won.length/t.des.length:null, list:"won", era:"old"},
+  {id:"c2w",      label:"Contract → close",      ratio:true, f:t=>t.con.length?t.won.length/t.con.length:null, list:"won", era:"old"},
+  {id:"a2w",      label:"Audit run → close",     ratio:true, f:t=>t.arun.length?t.won.length/t.arun.length:null, list:"won", sub:t=>t.arun.length?t.won.length+" of "+t.arun.length:"", era:"new"},
+  {id:"p2w",      label:"Prop review run → close", ratio:true, f:t=>t.prun.length?t.won.length/t.prun.length:null, list:"won", sub:t=>t.prun.length?t.won.length+" of "+t.prun.length:"", era:"new"},
 ];
+let SC_ROWS = eraPick(SC_ROWS_ALL);
 const SC_SPLIT = [
   {key:"sc:split:out", name:"Outbound (BDR)", pred:isOutb},
   {key:"sc:split:inb", name:"Inbound leads",  pred:isLeadIn},
@@ -1892,7 +1998,7 @@ function axSlots(v, p){
   return {slots:m.size, calls, used};
 }
 const axStats = (v, p) => v.ae ? statsFor(v.ae, "ae", p) : v.aeFormer ? statsFor(FORMER, "ae", p) : statsFor(v.key, "bdr", p);
-const AX_COLS = [
+const AX_COLS_ALL = [
   {id:"due",   label:"Runs due",        f:t=>t.dueN, list:"due"},
   {id:"had",   label:"Runs had",        f:t=>t.had.length, list:"had"},
   {id:"slots", label:"Slots",           slot:true, f:x=>x.slots},
@@ -1902,15 +2008,22 @@ const AX_COLS = [
   {id:"rec",   label:"No-show recovery", ratio:true, f:t=>t.recovery, list:"rec", sub:t=>t.rec.length?t.recBack.length+" of "+t.rec.length:""},
   {id:"first", label:"1st-time show",   ratio:true, f:t=>t.first, list:"fdue", sub:t=>t.fdue.length?t.f1.length+" of "+t.fdue.length:""},
   {id:"dq",    label:"Showed, then DQ'd", ratio:true, f:t=>t.dqRate, list:"dq", sub:t=>t.had.length?t.hdq.length+" of "+t.had.length:""},
-  {id:"des",   label:"Designs",         f:t=>t.des.length, list:"des"},
-  {id:"r2d",   label:"Run → design",    ratio:true, f:t=>t.had.length?t.des.length/t.had.length:null, list:"des"},
-  {id:"dheld", label:"Designs held",    f:t=>t.dheld.length, list:"dheld"},
-  {id:"prop",  label:"Prop updates",    f:t=>t.prop.length, list:"prop"},
-  {id:"con",   label:"Contracts",       f:t=>t.con.length, list:"con"},
+  {id:"des",   label:"Designs",         f:t=>t.des.length, list:"des", era:"old"},
+  {id:"r2d",   label:"Run → design",    ratio:true, f:t=>t.had.length?t.des.length/t.had.length:null, list:"des", era:"old"},
+  {id:"dheld", label:"Designs held",    f:t=>t.dheld.length, list:"dheld", era:"old"},
+  {id:"prop",  label:"Prop updates",    f:t=>t.prop.length, list:"prop", era:"old"},
+  {id:"con",   label:"Contracts",       f:t=>t.con.length, list:"con", era:"old"},
+  {id:"desn",  label:"Design/Audit",    f:t=>t.des.length, list:"des", era:"new"},
+  {id:"arun",  label:"Audits run",      f:t=>t.arun.length, list:"arun", era:"new"},
+  {id:"ans",   label:"Audit no-shows",  f:t=>t.ans.length, list:"ans", era:"new"},
+  {id:"prun",  label:"Prop reviews run", f:t=>t.prun.length, list:"prun", era:"new"},
+  {id:"pns",   label:"Prop review no-shows", f:t=>t.pns.length, list:"pns", era:"new"},
   {id:"won",   label:"Closes",          f:t=>t.won.length, list:"won"},
-  {id:"d2w",   label:"Design → close",  ratio:true, f:t=>t.des.length?t.won.length/t.des.length:null, list:"won"},
+  {id:"d2w",   label:"Design → close",  ratio:true, f:t=>t.des.length?t.won.length/t.des.length:null, list:"won", era:"old"},
+  {id:"p2w",   label:"Prop review → close", ratio:true, f:t=>t.prun.length?t.won.length/t.prun.length:null, list:"won", sub:t=>t.prun.length?t.won.length+" of "+t.prun.length:"", era:"new"},
   {id:"cwd",   label:"MRR",             money:true, f:t=>t.cwd, list:"won"},
 ];
+let AX_COLS = eraPick(AX_COLS_ALL);
 const axVal = (c, v, p) => c.slot ? c.f(axSlots(v, p)) : c.f(axStats(v, p));
 const axSub = (c, v, p) => !c.sub ? "" : c.slot ? c.sub(axSlots(v, p)) : c.sub(axStats(v, p));
 function axWhoList(p){

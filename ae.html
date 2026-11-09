@@ -151,7 +151,7 @@
     });
   }
   function count(rs, r) {
-    var c = { dRun: 0, dRunB: 0, dRunI: 0, dNs: 0, dPend: 0, aBook: 0, aRun: 0, aNs: 0, aPend: 0, aUp: 0, pBook: 0, pRun: 0, pNs: 0, pPend: 0, pUp: 0, won: 0, mrr: 0, dq: 0, wonHT: 0, wonLT: 0 };
+    var c = { dRun: 0, dRunB: 0, dRunI: 0, dNs: 0, dPend: 0, aBook: 0, aRun: 0, aNs: 0, aPend: 0, aUp: 0, pBook: 0, pRun: 0, pNs: 0, pPend: 0, pUp: 0, won: 0, mrr: 0, dq: 0, wonHT: 0, wonLT: 0, wonNS: 0 };
     rs.forEach(function (x) {
       if (x.excluded || !inR(x.at, r)) return;
       if (x.kind === 'disco') { if (x.status === 'run') { c.dRun++; x.src === 'bdr' ? c.dRunB++ : c.dRunI++; } else if (x.status === 'noshow') c.dNs++; else if (x.status === 'pending' && new Date(x.at) < new Date()) c.dPend++; }
@@ -159,7 +159,7 @@
       else if (x.kind === 'prop_booked') c.pBook++;
       else if (x.kind === 'audit_call') { if (x.status === 'held') c.aRun++; else if (x.status === 'noshow') c.aNs++; else if (x.status === 'pending') c.aPend++; else if (x.status === 'upcoming') c.aUp++; }
       else if (x.kind === 'prop_call') { if (x.status === 'held') c.pRun++; else if (x.status === 'noshow') c.pNs++; else if (x.status === 'pending') c.pPend++; else if (x.status === 'upcoming') c.pUp++; }
-      else if (x.kind === 'won') { c.won++; c.mrr += Number(x.amount) || 0; x.offer === 'lt' ? c.wonLT++ : c.wonHT++; }
+      else if (x.kind === 'won') { c.won++; c.mrr += Number(x.amount) || 0; if (x.offer === 'lt') c.wonLT++; else if (x.offer === 'ht') c.wonHT++; else c.wonNS++; }
       else if (x.kind === 'dq') c.dq++;
     });
     return c;
@@ -197,7 +197,7 @@
       stage('Prop Review / Contract', c.pRun, 'prop reviews run',
         r('Moved to Prop Review', c.pBook) + r('No-shows', c.pNs) + r('Show rate', pct(c.pRun, c.pRun + c.pNs)) + (c.pPend ? r('Needs your answer', c.pPend, 'pend') : '') + (c.pUp ? r('Booked ahead', c.pUp) : ''),
         pct(c.won, c.pBook)) +
-      stage('Closed won', c.won, 'closes', r('MRR closed', money(c.mrr)) + r('HT / LT', c.wonHT + ' / ' + c.wonLT) + r('DQ&rsquo;d', c.dq) + r('Disco &rarr; close', pct(c.won, c.dRun)), null) +
+      stage('Closed won', c.won, 'closes', r('MRR closed', money(c.mrr)) + r('HT / LT', c.wonHT + ' / ' + c.wonLT) + (c.wonNS ? r('Offer not set', c.wonNS, 'pend') : '') + r('DQ&rsquo;d', c.dq) + r('Disco &rarr; close', pct(c.won, c.dRun)), null) +
       '</section>';
   }
 

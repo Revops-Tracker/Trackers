@@ -128,6 +128,25 @@
   .excl-prompt { color: var(--muted); padding: 24px 0; text-align: center; font-size: 13.5px; }
   .excl-note { font-size: 12.5px; color: var(--muted); margin-top: 10px; }
 
+  .upload-row { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+  .upload-drop { display: flex; align-items: center; gap: 10px; border: 1.5px dashed var(--line); border-radius: 12px;
+    padding: 12px 16px; flex: 1; min-width: 220px; cursor: pointer; transition: border-color .15s, background .15s; }
+  .upload-drop:hover, .upload-drop.dragover { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 6%, transparent); }
+  .upload-drop .u-icon { font-size: 20px; line-height: 1; }
+  .upload-drop .u-text { font-size: 13px; color: var(--muted); }
+  .upload-drop .u-text b { color: var(--ink); font-weight: 600; }
+  .upload-drop input[type="file"] { display: none; }
+  .progress-wrap { margin-top: 14px; }
+  .progress-track { background: var(--line); border-radius: 999px; height: 8px; overflow: hidden; }
+  .progress-fill { background: var(--accent); height: 100%; border-radius: 999px; transition: width .4s ease; width: 0%; }
+  .progress-label { font-size: 12.5px; color: var(--muted); margin-top: 6px; }
+  .kpi.good { border-color: color-mix(in srgb, var(--good) 45%, var(--line)); }
+  .kpi.good .v { color: var(--good); }
+  .kpi.warn { border-color: color-mix(in srgb, var(--warn) 45%, var(--line)); }
+  .kpi.warn .v { color: var(--warn); }
+  .kpi.muted .v { color: var(--muted); }
+  .revert-total { font-size: 12.5px; color: var(--muted); margin-top: 2px; }
+
   .flag-section-title { font-size: 11.5px; text-transform: uppercase; letter-spacing: .08em; color: var(--accent);
     font-weight: 700; margin: 18px 0 8px; }
   .flag-section-title:first-child { margin-top: 0; }
@@ -247,26 +266,35 @@
   <div id="revertTab">
     <h2 id="revert-section" class="section-title">Exclude Revert Check</h2>
     <p id="revertInfo" class="section-sub">
-      Drop a CSV of contacts (needs a <code>domain</code> column; <code>firstname</code>/<code>lastname</code>
-      help disambiguate companies with more than one excluded contact; a <code>contact_id</code> column
-      skips matching entirely). Finds the ones currently <code>exclude1=True</code> in HubSpot, classifies
-      why, and marks which are safe to revert. Analysis only — this never writes back to HubSpot.
+      Drop a CSV of contacts — needs a <code>domain</code> or <code>email</code> column (email is the most
+      reliable; <code>firstname</code>/<code>lastname</code> help disambiguate a company with more than one
+      excluded contact when matching by domain). Finds the ones currently <code>exclude1=True</code> in
+      HubSpot, classifies why, and marks which are safe to revert. Analysis only — this never writes back
+      to HubSpot.
     </p>
     <div class="card" id="revertAdminCard" style="display:none">
-      <div class="toolbar">
+      <div class="upload-row">
+        <label class="upload-drop" id="revertDropZone" for="revertFile">
+          <span class="u-icon">📄</span>
+          <span class="u-text" id="revertDropText"><b>Choose a CSV</b> or drag one here</span>
+        </label>
         <input type="file" id="revertFile" accept=".csv">
         <button class="primary" id="revertAnalyzeBtn" disabled>Analyze</button>
+      </div>
+      <div class="toolbar" style="margin-top:10px">
         <span class="msg" id="revertMsg"></span>
       </div>
-      <div id="revertProgress" style="display:none;margin-top:10px">
-        <div class="section-sub" id="revertProgressText"></div>
+      <div class="progress-wrap" id="revertProgress" style="display:none">
+        <div class="progress-track"><div class="progress-fill" id="revertProgressFill"></div></div>
+        <div class="progress-label" id="revertProgressText"></div>
       </div>
     </div>
     <div class="card" id="revertBreakdownCard" style="display:none">
       <h2>Breakdown</h2>
-      <div id="revertBreakdown"></div>
+      <div class="kpi-row" id="revertBreakdown"></div>
+      <p class="revert-total" id="revertTotal"></p>
       <div class="toolbar" style="margin-top:10px">
-        <button id="revertDownloadBtn">Download CSV</button>
+        <button class="primary" id="revertDownloadBtn">Download CSV</button>
         <span class="msg" id="revertDownloadMsg"></span>
       </div>
     </div>
@@ -797,15 +825,31 @@ var REVERT_BUCKET_LABELS = {
   too_recent: "Too recent (not yet stale)", unmatched: "Not matched to an exclude1=True contact",
 };
 var REVERT_BUCKET_ORDER = ["revert_candidates", "needs_human_review", "deferred", "customer_exclude", "permanent", "on_list_skipped", "too_recent", "unmatched"];
+var REVERT_BUCKET_KIND = { revert_candidates: "good", needs_human_review: "warn" };
 
-document.getElementById("revertFile").onchange = function (e) {
-  var f = e.target.files[0];
+function loadRevertFile(f) {
   var btn = document.getElementById("revertAnalyzeBtn");
+  var dropText = document.getElementById("revertDropText");
   if (!f) { revertFileText = null; btn.disabled = true; return; }
   var reader = new FileReader();
-  reader.onload = function () { revertFileText = reader.result; btn.disabled = false; };
+  reader.onload = function () {
+    revertFileText = reader.result; btn.disabled = false;
+    dropText.innerHTML = "<b>" + esc(f.name) + "</b> ready — click Analyze";
+  };
   reader.readAsText(f);
-};
+}
+document.getElementById("revertFile").onchange = function (e) { loadRevertFile(e.target.files[0]); };
+var revertDropZone = document.getElementById("revertDropZone");
+["dragenter", "dragover"].forEach(function (evt) {
+  revertDropZone.addEventListener(evt, function (e) { e.preventDefault(); revertDropZone.classList.add("dragover"); });
+});
+["dragleave", "drop"].forEach(function (evt) {
+  revertDropZone.addEventListener(evt, function (e) { e.preventDefault(); revertDropZone.classList.remove("dragover"); });
+});
+revertDropZone.addEventListener("drop", function (e) {
+  var f = e.dataTransfer.files && e.dataTransfer.files[0];
+  if (f) { document.getElementById("revertFile").files = e.dataTransfer.files; loadRevertFile(f); }
+});
 
 document.getElementById("revertAnalyzeBtn").onclick = function () {
   if (!revertFileText) return;
@@ -817,6 +861,7 @@ document.getElementById("revertAnalyzeBtn").onclick = function () {
       if (!d.ok) { btn.disabled = false; msg.textContent = d.error || "failed"; msg.className = "msg err"; return; }
       revertRunId = d.run_id;
       msg.textContent = d.input_count + " rows uploaded — analyzing…";
+      document.getElementById("revertProgressFill").style.width = "0%";
       document.getElementById("revertProgress").style.display = "block";
       if (revertPollTimer) clearInterval(revertPollTimer);
       revertPollTimer = setInterval(pollRevertStatus, 2500);
@@ -830,14 +875,20 @@ function pollRevertStatus() {
     if (!d.ok) return;
     var run = d.run;
     var progressText = document.getElementById("revertProgressText");
+    var progressFill = document.getElementById("revertProgressFill");
     var btn = document.getElementById("revertAnalyzeBtn");
     var msg = document.getElementById("revertMsg");
     if (run.status === "running" || run.status === "queued") {
-      progressText.textContent = run.progress_total
-        ? "Processing " + run.progress_done + " / " + run.progress_total + " excluded contacts…"
-        : "Scanning for exclude1=True contacts…";
+      if (run.progress_total) {
+        progressText.textContent = "Processing " + run.progress_done + " / " + run.progress_total + " excluded contacts…";
+        progressFill.style.width = Math.min(100, Math.round(100 * run.progress_done / run.progress_total)) + "%";
+      } else {
+        progressText.textContent = "Scanning for exclude1=True contacts…";
+        progressFill.style.width = "8%";
+      }
       return;
     }
+    progressFill.style.width = "100%";
     clearInterval(revertPollTimer); revertPollTimer = null;
     btn.disabled = false;
     document.getElementById("revertProgress").style.display = "none";
@@ -851,9 +902,10 @@ function renderRevertBreakdown(breakdown) {
   var box = document.getElementById("revertBreakdown");
   var total = 0; for (var k in breakdown) total += breakdown[k];
   box.innerHTML = REVERT_BUCKET_ORDER.filter(function (k) { return breakdown[k]; }).map(function (k) {
-    return '<div class="reason-row"><span class="rk">' + esc(REVERT_BUCKET_LABELS[k] || k) + '</span><span class="rv">' + breakdown[k] + "</span></div>";
+    var kind = REVERT_BUCKET_KIND[k] || "muted";
+    return '<div class="kpi ' + kind + '"><div class="k">' + esc(REVERT_BUCKET_LABELS[k] || k) + '</div><div class="v">' + breakdown[k] + "</div></div>";
   }).join("") || '<p class="empty">No exclude1=True contacts found among these rows.</p>';
-  if (total) box.innerHTML += '<p class="section-sub" style="margin-top:8px">' + total + " excluded contact(s) matched across the uploaded rows.</p>";
+  document.getElementById("revertTotal").textContent = total ? total + " excluded contact(s) matched across the uploaded rows." : "";
   document.getElementById("revertBreakdownCard").style.display = "block";
 }
 

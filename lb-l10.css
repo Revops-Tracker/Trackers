@@ -1,0 +1,91 @@
+/* Sales L10 only (reporting.html). Loaded after lb-core.css. */
+section[hidden]{display:none}
+/* Inbound deep dive (Sales L10) */
+.ib-ctl{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+.ib-tiles{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:12px;margin:4px 0 18px}
+.ib-tile{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:12px 14px}
+.ib-tile .k{font-size:13px;color:var(--muted)}
+.ib-tile .v{font-family:var(--display);font-weight:700;font-size:32px;line-height:1.1;font-variant-numeric:tabular-nums}
+.ib-tile .s{font-size:12px;color:var(--muted)}
+.ib-h{font-family:var(--display);font-weight:600;font-size:22px;margin:22px 0 8px}
+.ib-tbl{min-width:720px}
+.ib-tbl th,.ib-tbl td{padding:8px 7px;font-size:14px}
+.ib-tbl th:first-child,.ib-tbl td:first-child{white-space:nowrap}
+.ib-tbl td small{display:block;font-size:11px;color:var(--muted)}
+.ib-tbl tr.tot td{font-weight:700;border-top:2px solid var(--line)}
+.ib-tbl tr.bench td{color:var(--muted);font-style:italic}
+.ib-tbl tr.sel td{background:color-mix(in srgb,var(--fill) 7%,transparent)}
+.ib-pick{display:inline-flex;align-items:center;gap:8px;font-size:14px;color:var(--muted);font-weight:500}
+.ib-pick select{border:1px solid var(--line);background:var(--panel);color:var(--ink);border-radius:8px;padding:7px 10px;font:inherit;font-size:14px}
+.l10-sec{margin-top:8px}
+/* Deals tab (Sales L10) */
+.cl-panel{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:12px 14px;margin:0 0 16px;display:grid;gap:12px}
+.cl-row{display:flex;flex-wrap:wrap;gap:10px 16px;align-items:flex-end}
+.cl-f{display:flex;flex-direction:column;gap:4px;font-size:12px;font-weight:600;color:var(--muted);min-width:0}
+.cl-f select,.cl-f input{border:1px solid var(--line);background:var(--panel);color:var(--ink);border-radius:8px;padding:7px 10px;font:inherit;font-size:14px;font-weight:500;max-width:100%}
+.cl-f select[data-flt]{min-width:170px}
+.cl-pair{display:flex;gap:6px;flex-wrap:wrap}
+.cl-pair [hidden]{display:none}
+#clUtmVal,#clUtmTxt{min-width:210px}
+#clClear{align-self:center;margin-left:auto}
+.cl-by{display:flex;align-items:flex-end;justify-content:space-between;gap:10px;margin:6px 0 8px}
+.cl-f-in{flex-direction:row;align-items:center;gap:10px;font-size:15px;color:var(--ink)}
+.cl-tbl .cl-seg{text-align:left;white-space:normal;min-width:220px}
+.cl-rk{color:var(--muted);font-variant-numeric:tabular-nums;width:32px}
+.cl-dim{display:block;font-size:11px;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.03em}
+.cl-bar.lo{background:var(--muted);opacity:.45}
+.cl-tbl{min-width:0;width:100%}
+.cl-tbl td.cl-bc{width:18%;min-width:48px;overflow:hidden}
+.cl-bar{height:8px;border-radius:4px;background:var(--fill);min-width:2px;max-width:100%}
+/* Sales L10 layout: tabs + scorecard */
+.l10-tabs{display:none}
+html.view-reporting .l10-tabs{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 22px;border-bottom:1px solid var(--line)}
+.l10-tabs button{border:0;background:transparent;padding:10px 14px;font-weight:600;color:var(--muted);cursor:pointer;border-bottom:3px solid transparent;margin-bottom:-1px;font-size:15px}
+.l10-tabs button[aria-selected="true"]{color:var(--ink);border-bottom-color:var(--fill)}
+.l10-era{display:none}
+html.view-reporting .l10-era{display:flex;flex-wrap:wrap;align-items:center;gap:10px 16px;margin:0 0 14px;padding:12px 14px;border:1px solid var(--line);border-radius:12px;background:var(--panel)}
+.l10-era .lbl{font-weight:700;font-size:14px}
+.era-seg{display:inline-flex;border:1px solid var(--line);border-radius:999px;overflow:hidden}
+.era-seg button{border:0;background:transparent;padding:7px 14px;font:inherit;font-size:13.5px;cursor:pointer;color:var(--ink)}
+.era-seg button+button{border-left:1px solid var(--line)}
+.era-seg button[aria-pressed="true"]{background:var(--ink);color:var(--panel);font-weight:600}
+.l10-era .note{flex:1 1 320px;font-size:12.5px;color:var(--muted)}
+html.view-reporting section[data-tab][hidden]{display:none!important}
+details.how{margin-top:12px;color:var(--muted);font-size:13px}
+details.how summary{cursor:pointer;font-weight:600;color:var(--muted);list-style:none;display:inline-flex;align-items:center;gap:6px}
+details.how summary::before{content:"ⓘ";font-size:14px}
+details.how summary::-webkit-details-marker{display:none}
+details.how > div{margin-top:8px;line-height:1.5}
+.sc-ctl{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+.sc-tbl{min-width:860px;border-collapse:collapse;width:100%}
+.sc-tbl th,.sc-tbl td{padding:7px 8px;font-size:14px;text-align:right;font-variant-numeric:tabular-nums;border-bottom:1px solid var(--line);white-space:nowrap}
+.sc-tbl th{font-size:12px;color:var(--muted);font-weight:600;vertical-align:bottom}
+.sc-tbl th small{display:block;font-weight:500}
+.sc-tbl th:first-child,.sc-tbl td:first-child{text-align:left;position:sticky;left:0;background:var(--panel);z-index:1}
+.sc-tbl td.goal,.sc-tbl th.goal{color:var(--muted);border-right:1px solid var(--line)}
+.sc-tbl td.avg,.sc-tbl th.avg{border-left:1px solid var(--line);font-weight:600}
+.sc-tbl th.cur,.sc-tbl td.cur{background:color-mix(in srgb,var(--fill) 6%,var(--panel))}
+.sc-tbl tr.grp td{background:var(--paper);font-family:var(--display);font-weight:700;font-size:15px;letter-spacing:.04em;text-transform:uppercase;color:var(--muted);padding-top:12px}
+.sc-tbl tr.sub td:first-child{padding-left:26px;color:var(--muted);font-size:13px}
+.sc-tbl tr.sub td{font-size:13px}
+.sc-tbl td.ok{color:var(--ahead);font-weight:600}
+.sc-tbl td.bad{color:var(--behind);font-weight:600}
+.sc-tbl td small{display:block;font-size:11px;color:var(--muted);font-weight:400}
+.sc-wrap{background:var(--panel);border:1px solid var(--line);border-radius:12px;overflow-x:auto}
+.sc-note{color:var(--muted);font-size:13px;margin:8px 0 0}
+.sc-tbl th .db{color:var(--gold)}
+.ax-chart{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px 14px 8px;position:relative}
+.ax-chart svg{display:block;width:100%;height:auto;overflow:visible}
+.ax-chart text{font-family:var(--body);fill:var(--muted);font-size:12px}
+.ax-chart .grid{stroke:var(--line);stroke-width:1}
+.ax-chart .ln{fill:none;stroke:var(--fill);stroke-width:2.5}
+.ax-chart .pt{fill:var(--fill);cursor:pointer}
+.ax-chart .pt.cur{fill:var(--panel);stroke:var(--fill);stroke-width:2}
+.ax-chart .base{stroke:var(--muted);stroke-dasharray:5 4;stroke-width:1.5}
+.ax-chart .dbz{fill:color-mix(in srgb,var(--gold) 12%,transparent)}
+.ax-chart .val{fill:var(--ink);font-weight:600;font-size:11px}
+.ax-key{display:flex;flex-wrap:wrap;gap:14px;font-size:13px;color:var(--muted);margin:0 0 8px}
+.ax-key i{display:inline-block;width:14px;height:3px;vertical-align:middle;margin-right:6px;background:var(--fill)}
+.ax-key i.b{background:none;border-top:2px dashed var(--muted);height:0}
+.ax-key i.z{height:10px;background:color-mix(in srgb,var(--gold) 25%,transparent)}
+.sc-tbl td.goal small{display:block;font-size:11px}

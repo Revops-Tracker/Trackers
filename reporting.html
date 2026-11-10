@@ -152,6 +152,28 @@ button.linkish{border:0;background:transparent;padding:0;color:var(--fill);font-
 .deal .fix{margin-top:6px;font-size:13px;display:flex;gap:12px;flex-wrap:wrap;align-items:center}
 .deal .corr{background:color-mix(in srgb,var(--gold) 16%,transparent);border-radius:8px;padding:6px 9px;font-size:13px;margin-top:6px}
 .grp{font-family:var(--display);font-weight:700;font-size:18px;color:var(--muted);padding:14px 22px 2px;margin:0}
+/* who cancelled: the decision-tree result on bookings that missed their first slot ahead of time (same as the leaderboard) */
+.wc{margin-top:6px;font-size:13px}
+.wc summary{cursor:pointer;list-style:none;display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.wc summary::-webkit-details-marker{display:none}
+.wc .tag{font-weight:700;border-radius:999px;padding:1px 9px;font-size:12px}
+.wc .tag.ours{background:color-mix(in srgb,var(--behind) 16%,transparent);color:var(--behind)}
+.wc .tag.theirs{background:color-mix(in srgb,var(--ahead) 16%,transparent);color:var(--ahead)}
+.wc .tag.unknown{background:var(--chip);color:var(--muted)}
+.wc .more{color:var(--muted);text-decoration:underline}
+.wc .tree{margin:8px 0 0;padding:8px 10px;border:1px solid var(--line);border-radius:8px;background:var(--paper)}
+.wc .step{display:grid;grid-template-columns:22px 1fr;gap:2px 8px;padding:4px 0;border-bottom:1px dashed var(--line)}
+.wc .step:last-child{border-bottom:0}
+.wc .step .n{font-weight:700;color:var(--muted);text-align:center}
+.wc .step.yes .n{color:var(--ink)}
+.wc .step .q{font-weight:600}
+.wc .step .a{font-weight:700;margin-left:6px}
+.wc .step.yes .a{color:var(--ink)} .wc .step.no .a,.wc .step.skipped .a{color:var(--muted);font-weight:500}
+.wc .step .w{grid-column:2;color:var(--muted)}
+.wc .ev{margin:8px 0 0;padding:0;list-style:none;display:grid;gap:4px}
+.wc .ev li{color:var(--muted)} .wc .ev li.used{color:var(--ink)}
+.wc .ev .src{font-weight:600;margin-right:4px}
+.wc .flip{display:flex;gap:8px;margin-top:8px;align-items:center;flex-wrap:wrap}
 .fixbox{display:grid;gap:10px;padding:10px 0 4px}
 .fixbox label{display:flex;flex-direction:column;gap:4px;font-size:13px;color:var(--muted);font-weight:500}
 .fixbox select,.fixbox textarea{border:1px solid var(--line);background:var(--paper);border-radius:8px;padding:8px 10px;font:inherit;color:var(--ink)}
@@ -333,7 +355,7 @@ details.how > div{margin-top:8px;line-height:1.5}
     <div class="tbl-toggle"><button class="btn ghost" type="button" id="bdrTableBtn" aria-expanded="false" aria-controls="bdrMetrics">Show metrics table</button></div>
     <div id="bdrMetrics" hidden>
     <div class="table-wrap" id="bdrTable"></div>
-    <div class="legend"><b>Books</b>: new calls booked in the period, counted on the day they were booked (a rebook only counts as new when it is booked more than 30 days after the deal's last slot). <b>Runs due</b>: discovery calls whose slot arrived in the period, counted per call (a deal that no-shows and is rebooked into the same period = 2 calls due). <b>Runs had</b>: calls that were held. <b>Overall show</b> = runs had ÷ runs due. <b>No-show recovery</b>: of deals that missed a call in the period, the share held at a later slot (recent periods can still recover). <b>1st-time show</b> = new books held at their first slot ÷ new books whose first slot came due in the period. <b>Showed, then DQ'd</b>: of the calls held in the period, the share where the deal went to the DQ stage (showed up but was not a fit). Lower is better; a high number means the rep is booking people who show but do not qualify. <b>MRR generated</b>: monthly retainer (USD) of deals closed won in the period, credited to the rep who booked them. <b>Designs</b> (designs created): deals moved into the Design/Prop Review stage in HubSpot. <b>Designs held</b>: deals moved from Design on to a later stage (Prop Update or beyond).</div>
+    <div class="legend"><b>Books</b>: new calls booked in the period, counted on the day they were booked (a rebook only counts as new when it is booked more than 30 days after the deal's last slot). <b>Runs due</b>: discovery calls whose slot arrived in the period, counted per call (a deal that no-shows and is rebooked into the same period = 2 calls due). <b>Runs had</b>: calls that were held. <b>Overall show</b> = runs had ÷ runs due. <b>No-show recovery</b>: of deals that missed a call in the period, the share held at a later slot (recent periods can still recover). <b>1st-time show</b> = held at the first slot ÷ new books whose first slot has passed, shown three ways: <b>excl. our cancels</b> (the headline: calls we pulled, e.g. not an MSP or DQ, are left out), <b>all</b> (nothing left out) and <b>excl. their cancels</b> (prospect cancels and reschedules before the call are left out). A booking moved before its first slot counts as a cancel. Who cancelled is decided by the who-cancelled check (open a deal and click <i>Why?</i>); <b>cancelled ahead, who unknown</b> stays in every view as a miss until someone picks ours or theirs. <b>Showed, then DQ'd</b>: of the calls held in the period, the share where the deal went to the DQ stage (showed up but was not a fit). Lower is better; a high number means the rep is booking people who show but do not qualify. <b>MRR generated</b>: monthly retainer (USD) of deals closed won in the period, credited to the rep who booked them. <b>Designs</b> (designs created): deals moved into the Design/Prop Review stage in HubSpot. <b>Designs held</b>: deals moved from Design on to a later stage (Prop Update or beyond).</div>
     </div>
   </section>
 
@@ -389,7 +411,7 @@ details.how > div{margin-top:8px;line-height:1.5}
     <details class="how"><summary>How this is counted</summary><div>
       One row per L10 metric, one column per week (Mon to Sun) or month, newest on the right. The shaded column is the period in progress: it is checked against where the goal should be by yesterday. <b>Green</b> = at or above goal, <b>red</b> = below. <b>Avg</b> = average of the finished columns shown.<br>
       <b>Dials, connects, conversations</b> come from the weekly Nooks upload (RevOps L10 tab); a week shows blank until it is uploaded. <b>Conversation → book</b> = BDR books ÷ Nooks conversations (the sheet's "complete to disco").<br>
-      <b>Books</b> = new calls, counted on the day they were booked (a rebook only counts when it is booked 30+ days after the deal's last slot). <b>Runs due</b> = calls whose slot came up; <b>runs had</b> = calls that happened; <b>overall show</b> = calls held ÷ calls due, per call (a deal that no-shows and is rebooked = 2 calls due); <b>no-show recovery</b> = of deals that missed a call in the period, how many were held at a later slot (recent periods can still recover); <b>1st-time show</b> = held at the first slot ÷ first slots that came due. <b>Outbound</b> = a BDR booked it and the first touch is cold call / RTB; <b>inbound leads</b> = inbound first touch or self-booked / CloseBot, whoever booked it.<br>
+      <b>Books</b> = new calls, counted on the day they were booked (a rebook only counts when it is booked 30+ days after the deal's last slot). <b>Runs due</b> = calls whose slot came up; <b>runs had</b> = calls that happened; <b>overall show</b> = calls held ÷ calls due, per call (a deal that no-shows and is rebooked = 2 calls due); <b>no-show recovery</b> = of deals that missed a call in the period, how many were held at a later slot (recent periods can still recover); <b>1st-time show</b> = held at the first slot ÷ new books whose first slot has passed, shown three ways: <b>excl. our cancels</b> (the headline: calls we pulled, e.g. not an MSP or DQ, are left out), <b>all</b> (nothing left out) and <b>excl. their cancels</b> (prospect cancels and reschedules before the call are left out). A booking moved before its first slot counts as a cancel. Who cancelled is decided by the who-cancelled check (open a deal and click <i>Why?</i>); <b>cancelled ahead, who unknown</b> stays in every view as a miss until someone picks ours or theirs. <b>Outbound</b> = a BDR booked it and the first touch is cold call / RTB; <b>inbound leads</b> = inbound first touch or self-booked / CloseBot, whoever booked it.<br>
       <b>AE time (slots)</b> (whole team and AE views): an AE slot = one AE + one start time that came up; it <b>ran</b> if at least one call in it was held. <b>Run rate per slot</b> = slots that ran ÷ slots that came up; <b>calls per slot</b> = calls due ÷ slots. The goal column shows the Jul 1 – Oct 4 baseline (before double booking); weeks marked <span style="color:var(--gold)">●</span> are double-booking weeks (from Oct 5). Before Oct 5, two deals on one slot means a cancelled call whose slot was rebooked but whose meeting was never marked cancelled.<br>
       Designs, designs held, diagnosis, prop updates, contracts and closes are counted on the day they happened; MRR is by close date. Click any number to see the deals.<br>
       <b>Goals</b> are weekly (monthly = ×4): per BDR 1,000 dials, 80 connects, 12 books, 8 runs had, 4 designs; per AE 20 runs, 5 designs held, 8 prop updates, 4 contracts, 2 closes, $10,750 MRR; 75% show; ratio goals from the L10 sheet (book → design 33%, run → design 50%, design → close 30%, contract → close 85%). Team goals = per-BDR goal × current BDRs.
@@ -427,7 +449,7 @@ details.how > div{margin-top:8px;line-height:1.5}
     <div class="ax-key" id="axKey"></div>
     <div class="ax-chart" id="axChart"></div>
     <details class="how"><summary>How this is counted</summary><div>
-      Each AE's numbers are the calls and deals assigned to them, whoever booked them. <b>AE slot</b> = one AE + one start time that came up; it <b>ran</b> if at least one call in it was held. <b>Run rate per slot</b> = slots that ran ÷ slots that came up: how much booked AE time turned into a conversation, the number double booking should lift. <b>Calls per slot</b> = calls due ÷ slots (1.0 = no double booking). <b>Overall show</b> = calls held ÷ calls due, per call (every slot that came up counts once); <b>no-show recovery</b> = deals that missed a call and were held at a later slot ÷ deals that missed a call; <b>1st-time show</b> = held at the first slot ÷ first slots that came due. <b>Run → design</b> = designs created ÷ runs had in the same period; <b>design → close</b> = closes ÷ designs created. The dashed line is the Jul 1 – Oct 4 average (before double booking); the shaded weeks are double booking (from Oct 5). The last point is the period in progress (hollow). Click a number or a point to see the deals.
+      Each AE's numbers are the calls and deals assigned to them, whoever booked them. <b>AE slot</b> = one AE + one start time that came up; it <b>ran</b> if at least one call in it was held. <b>Run rate per slot</b> = slots that ran ÷ slots that came up: how much booked AE time turned into a conversation, the number double booking should lift. <b>Calls per slot</b> = calls due ÷ slots (1.0 = no double booking). <b>Overall show</b> = calls held ÷ calls due, per call (every slot that came up counts once); <b>no-show recovery</b> = deals that missed a call and were held at a later slot ÷ deals that missed a call; <b>1st-time show</b> = held at the first slot ÷ new books whose first slot has passed, shown three ways: <b>excl. our cancels</b> (the headline: calls we pulled, e.g. not an MSP or DQ, are left out), <b>all</b> (nothing left out) and <b>excl. their cancels</b> (prospect cancels and reschedules before the call are left out). A booking moved before its first slot counts as a cancel. Who cancelled is decided by the who-cancelled check (open a deal and click <i>Why?</i>); <b>cancelled ahead, who unknown</b> stays in every view as a miss until someone picks ours or theirs. <b>Run → design</b> = designs created ÷ runs had in the same period; <b>design → close</b> = closes ÷ designs created. The dashed line is the Jul 1 – Oct 4 average (before double booking); the shaded weeks are double booking (from Oct 5). The last point is the period in progress (hollow). Click a number or a point to see the deals.
     </div></details>
   </section>
 
@@ -530,7 +552,7 @@ details.how > div{margin-top:8px;line-height:1.5}
     <div class="table-wrap" id="ibByChannel"></div>
     <div class="ib-h">By who booked the call</div>
     <div class="table-wrap" id="ibByPath"></div>
-    <details class="how"><summary>How this is counted</summary><div><b>Inbound lead</b> = the deal's first touch is an inbound channel (form, ad, chat, organic…), or the lead booked the call themselves / through CloseBot. This includes inbound leads a BDR booked. An <b>RTB hit</b> first touch counts as outbound (it is an intent signal, not the lead reaching out). Use <b>Booked by</b> to split self-booked / CloseBot from BDR-booked. <b>Outbound calls</b> (grey) are there for comparison: cold-call and RTB leads a BDR booked. Same definitions everywhere: <b>Books</b> = new calls counted on the day they were booked; <b>Runs due</b> = calls whose slot came up; <b>Overall show</b> = calls held ÷ calls due (per call: a no-show that is rebooked and held = 2 calls, 1 held); <b>Recovery</b> = deals that missed a call and were held at a later slot ÷ deals that missed a call; <b>1st-time show</b> = held at the first slot ÷ first slots that came due (counts underneath). Closes and MRR are by close date. Click any number to see the deals.</div></details>
+    <details class="how"><summary>How this is counted</summary><div><b>Inbound lead</b> = the deal's first touch is an inbound channel (form, ad, chat, organic…), or the lead booked the call themselves / through CloseBot. This includes inbound leads a BDR booked. An <b>RTB hit</b> first touch counts as outbound (it is an intent signal, not the lead reaching out). Use <b>Booked by</b> to split self-booked / CloseBot from BDR-booked. <b>Outbound calls</b> (grey) are there for comparison: cold-call and RTB leads a BDR booked. Same definitions everywhere: <b>Books</b> = new calls counted on the day they were booked; <b>Runs due</b> = calls whose slot came up; <b>Overall show</b> = calls held ÷ calls due (per call: a no-show that is rebooked and held = 2 calls, 1 held); <b>Recovery</b> = deals that missed a call and were held at a later slot ÷ deals that missed a call; <b>1st-time show</b> = held at the first slot ÷ new books whose first slot has passed, shown three ways: <b>excl. our cancels</b> (the headline: calls we pulled, e.g. not an MSP or DQ, are left out), <b>all</b> (nothing left out) and <b>excl. their cancels</b> (prospect cancels and reschedules before the call are left out). A booking moved before its first slot counts as a cancel. Who cancelled is decided by the who-cancelled check (open a deal and click <i>Why?</i>); <b>cancelled ahead, who unknown</b> stays in every view as a miss until someone picks ours or theirs. </div></details>
   </section>
 
   <section id="clSec" class="l10-sec" data-tab="cl" hidden>
@@ -700,7 +722,7 @@ function paceFraction(p){
 }
 
 /* ---------- state ---------- */
-const state = { kind:"week", offset:0, rank:"had", aeRank:"cwd", me:null, showup:[], events:[], ov:new Map(), pend:new Map(), reviews:new Map(), lastRun:null,
+const state = { kind:"week", offset:0, rank:"had", aeRank:"cwd", me:null, showup:[], events:[], ov:new Map(), pend:new Map(), reviews:new Map(), cattr:new Map(), lastRun:null,
   // Sales process era (Sales L10 only). Official switch to the 3-call close = lb_auto_config.process_cutover (2026-10-27).
   era:(()=>{ try{ return sessionStorage.getItem("l10-era") || "new"; }catch(e){ return "new"; } })(), cutover:"2026-10-27", v2ev:[], cohort:new Map(), dealIdx:new Map() };
 const REVIEW_SINCE = "2026-10-01";   // reps sign off on everything from here on
@@ -722,6 +744,10 @@ function effShowup(){
       }
       if(o.exclude || o.cat==="not_a_booking") e.dropped = true;
     }
+    // who cancelled (only for bookings that missed their FIRST slot ahead of time: cancelled or moved before it)
+    e.ahead = e.cat==="cancelled_ahead" || !!e.pushed;
+    e.ca = state.cattr.get(key) || null;
+    e.who = e.ahead ? ((o && o.who) || (e.ca ? e.ca.verdict : "unknown")) : null;
     return e;
   });
 }
@@ -815,13 +841,21 @@ function showupStats(rows, p){
     miss.forEach(()=>missed.push(r));
   });
   const dueN = had.length + missed.length;
-  const fdue = firsts.filter(r=>!r.pushed && slotPassed(r.first_slot));
-  const f1 = fdue.filter(r=>r.cat==="first_time_show");
+  // 1st-time show, three views (Vianney 11-10). Every new booking whose first slot has passed counts, including ones
+  // moved before that slot (a prospect reschedule = their cancel). Ahead-of-time cancels/moves are sorted by the
+  // "who cancelled" tree into ours / theirs / unknown; unknowns stay in every view and are shown as a count.
+  const fall = firsts.filter(r=>slotPassed(r.first_slot));
+  const f1 = fall.filter(r=>!r.pushed && r.cat==="first_time_show");
+  const fOurs = fall.filter(r=>r.ahead && r.who==="ours"), fTheirs = fall.filter(r=>r.ahead && r.who==="theirs"), fUnk = fall.filter(r=>r.ahead && r.who==="unknown");
+  const fdue = fall.filter(r=>!fOurs.includes(r));            // headline: everyone we expected to show
+  const fdueT = fall.filter(r=>!fTheirs.includes(r));
   const notHad = due.filter(r=>r._miss && r._miss.length);   // deals with at least one missed call (may also have been held later)
   // No-show recovery: of deals that missed a call in the period, how many were held at a later slot (any time after)
   const rec = notHad, recBack = notHad.filter(r=>r.run_at && Date.parse(r.run_at) > Date.parse(r._miss[0]));
   const hdq = had.filter(r=>r.dq);   // held calls where the deal went to the DQ stage: showed up, then disqualified
-  return { books, firsts, due, dueN, had, fdue, f1, notHad, missed, rec, recBack, hdq,
+  return { books, firsts, due, dueN, had, fdue, f1, notHad, missed, rec, recBack, hdq, fall, fdueT, fOurs, fTheirs, fUnk,
+    firstAll: fall.length ? f1.length/fall.length : null,
+    firstExT: fdueT.length ? f1.length/fdueT.length : null,
     dqRate: had.length ? hdq.length/had.length : null,
     ns: missed.filter(r=>r.cat!=="cancelled_ahead"),
     ca: missed.filter(r=>r.cat==="cancelled_ahead"),
@@ -924,7 +958,10 @@ function render(){
     ["Runs due (calls)", t=>t.dueN, "due", null],
     ["Runs had", t=>t.had.length, "had", 8],
     ["Overall show", t=>pctS(t.show), "due", null],
-    ["1st-time show", t=>pctS(t.first), "fdue", null],
+    ["1st-time show (excl. our cancels)", t=>pctS(t.first), "fdue", null],
+    ["1st-time show, all", t=>pctS(t.firstAll), "fall", null],
+    ["1st-time show (excl. their cancels)", t=>pctS(t.firstExT), "fext", null],
+    ["Cancelled ahead, who unknown", t=>t.fUnk.length, "cunk", null],
     ["Showed, then DQ'd", t=>pctS(t.dqRate), "dq", null],
     ["No-shows", t=>t.ns.length, "ns", null],
     ["Cancelled / DQ'd ahead", t=>t.ca.length, "ca", null],
@@ -970,7 +1007,10 @@ function render(){
     ["Runs due (calls)", t=>t.dueN, "due", null],
     ["Disco no-shows", t=>t.ns.length, "ns", null],
     ["Overall show", t=>pctS(t.show), "due", null],
-    ["1st-time show", t=>pctS(t.first), "fdue", null],
+    ["1st-time show (excl. our cancels)", t=>pctS(t.first), "fdue", null],
+    ["1st-time show, all", t=>pctS(t.firstAll), "fall", null],
+    ["1st-time show (excl. their cancels)", t=>pctS(t.firstExT), "fext", null],
+    ["Cancelled ahead, who unknown", t=>t.fUnk.length, "cunk", null],
     ["Showed, then DQ'd", t=>pctS(t.dqRate), "dq", null],
     ["Moved to Diagnosis", t=>t.diag.length, "diag", null],
     ["Designs created", t=>t.des.length, "des", null],
@@ -1063,7 +1103,26 @@ function dealHTML(r, isEv){
   if(!me.approver && me.rep && reviewOwner(r)===me.rep && reviewState(r, me.rep)==="true") acts.push(`<button class="linkish" data-fix="${esc(r.key)}" data-ev="${isEv?1:0}">Actually, this is wrong</button>`);
   const fix = acts.length ? `<div class="fix">${acts.join("")}</div><div class="fixslot" id="fix-${esc(r.key)}"></div>` : "";
   return `<li class="deal${r.dropped?" dropped":""}"><div class="top"><span class="nm"><a href="${link}" target="_blank" rel="noopener">${esc(r.deal_name)}</a></span><span class="pill ${cls}">${esc(lbl)}${r.dropped?" · not counted":""}</span></div>
-    <div class="why">${why}</div>${corr}${fix}</li>`;
+    <div class="why">${why}</div>${isEv?"":whoHTML(r)}${corr}${fix}</li>`;
+}
+/* ---------- who cancelled: verdict + the decision tree + evidence, and a one-click flip (same as the leaderboard) ---------- */
+const WC_SRC = {hs_stage:"HubSpot stage", msp_verify:"MSP Verify", slack_slotguard:"Slack slot guard", slack_icp:"Slack ICP alert", gcal:"Calendar",
+  ghl_appt:"GHL appointment", ghl_sms:"GHL text", ghl_email:"GHL email", ghl_call:"GHL call", hs_email:"HubSpot email", hs_note:"HubSpot note", hs_call:"HubSpot call log", ai:"AI"};
+const WC_WHO = {ours:"Our cancel", theirs:"Their cancel", unknown:"Who cancelled: unknown"};
+function whoHTML(r){
+  if(!r.ahead) return "";
+  const c = r.ca, ov = r.ov && r.ov.who ? r.ov : null, pend = r.pend && r.pend.who ? r.pend : null;
+  const kind = r.pushed ? "moved before its first slot" : "cancelled before its first slot";
+  const head = `<span class="tag ${r.who}">${WC_WHO[r.who]}</span><span>${esc(ov ? "Set by "+ov.by_email : (c ? c.reason : "Not sorted yet (runs weekday mornings)"))}${c&&!ov&&c.step?` · step ${c.step}`:""}</span>${c||pend?`<span class="more">Why?</span>`:""}`;
+  const stepCls = a => (a==="yes"||a==="us"||a==="prospect") ? "yes" : (a||"no");
+  const steps = c ? (c.path||[]).map(s=>`<div class="step ${stepCls(s.a)}"><span class="n">${typeof s.step==="number"?s.step:(s.step==="first"?"⇄":"AI")}</span><span><span class="q">${esc(s.q)}</span>${s.a?`<span class="a">${esc(s.a)}</span>`:""}</span><span class="w">${esc(s.why)}</span></div>`).join("") : "";
+  const evs = c ? (c.evidence||[]).slice(0,10).map(e=>`<li class="${e.used?"used":""}"><span class="src">${e.used?"✓ ":""}${esc(WC_SRC[e.src]||e.src)}${e.at?" · "+nice(e.at):""}${e.side&&e.side!=="system"?" · "+esc(e.side):""}:</span> ${esc(e.text)}${e.url?` <a href="${esc(e.url)}" target="_blank" rel="noopener">open</a>`:""}</li>`).join("") : "";
+  const conf = c && (c.conflicts||[]).length ? `<div class="w" style="margin-top:6px"><b>Pointed the other way:</b> ${c.conflicts.map(e=>esc((WC_SRC[e.src]||e.src)+": "+e.text)).join(" · ")}</div>` : "";
+  const me = state.me||{};
+  const canFlip = me.approver || (me.rep && credited(r, me.rep));
+  const btn = (w, t) => `<button class="btn ghost" type="button" data-who="${w}" data-key="${esc(r.key)}" data-label="${esc(labelOf(r))}">${t}</button>`;
+  const flip = canFlip ? `<div class="flip"><span>Wrong?</span>${r.who!=="ours"?btn("ours","It was us"):""}${r.who!=="theirs"?btn("theirs","It was them"):""}${pend?`<span>Waiting for approval: ${esc(pend.who==="ours"?"our cancel":"their cancel")}</span>`:""}</div>` : "";
+  return `<details class="wc"><summary>${head}</summary><div class="tree"><div class="w" style="margin-bottom:4px">This call was ${kind}. The checks run in order and stop at the first yes: 1 not a fit (ours) → 2 the prospect acted on the calendar (theirs) → 3 the prospect said so in a message (theirs) → 4 we moved it (ours) → otherwise unknown. If both sides acted, whoever acted first decides.</div>${steps}${evs?`<ul class="ev">${evs}</ul>`:""}${conf}${flip}</div></details>`;
 }
 let lastOpen = null;
 function openList(person, role, metric, title, pOverride){
@@ -1082,7 +1141,14 @@ function openList(person, role, metric, title, pOverride){
   else if(metric==="due") groups.push(["Held", s.had], ["Missed calls (a deal can be in both lists)", s.notHad]);
   else if(metric==="rec") groups.push(["Missed, then held at a later slot", s.recBack], ["Missed, not held since", s.rec.filter(r=>!s.recBack.includes(r))]);
   else if(metric==="dq") groups.push(["Showed, then DQ'd", s.hdq], ["Showed, not DQ'd", s.had.filter(r=>!s.hdq.includes(r))]);
-  else if(metric==="fdue") groups.push(["Held at first slot", s.f1], ["First slot came due, not held there", s.fdue.filter(r=>!s.f1.includes(r))]);
+  else if(["fdue","fall","fext","cunk"].includes(metric)){
+    const missF = s.fall.filter(r=>!s.f1.includes(r) && !r.ahead);
+    if(metric==="cunk") groups.push(["Cancelled or moved ahead, nobody can tell who yet (pick ours or theirs)", s.fUnk]);
+    else groups.push(["Held at first slot", s.f1], ["No-show at first slot", missF],
+      ["Cancelled or moved ahead by the prospect" + (metric==="fext" ? " (not counted in this view)" : ""), s.fTheirs],
+      ["Cancelled or moved ahead by us" + (metric==="fdue" ? " (not counted in this view)" : ""), s.fOurs],
+      ["Cancelled or moved ahead, who unknown (counted as a miss)", s.fUnk]);
+  }
   else if(metric==="ns") groups.push(["No-shows (one per missed call)", [...new Set(s.ns)]]);
   else if(metric==="ca") groups.push(["Cancelled / DQ'd ahead", [...new Set(s.ca)]]);
   else if(["arun","ans","ashow"].includes(metric)) groups.push(["Audits held", v2Of("arun")], ["Audit no-shows", v2Of("ans")], ["Not confirmed yet (the AE answers on the AE tracker)", v2Of("apend")]);
@@ -1101,7 +1167,7 @@ function openList(person, role, metric, title, pOverride){
     if(ev.length) groups.push(["Pipeline", ev]);
     if(v2.length) groups.push(["New-process calls", v2]);
   }
-  if(dropped.length && ["all","books","due","fdue"].includes(metric)) groups.push(["Not counted (corrected out)", dropped]);
+  if(dropped.length && ["all","books","due","fdue","fall","fext"].includes(metric)) groups.push(["Not counted (corrected out)", dropped]);
   showDialog(title, `${p.label}. Click a deal name to open it in HubSpot.`, groups);
 }
 function openQueue(rep){
@@ -1180,6 +1246,7 @@ async function refresh(){
   state.ov = new Map((r.overrides||[]).filter(o=>o.status==="approved").map(o=>[o.key,o]));
   state.pend = new Map((r.overrides||[]).filter(o=>o.status==="pending").map(o=>[o.key,o]));
   state.reviews = new Map((r.reviews||[]).map(v=>[v.key+"|"+v.rep, v]));
+  state.cattr = new Map((r.cattr||[]).map(c=>[c.key, c]));
   state.attrs = new Map((r.attrs||[]).map(a=>[String(a.deal_id), a.p||{}]));
   buildEra(r);
   applyEra();
@@ -1233,6 +1300,7 @@ document.addEventListener("click", e=>{
   if(n){ openList(n.dataset.person, n.dataset.role, n.dataset.metric, n.dataset.title); return; }
   const f = e.target.closest("[data-fix]"); if(f){ fixForm(f.dataset.fix, f.dataset.ev==="1"); return; }
   const u = e.target.closest("[data-undo]"); if(u){ undo(u.dataset.undo); return; }
+  const w = e.target.closest("[data-who]"); if(w){ act("/correct", {key:w.dataset.key, who:w.dataset.who, label:w.dataset.label}, state.me && state.me.approver ? "Saved: "+(w.dataset.who==="ours"?"our cancel":"their cancel") : "Sent to Vianney / Max for approval"); return; }
   const t = e.target.closest("[data-true]"); if(t){ act("/review", t.dataset.rep ? {key:t.dataset.true, label:t.dataset.label, rep:t.dataset.rep} : {key:t.dataset.true, label:t.dataset.label}, t.dataset.rep ? "Confirmed for "+t.dataset.rep : "Confirmed"); return; }
   const ap = e.target.closest("[data-approve]"); if(ap){ act("/decide", {key:ap.dataset.approve, approve:true}, "Approved, numbers updated"); return; }
   const rj = e.target.closest("[data-reject]"); if(rj){ act("/decide", {key:rj.dataset.reject, approve:false}, "Rejected, back to the rep"); return; }
@@ -1483,7 +1551,9 @@ const BK_COLS_ALL = [
   {label:"Runs due",        f:t=>t.dueN,         list:"due"},
   {label:"Runs had",        f:t=>t.had.length,   list:"had"},
   {label:"Overall show",    f:t=>t.show,  pct:true, list:"due",  sub:t=>t.dueN?t.had.length+" of "+t.dueN:""},
-  {label:"1st-time show",   f:t=>t.first, pct:true, list:"fdue", sub:t=>t.fdue.length?t.f1.length+" of "+t.fdue.length:""},
+  {label:"1st-time show (excl. our cancels)", f:t=>t.first, pct:true, list:"fdue", sub:t=>t.fdue.length?t.f1.length+" of "+t.fdue.length:""},
+  {label:"1st-time show, all", f:t=>t.firstAll, pct:true, list:"fall", sub:t=>t.fall.length?t.f1.length+" of "+t.fall.length:""},
+  {label:"1st-time show (excl. their cancels)", f:t=>t.firstExT, pct:true, list:"fext", sub:t=>t.fdueT.length?t.f1.length+" of "+t.fdueT.length:""},
   {label:"Showed, DQ'd",   f:t=>t.dqRate, pct:true, list:"dq", sub:t=>t.had.length?t.hdq.length+" of "+t.had.length:""},
   {label:"No-shows",        f:t=>t.ns.length,    list:"ns"},
   {label:"Cancelled ahead", f:t=>t.ca.length,    list:"ca"},
@@ -1819,7 +1889,10 @@ const SC_ROWS_ALL = [
   {id:"ca",       label:"Cancelled ahead",       f:t=>t.ca.length, list:"ca", lower:true},
   {id:"show",     label:"Overall show",          ratio:true, f:t=>t.show, list:"due", sub:t=>t.dueN?t.had.length+" of "+t.dueN:"", split:true},
   {id:"rec",      label:"No-show recovery",      ratio:true, f:t=>t.recovery, list:"rec", sub:t=>t.rec.length?t.recBack.length+" of "+t.rec.length:""},
-  {id:"first",    label:"1st-time show",         ratio:true, f:t=>t.first, list:"fdue", sub:t=>t.fdue.length?t.f1.length+" of "+t.fdue.length:""},
+  {id:"first",    label:"1st-time show (excl. our cancels)", ratio:true, f:t=>t.first, list:"fdue", sub:t=>t.fdue.length?t.f1.length+" of "+t.fdue.length:""},
+  {id:"firstAll", label:"1st-time show, all",    ratio:true, f:t=>t.firstAll, list:"fall", sub:t=>t.fall.length?t.f1.length+" of "+t.fall.length:""},
+  {id:"firstExT", label:"1st-time show (excl. their cancels)", ratio:true, f:t=>t.firstExT, list:"fext", sub:t=>t.fdueT.length?t.f1.length+" of "+t.fdueT.length:""},
+  {id:"cunk",     label:"Cancelled ahead, who unknown", f:t=>t.fUnk.length, list:"cunk", lower:true},
   {id:"dq",       label:"Showed, then DQ'd",     ratio:true, lower:true, f:t=>t.dqRate, list:"dq", sub:t=>t.had.length?t.hdq.length+" of "+t.had.length:""},
   {grp:"Pipeline"},
   {id:"des",      label:"Designs created",       f:t=>t.des.length, list:"des", era:"old"},
@@ -2032,7 +2105,9 @@ const AX_COLS_ALL = [
   {id:"rps",   label:"Run rate per slot", slot:true, ratio:true, f:x=>x.slots?x.used/x.slots:null, sub:x=>x.slots?x.used+" of "+x.slots:""},
   {id:"show",  label:"Overall show",    ratio:true, f:t=>t.show, list:"due", sub:t=>t.dueN?t.had.length+" of "+t.dueN:""},
   {id:"rec",   label:"No-show recovery", ratio:true, f:t=>t.recovery, list:"rec", sub:t=>t.rec.length?t.recBack.length+" of "+t.rec.length:""},
-  {id:"first", label:"1st-time show",   ratio:true, f:t=>t.first, list:"fdue", sub:t=>t.fdue.length?t.f1.length+" of "+t.fdue.length:""},
+  {id:"first", label:"1st-time show (excl. our cancels)", ratio:true, f:t=>t.first, list:"fdue", sub:t=>t.fdue.length?t.f1.length+" of "+t.fdue.length:""},
+  {id:"firstAll", label:"1st-time show, all", ratio:true, f:t=>t.firstAll, list:"fall", sub:t=>t.fall.length?t.f1.length+" of "+t.fall.length:""},
+  {id:"firstExT", label:"1st-time show (excl. their cancels)", ratio:true, f:t=>t.firstExT, list:"fext", sub:t=>t.fdueT.length?t.f1.length+" of "+t.fdueT.length:""},
   {id:"dq",    label:"Showed, then DQ'd", ratio:true, f:t=>t.dqRate, list:"dq", sub:t=>t.had.length?t.hdq.length+" of "+t.had.length:""},
   {id:"des",   label:"Designs",         f:t=>t.des.length, list:"des", era:"old"},
   {id:"r2d",   label:"Run → design",    ratio:true, f:t=>t.had.length?t.des.length/t.had.length:null, list:"des", era:"old"},

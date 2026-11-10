@@ -150,6 +150,28 @@ button.linkish{border:0;background:transparent;padding:0;color:var(--fill);font-
 .deal .fix{margin-top:6px;font-size:13px;display:flex;gap:12px;flex-wrap:wrap;align-items:center}
 .deal .corr{background:color-mix(in srgb,var(--gold) 16%,transparent);border-radius:8px;padding:6px 9px;font-size:13px;margin-top:6px}
 .grp{font-family:var(--display);font-weight:700;font-size:18px;color:var(--muted);padding:14px 22px 2px;margin:0}
+/* who cancelled: the decision-tree result on bookings that missed their first slot ahead of time */
+.wc{margin-top:6px;font-size:13px}
+.wc summary{cursor:pointer;list-style:none;display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.wc summary::-webkit-details-marker{display:none}
+.wc .tag{font-weight:700;border-radius:999px;padding:1px 9px;font-size:12px}
+.wc .tag.ours{background:color-mix(in srgb,var(--behind) 16%,transparent);color:var(--behind)}
+.wc .tag.theirs{background:color-mix(in srgb,var(--ahead) 16%,transparent);color:var(--ahead)}
+.wc .tag.unknown{background:var(--chip);color:var(--muted)}
+.wc .more{color:var(--muted);text-decoration:underline}
+.wc .tree{margin:8px 0 0;padding:8px 10px;border:1px solid var(--line);border-radius:8px;background:var(--paper)}
+.wc .step{display:grid;grid-template-columns:22px 1fr;gap:2px 8px;padding:4px 0;border-bottom:1px dashed var(--line)}
+.wc .step:last-child{border-bottom:0}
+.wc .step .n{font-weight:700;color:var(--muted);text-align:center}
+.wc .step.yes .n{color:var(--ink)}
+.wc .step .q{font-weight:600}
+.wc .step .a{font-weight:700;margin-left:6px}
+.wc .step.yes .a{color:var(--ink)} .wc .step.no .a,.wc .step.skipped .a{color:var(--muted);font-weight:500}
+.wc .step .w{grid-column:2;color:var(--muted)}
+.wc .ev{margin:8px 0 0;padding:0;list-style:none;display:grid;gap:4px}
+.wc .ev li{color:var(--muted)} .wc .ev li.used{color:var(--ink)}
+.wc .ev .src{font-weight:600;margin-right:4px}
+.wc .flip{display:flex;gap:8px;margin-top:8px;align-items:center;flex-wrap:wrap}
 .fixbox{display:grid;gap:10px;padding:10px 0 4px}
 .fixbox label{display:flex;flex-direction:column;gap:4px;font-size:13px;color:var(--muted);font-weight:500}
 .fixbox select,.fixbox textarea{border:1px solid var(--line);background:var(--paper);border-radius:8px;padding:8px 10px;font:inherit;color:var(--ink)}
@@ -241,7 +263,7 @@ html.view-reporting .lb-only{display:none!important}
     <div class="tbl-toggle"><button class="btn ghost" type="button" id="bdrTableBtn" aria-expanded="false" aria-controls="bdrMetrics">Show metrics table</button></div>
     <div id="bdrMetrics" hidden>
     <div class="table-wrap" id="bdrTable"></div>
-    <div class="legend"><b>Books</b>: new calls booked in the period, counted on the day they were booked (a rebook only counts as new when it is booked more than 30 days after the deal's last slot). <b>Runs due</b>: discovery calls whose slot arrived in the period, counted per call (a deal that no-shows and is rebooked into the same period = 2 calls due). <b>Runs had</b>: calls that were held. <b>Overall show</b> = runs had ÷ runs due. <b>No-show recovery</b>: of deals that missed a call in the period, the share held at a later slot (recent periods can still recover). <b>1st-time show</b> = new books held at their first slot ÷ new books whose first slot came due in the period. <b>Showed, then DQ'd</b>: of the calls held in the period, the share where the deal went to the DQ stage (showed up but was not a fit). Lower is better; a high number means the rep is booking people who show but do not qualify. <b>MRR generated</b>: monthly retainer (USD) of deals closed won in the period, credited to the rep who booked them. <b>Designs</b> (designs created): deals moved into the Design/Prop Review stage in HubSpot. <b>Designs held</b>: deals moved from Design on to a later stage (Prop Update or beyond).</div>
+    <div class="legend"><b>Books</b>: new calls booked in the period, counted on the day they were booked (a rebook only counts as new when it is booked more than 30 days after the deal's last slot). <b>Runs due</b>: discovery calls whose slot arrived in the period, counted per call (a deal that no-shows and is rebooked into the same period = 2 calls due). <b>Runs had</b>: calls that were held. <b>Overall show</b> = runs had ÷ runs due. <b>No-show recovery</b>: of deals that missed a call in the period, the share held at a later slot (recent periods can still recover). <b>1st-time show</b> = held at the first slot ÷ new books whose first slot has passed, shown three ways: <b>excl. our cancels</b> (the headline: calls we pulled, e.g. not an MSP or DQ, are left out), <b>all</b> (nothing left out) and <b>excl. their cancels</b> (prospect cancels and reschedules before the call are left out). A booking moved before its first slot counts as a cancel. Who cancelled is decided by the who-cancelled check (open a deal and click <i>Why?</i>); <b>cancelled ahead, who unknown</b> stays in every view as a miss until someone picks ours or theirs. <b>Showed, then DQ'd</b>: of the calls held in the period, the share where the deal went to the DQ stage (showed up but was not a fit). Lower is better; a high number means the rep is booking people who show but do not qualify. <b>MRR generated</b>: monthly retainer (USD) of deals closed won in the period, credited to the rep who booked them. <b>Designs</b> (designs created): deals moved into the Design/Prop Review stage in HubSpot. <b>Designs held</b>: deals moved from Design on to a later stage (Prop Update or beyond).</div>
     </div>
   </section>
 
@@ -360,7 +382,7 @@ const BDR_RANK = [
   {id:"had",   label:"Runs had",      goal:8,  fmt:"n"},
   {id:"books", label:"Books (new)",   goal:12, fmt:"n"},
   {id:"show",  label:"Overall show",  goal:null, fmt:"pct"},
-  {id:"first", label:"1st-time show", goal:null, fmt:"pct"},
+  {id:"first", label:"1st-time show", goal:null, fmt:"pct"},   // excl. our cancels (see showupStats)
   {id:"dq",    label:"Showed, then DQ'd", goal:null, fmt:"pct", lower:true},
   {id:"des",   label:"Designs",       goal:4,  fmt:"n"},
 ];
@@ -414,7 +436,7 @@ function paceFraction(p){
 }
 
 /* ---------- state ---------- */
-const state = { kind:"week", offset:0, rank:"had", aeRank:"cwd", me:null, showup:[], events:[], ov:new Map(), pend:new Map(), reviews:new Map(), lastRun:null };
+const state = { kind:"week", offset:0, rank:"had", aeRank:"cwd", me:null, showup:[], events:[], ov:new Map(), pend:new Map(), reviews:new Map(), cattr:new Map(), lastRun:null };
 const REVIEW_SINCE = "2026-10-01";   // reps sign off on everything from here on
 const REPS = ["Brandon","Issa","Dipen"];
 
@@ -434,6 +456,10 @@ function effShowup(){
       }
       if(o.exclude || o.cat==="not_a_booking") e.dropped = true;
     }
+    // who cancelled (only for bookings that missed their FIRST slot ahead of time: cancelled or moved before it)
+    e.ahead = e.cat==="cancelled_ahead" || !!e.pushed;
+    e.ca = state.cattr.get(key) || null;
+    e.who = e.ahead ? ((o && o.who) || (e.ca ? e.ca.verdict : "unknown")) : null;
     return e;
   });
 }
@@ -491,13 +517,21 @@ function showupStats(rows, p){
     miss.forEach(()=>missed.push(r));
   });
   const dueN = had.length + missed.length;
-  const fdue = firsts.filter(r=>!r.pushed && slotPassed(r.first_slot));
-  const f1 = fdue.filter(r=>r.cat==="first_time_show");
+  // 1st-time show, three views (Vianney 11-10). Every new booking whose first slot has passed counts, including ones
+  // moved before that slot (a prospect reschedule = their cancel). Ahead-of-time cancels/moves are sorted by the
+  // "who cancelled" tree into ours / theirs / unknown; unknowns stay in every view and are shown as a count.
+  const fall = firsts.filter(r=>slotPassed(r.first_slot));
+  const f1 = fall.filter(r=>!r.pushed && r.cat==="first_time_show");
+  const fOurs = fall.filter(r=>r.ahead && r.who==="ours"), fTheirs = fall.filter(r=>r.ahead && r.who==="theirs"), fUnk = fall.filter(r=>r.ahead && r.who==="unknown");
+  const fdue = fall.filter(r=>!fOurs.includes(r));            // headline: everyone we expected to show
+  const fdueT = fall.filter(r=>!fTheirs.includes(r));
   const notHad = due.filter(r=>r._miss && r._miss.length);   // deals with at least one missed call (may also have been held later)
   // No-show recovery: of deals that missed a call in the period, how many were held at a later slot (any time after)
   const rec = notHad, recBack = notHad.filter(r=>r.run_at && Date.parse(r.run_at) > Date.parse(r._miss[0]));
   const hdq = had.filter(r=>r.dq);   // held calls where the deal went to the DQ stage: showed up, then disqualified
-  return { books, firsts, due, dueN, had, fdue, f1, notHad, missed, rec, recBack, hdq,
+  return { books, firsts, due, dueN, had, fdue, f1, notHad, missed, rec, recBack, hdq, fall, fdueT, fOurs, fTheirs, fUnk,
+    firstAll: fall.length ? f1.length/fall.length : null,
+    firstExT: fdueT.length ? f1.length/fdueT.length : null,
     dqRate: had.length ? hdq.length/had.length : null,
     ns: missed.filter(r=>r.cat!=="cancelled_ahead"),
     ca: missed.filter(r=>r.cat==="cancelled_ahead"),
@@ -585,7 +619,10 @@ function render(){
     ["Runs due (calls)", t=>t.dueN, "due", null],
     ["Runs had", t=>t.had.length, "had", 8],
     ["Overall show", t=>pctS(t.show), "due", null],
-    ["1st-time show", t=>pctS(t.first), "fdue", null],
+    ["1st-time show (excl. our cancels)", t=>pctS(t.first), "fdue", null],
+    ["1st-time show, all", t=>pctS(t.firstAll), "fall", null],
+    ["1st-time show (excl. their cancels)", t=>pctS(t.firstExT), "fext", null],
+    ["Cancelled ahead, who unknown", t=>t.fUnk.length, "cunk", null],
     ["Showed, then DQ'd", t=>pctS(t.dqRate), "dq", null],
     ["No-shows", t=>t.ns.length, "ns", null],
     ["Cancelled / DQ'd ahead", t=>t.ca.length, "ca", null],
@@ -631,7 +668,10 @@ function render(){
     ["Runs due (calls)", t=>t.dueN, "due", null],
     ["Disco no-shows", t=>t.ns.length, "ns", null],
     ["Overall show", t=>pctS(t.show), "due", null],
-    ["1st-time show", t=>pctS(t.first), "fdue", null],
+    ["1st-time show (excl. our cancels)", t=>pctS(t.first), "fdue", null],
+    ["1st-time show, all", t=>pctS(t.firstAll), "fall", null],
+    ["1st-time show (excl. their cancels)", t=>pctS(t.firstExT), "fext", null],
+    ["Cancelled ahead, who unknown", t=>t.fUnk.length, "cunk", null],
     ["Showed, then DQ'd", t=>pctS(t.dqRate), "dq", null],
     ["Moved to Diagnosis", t=>t.diag.length, "diag", null],
     ["Designs created", t=>t.des.length, "des", null],
@@ -722,7 +762,26 @@ function dealHTML(r, isEv){
   if(!me.approver && me.rep && reviewOwner(r)===me.rep && reviewState(r, me.rep)==="true") acts.push(`<button class="linkish" data-fix="${esc(r.key)}" data-ev="${isEv?1:0}">Actually, this is wrong</button>`);
   const fix = acts.length ? `<div class="fix">${acts.join("")}</div><div class="fixslot" id="fix-${esc(r.key)}"></div>` : "";
   return `<li class="deal${r.dropped?" dropped":""}"><div class="top"><span class="nm"><a href="${link}" target="_blank" rel="noopener">${esc(r.deal_name)}</a></span><span class="pill ${cls}">${esc(lbl)}${r.dropped?" · not counted":""}</span></div>
-    <div class="why">${why}</div>${corr}${fix}</li>`;
+    <div class="why">${why}</div>${isEv?"":whoHTML(r)}${corr}${fix}</li>`;
+}
+/* ---------- who cancelled: verdict + the decision tree + evidence, and a one-click flip ---------- */
+const WC_SRC = {hs_stage:"HubSpot stage", msp_verify:"MSP Verify", slack_slotguard:"Slack slot guard", slack_icp:"Slack ICP alert", gcal:"Calendar",
+  ghl_appt:"GHL appointment", ghl_sms:"GHL text", ghl_email:"GHL email", ghl_call:"GHL call", hs_email:"HubSpot email", hs_note:"HubSpot note", hs_call:"HubSpot call log", ai:"AI"};
+const WC_WHO = {ours:"Our cancel", theirs:"Their cancel", unknown:"Who cancelled: unknown"};
+function whoHTML(r){
+  if(!r.ahead) return "";
+  const c = r.ca, ov = r.ov && r.ov.who ? r.ov : null, pend = r.pend && r.pend.who ? r.pend : null;
+  const kind = r.pushed ? "moved before its first slot" : "cancelled before its first slot";
+  const head = `<span class="tag ${r.who}">${WC_WHO[r.who]}</span><span>${esc(ov ? "Set by "+ov.by_email : (c ? c.reason : "Not sorted yet (runs weekday mornings)"))}${c&&!ov&&c.step?` · step ${c.step}`:""}</span>${c||pend?`<span class="more">Why?</span>`:""}`;
+  const stepCls = a => (a==="yes"||a==="us"||a==="prospect") ? "yes" : (a||"no");
+  const steps = c ? (c.path||[]).map(s=>`<div class="step ${stepCls(s.a)}"><span class="n">${typeof s.step==="number"?s.step:(s.step==="first"?"⇄":"AI")}</span><span><span class="q">${esc(s.q)}</span>${s.a?`<span class="a">${esc(s.a)}</span>`:""}</span><span class="w">${esc(s.why)}</span></div>`).join("") : "";
+  const evs = c ? (c.evidence||[]).slice(0,10).map(e=>`<li class="${e.used?"used":""}"><span class="src">${e.used?"✓ ":""}${esc(WC_SRC[e.src]||e.src)}${e.at?" · "+nice(e.at):""}${e.side&&e.side!=="system"?" · "+esc(e.side):""}:</span> ${esc(e.text)}${e.url?` <a href="${esc(e.url)}" target="_blank" rel="noopener">open</a>`:""}</li>`).join("") : "";
+  const conf = c && (c.conflicts||[]).length ? `<div class="w" style="margin-top:6px"><b>Pointed the other way:</b> ${c.conflicts.map(e=>esc((WC_SRC[e.src]||e.src)+": "+e.text)).join(" · ")}</div>` : "";
+  const me = state.me||{};
+  const canFlip = me.approver || (me.rep && credited(r, me.rep));
+  const btn = (w, t) => `<button class="btn ghost" type="button" data-who="${w}" data-key="${esc(r.key)}" data-label="${esc(labelOf(r))}">${t}</button>`;
+  const flip = canFlip ? `<div class="flip"><span>Wrong?</span>${r.who!=="ours"?btn("ours","It was us"):""}${r.who!=="theirs"?btn("theirs","It was them"):""}${pend?`<span>Waiting for approval: ${esc(pend.who==="ours"?"our cancel":"their cancel")}</span>`:""}</div>` : "";
+  return `<details class="wc"><summary>${head}</summary><div class="tree"><div class="w" style="margin-bottom:4px">This call was ${kind}. The checks run in order and stop at the first yes: 1 not a fit (ours) → 2 the prospect acted on the calendar (theirs) → 3 the prospect said so in a message (theirs) → 4 we moved it (ours) → otherwise unknown. If both sides acted, whoever acted first decides.</div>${steps}${evs?`<ul class="ev">${evs}</ul>`:""}${conf}${flip}</div></details>`;
 }
 let lastOpen = null;
 function openList(person, role, metric, title, pOverride){
@@ -740,7 +799,14 @@ function openList(person, role, metric, title, pOverride){
   else if(metric==="due") groups.push(["Held", s.had], ["Missed calls (a deal can be in both lists)", s.notHad]);
   else if(metric==="rec") groups.push(["Missed, then held at a later slot", s.recBack], ["Missed, not held since", s.rec.filter(r=>!s.recBack.includes(r))]);
   else if(metric==="dq") groups.push(["Showed, then DQ'd", s.hdq], ["Showed, not DQ'd", s.had.filter(r=>!s.hdq.includes(r))]);
-  else if(metric==="fdue") groups.push(["Held at first slot", s.f1], ["First slot came due, not held there", s.fdue.filter(r=>!s.f1.includes(r))]);
+  else if(["fdue","fall","fext","cunk"].includes(metric)){
+    const missF = s.fall.filter(r=>!s.f1.includes(r) && !r.ahead);
+    if(metric==="cunk") groups.push(["Cancelled or moved ahead, nobody can tell who yet (pick ours or theirs)", s.fUnk]);
+    else groups.push(["Held at first slot", s.f1], ["No-show at first slot", missF],
+      ["Cancelled or moved ahead by the prospect" + (metric==="fext" ? " (not counted in this view)" : ""), s.fTheirs],
+      ["Cancelled or moved ahead by us" + (metric==="fdue" ? " (not counted in this view)" : ""), s.fOurs],
+      ["Cancelled or moved ahead, who unknown (counted as a miss)", s.fUnk]);
+  }
   else if(metric==="ns") groups.push(["No-shows (one per missed call)", [...new Set(s.ns)]]);
   else if(metric==="ca") groups.push(["Cancelled / DQ'd ahead", [...new Set(s.ca)]]);
   else if(["des","dheld","prop","diag","con","won"].includes(metric)) groups.push([null, evOf({des:"design",dheld:"dheld",prop:"prop",diag:"diag",con:"contract",won:"won"}[metric])]);
@@ -748,7 +814,7 @@ function openList(person, role, metric, title, pOverride){
     groups.push(["Held", s.had], ["Due but not held", s.notHad], ["Booked, not due yet", s.books.filter(r=>!s.due.includes(r))]);
     if(ev.length) groups.push(["Pipeline", ev]);
   }
-  if(dropped.length && ["all","books","due","fdue"].includes(metric)) groups.push(["Not counted (corrected out)", dropped]);
+  if(dropped.length && ["all","books","due","fdue","fall","fext"].includes(metric)) groups.push(["Not counted (corrected out)", dropped]);
   showDialog(title, `${p.label}. Click a deal name to open it in HubSpot.`, groups);
 }
 function openQueue(rep){
@@ -826,6 +892,7 @@ async function refresh(){
   state.ov = new Map((r.overrides||[]).filter(o=>o.status==="approved").map(o=>[o.key,o]));
   state.pend = new Map((r.overrides||[]).filter(o=>o.status==="pending").map(o=>[o.key,o]));
   state.reviews = new Map((r.reviews||[]).map(v=>[v.key+"|"+v.rep, v]));
+  state.cattr = new Map((r.cattr||[]).map(c=>[c.key, c]));
   render();
 }
 function toast(msg){ const t=document.getElementById("toast"); t.textContent=msg; t.classList.add("show"); setTimeout(()=>t.classList.remove("show"),2200); }
@@ -842,6 +909,7 @@ document.addEventListener("click", e=>{
   if(n){ openList(n.dataset.person, n.dataset.role, n.dataset.metric, n.dataset.title); return; }
   const f = e.target.closest("[data-fix]"); if(f){ fixForm(f.dataset.fix, f.dataset.ev==="1"); return; }
   const u = e.target.closest("[data-undo]"); if(u){ undo(u.dataset.undo); return; }
+  const w = e.target.closest("[data-who]"); if(w){ act("/correct", {key:w.dataset.key, who:w.dataset.who, label:w.dataset.label}, state.me && state.me.approver ? "Saved: "+(w.dataset.who==="ours"?"our cancel":"their cancel") : "Sent to Vianney / Max for approval"); return; }
   const t = e.target.closest("[data-true]"); if(t){ act("/review", t.dataset.rep ? {key:t.dataset.true, label:t.dataset.label, rep:t.dataset.rep} : {key:t.dataset.true, label:t.dataset.label}, t.dataset.rep ? "Confirmed for "+t.dataset.rep : "Confirmed"); return; }
   const ap = e.target.closest("[data-approve]"); if(ap){ act("/decide", {key:ap.dataset.approve, approve:true}, "Approved, numbers updated"); return; }
   const rj = e.target.closest("[data-reject]"); if(rj){ act("/decide", {key:rj.dataset.reject, approve:false}, "Rejected, back to the rep"); return; }

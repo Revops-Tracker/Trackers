@@ -89,3 +89,5 @@ details.how > div{margin-top:8px;line-height:1.5}
 .ax-key i.b{background:none;border-top:2px dashed var(--muted);height:0}
 .ax-key i.z{height:10px;background:color-mix(in srgb,var(--gold) 25%,transparent)}
 .sc-tbl td.goal small{display:block;font-size:11px}
+/* Sales L10 keeps its original dotted underline (the leaderboard's "under" position drops it into the sub-line on the big tile numbers) */
+html.view-reporting .click{text-underline-position:auto}

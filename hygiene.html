@@ -147,6 +147,7 @@
     <a href="#flags-section">Flags</a>
     <a href="#msp-section">MSP Analytics</a>
     <a href="#excl-section">Excluded Companies</a>
+    <a href="#revert-section">Exclude Revert Check</a>
   </nav>
 
   <div id="flagsTab">
@@ -240,6 +241,34 @@
         <span class="muted" id="exclCount" style="margin-left:auto"></span>
       </div>
       <div id="exclResults"></div>
+    </div>
+  </div>
+
+  <div id="revertTab">
+    <h2 id="revert-section" class="section-title">Exclude Revert Check</h2>
+    <p id="revertInfo" class="section-sub">
+      Drop a CSV of contacts (needs a <code>domain</code> column; <code>firstname</code>/<code>lastname</code>
+      help disambiguate companies with more than one excluded contact; a <code>contact_id</code> column
+      skips matching entirely). Finds the ones currently <code>exclude1=True</code> in HubSpot, classifies
+      why, and marks which are safe to revert. Analysis only — this never writes back to HubSpot.
+    </p>
+    <div class="card" id="revertAdminCard" style="display:none">
+      <div class="toolbar">
+        <input type="file" id="revertFile" accept=".csv">
+        <button class="primary" id="revertAnalyzeBtn" disabled>Analyze</button>
+        <span class="msg" id="revertMsg"></span>
+      </div>
+      <div id="revertProgress" style="display:none;margin-top:10px">
+        <div class="section-sub" id="revertProgressText"></div>
+      </div>
+    </div>
+    <div class="card" id="revertBreakdownCard" style="display:none">
+      <h2>Breakdown</h2>
+      <div id="revertBreakdown"></div>
+      <div class="toolbar" style="margin-top:10px">
+        <button id="revertDownloadBtn">Download CSV</button>
+        <span class="msg" id="revertDownloadMsg"></span>
+      </div>
     </div>
   </div>
 </div>
@@ -759,6 +788,90 @@ document.getElementById("exclClearBtn").onclick = function () {
   renderExclResults();
 };
 
+// ---- Exclude1 revert check ----
+var revertFileText = null, revertRunId = null, revertPollTimer = null;
+var REVERT_BUCKET_LABELS = {
+  revert_candidates: "Revert candidates", needs_human_review: "Needs human review",
+  deferred: "Deferred — active deal", customer_exclude: "Customer / permanent exclude",
+  permanent: "Permanent (never revert)", on_list_skipped: "Still on a BDR list",
+  too_recent: "Too recent (not yet stale)", unmatched: "Not matched to an exclude1=True contact",
+};
+var REVERT_BUCKET_ORDER = ["revert_candidates", "needs_human_review", "deferred", "customer_exclude", "permanent", "on_list_skipped", "too_recent", "unmatched"];
+
+document.getElementById("revertFile").onchange = function (e) {
+  var f = e.target.files[0];
+  var btn = document.getElementById("revertAnalyzeBtn");
+  if (!f) { revertFileText = null; btn.disabled = true; return; }
+  var reader = new FileReader();
+  reader.onload = function () { revertFileText = reader.result; btn.disabled = false; };
+  reader.readAsText(f);
+};
+
+document.getElementById("revertAnalyzeBtn").onclick = function () {
+  if (!revertFileText) return;
+  var btn = this, msg = document.getElementById("revertMsg");
+  btn.disabled = true; msg.textContent = "Starting…"; msg.className = "msg";
+  document.getElementById("revertBreakdownCard").style.display = "none";
+  fetch("/api/hygiene/exclude1-revert/start", { method: "POST", body: JSON.stringify({ csv: revertFileText }) })
+    .then(function (r) { return r.json(); }).then(function (d) {
+      if (!d.ok) { btn.disabled = false; msg.textContent = d.error || "failed"; msg.className = "msg err"; return; }
+      revertRunId = d.run_id;
+      msg.textContent = d.input_count + " rows uploaded — analyzing…";
+      document.getElementById("revertProgress").style.display = "block";
+      if (revertPollTimer) clearInterval(revertPollTimer);
+      revertPollTimer = setInterval(pollRevertStatus, 2500);
+      pollRevertStatus();
+    }).catch(function (e) { btn.disabled = false; msg.textContent = String(e); msg.className = "msg err"; });
+};
+
+function pollRevertStatus() {
+  if (!revertRunId) return;
+  fetch("/api/hygiene/exclude1-revert/status?run_id=" + encodeURIComponent(revertRunId)).then(function (r) { return r.json(); }).then(function (d) {
+    if (!d.ok) return;
+    var run = d.run;
+    var progressText = document.getElementById("revertProgressText");
+    var btn = document.getElementById("revertAnalyzeBtn");
+    var msg = document.getElementById("revertMsg");
+    if (run.status === "running" || run.status === "queued") {
+      progressText.textContent = run.progress_total
+        ? "Processing " + run.progress_done + " / " + run.progress_total + " excluded contacts…"
+        : "Scanning for exclude1=True contacts…";
+      return;
+    }
+    clearInterval(revertPollTimer); revertPollTimer = null;
+    btn.disabled = false;
+    document.getElementById("revertProgress").style.display = "none";
+    if (run.status === "error") { msg.textContent = "Failed: " + (run.error || "unknown error"); msg.className = "msg err"; return; }
+    msg.textContent = "Done."; msg.className = "msg ok";
+    renderRevertBreakdown(run.breakdown || {});
+  });
+}
+
+function renderRevertBreakdown(breakdown) {
+  var box = document.getElementById("revertBreakdown");
+  var total = 0; for (var k in breakdown) total += breakdown[k];
+  box.innerHTML = REVERT_BUCKET_ORDER.filter(function (k) { return breakdown[k]; }).map(function (k) {
+    return '<div class="reason-row"><span class="rk">' + esc(REVERT_BUCKET_LABELS[k] || k) + '</span><span class="rv">' + breakdown[k] + "</span></div>";
+  }).join("") || '<p class="empty">No exclude1=True contacts found among these rows.</p>';
+  if (total) box.innerHTML += '<p class="section-sub" style="margin-top:8px">' + total + " excluded contact(s) matched across the uploaded rows.</p>";
+  document.getElementById("revertBreakdownCard").style.display = "block";
+}
+
+document.getElementById("revertDownloadBtn").onclick = function () {
+  if (!revertRunId) return;
+  var msg = document.getElementById("revertDownloadMsg");
+  msg.textContent = "Preparing…";
+  fetch("/api/hygiene/exclude1-revert/csv?run_id=" + encodeURIComponent(revertRunId)).then(function (r) { return r.json(); }).then(function (d) {
+    if (!d.ok) { msg.textContent = d.error || "failed"; return; }
+    var blob = new Blob([d.csv], { type: "text/csv" });
+    var a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = d.filename || "exclude1-revert-results.csv";
+    document.body.appendChild(a); a.click(); a.remove();
+    msg.textContent = "Downloaded.";
+  }).catch(function (e) { msg.textContent = String(e); });
+};
+
 function whenUserReady(cb) {
   if (window.JF_USER) { cb(window.JF_USER); return; }
   var tries = 0;
@@ -771,7 +884,10 @@ function whenUserReady(cb) {
 
 document.addEventListener("DOMContentLoaded", function () {
   whenUserReady(function (u) {
-    if (u.role === "admin") { document.getElementById("adminCard").style.display = "block"; loadFlags(); }
+    if (u.role === "admin") {
+      document.getElementById("adminCard").style.display = "block"; loadFlags();
+      document.getElementById("revertAdminCard").style.display = "block";
+    }
   });
   loadRoster();
   loadStats();

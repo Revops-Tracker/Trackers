@@ -238,7 +238,7 @@
   function funnel(c, st) {
     return '<section class="funnel">' +
       stage('Discovery', c.dRun, 'discos run',
-        r('BDR / Inbound', c.dRunB + ' / ' + c.dRunI) + r('No-shows', c.dNs) + r('Show rate', pct(c.dRun, c.dRun + c.dNs)) + (c.dPend ? r('Not confirmed yet', c.dPend, 'pend') : ''),
+        r('BDR / Inbound', c.dRunB + ' / ' + c.dRunI) + r('No-shows', c.dNs) + r('Show rate (cancels not counted)', pct(c.dRun, c.dRun + c.dNs)) + (c.dPend ? r('Not confirmed yet', c.dPend, 'pend') : ''),
         pct(cnt(st.d, 'next'), st.d.length), 'disco') +
       stage('Design / Audit', c.aRun, 'audits run',
         r('Booked (moved to stage)', c.aBook) + r('No-shows', c.aNs) + r('Show rate', pct(c.aRun, c.aRun + c.aNs)) + (c.aPend ? r('Needs your answer', c.aPend, 'pend') : '') + (c.aUp ? r('Booked ahead', c.aUp) : ''),
@@ -357,7 +357,7 @@
 
   function defsCard() {
     return '<div class="card"><h2>How it counts</h2><ul class="defs">' +
-      '<li><strong>Discos run / no-shows</strong> &mdash; from the leaderboard&rsquo;s show-up engine, credited to the AE on the deal.</li>' +
+      '<li><strong>Discos run / no-shows</strong> &mdash; from the leaderboard&rsquo;s show-up engine, credited to the AE on the deal. Show rate here = held &divide; (held + no-show), so calls cancelled before the slot are left out. The Sales L10 shows 1st-time show three ways (excl. our cancels / all / excl. their cancels).</li>' +
       '<li><strong>Moved to Design/Audit</strong> and <strong>Moved to Prop Review</strong> &mdash; the day the deal entered that HubSpot stage.</li>' +
       '<li><strong>Audits / prop reviews run</strong> &mdash; MSP Audit and Proposal Review meetings (GHL calendars, synced to HubSpot). Held = Fathom recording or Completed outcome, or the deal moved past that stage after the call.</li>' +
       '<li><strong>No-shows</strong> &mdash; the deal went to the no-show stage, or you marked it. Rebooked calls aren&rsquo;t counted twice.</li>' +

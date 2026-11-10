@@ -650,10 +650,11 @@ const AE_RANK = [
 const DATA_FROM = "2026-07-01";   // history is backfilled from the start of Q3
 const NOT_A_BDR = new Set(["Inbound","CloseBot AI"]);
 // Reps who have left (e.g. Jules, Hannah, Armin in Q3; Erich in Oct) are not shown by name: their numbers roll up into one "Former reps" bucket.
-const FORMER = "Former reps", OTHER = "Other", INB_ALL = "All inbound";
+const FORMER = "Former reps", OTHER = "Other", INB_ALL = "All inbound", WHO_ALL = "Everyone";
 const PRED = new Map();   // Sales L10 breakdown rows: person key -> predicate on a record
 const CUR_BDR = new Set(BDRS.map(b=>b.key)), CUR_AE = new Set(AES.map(a=>a.key));
 function whoMatches(r, person, role){
+  if(person===WHO_ALL) return true;   // review-bar lists across every booker
   const v = role==="ae" ? r.ae : r.booker;
   if(person===INB_ALL) return role==="bdr" && NOT_A_BDR.has(v);
   if(PRED.has(person)) return role==="bdr" && PRED.get(person)(r);   // Sales L10 breakdown rows
@@ -668,7 +669,7 @@ const BDR_RANK = [
   {id:"had",   label:"Runs had",      goal:8,  fmt:"n"},
   {id:"books", label:"Books (new)",   goal:12, fmt:"n"},
   {id:"show",  label:"Overall show",  goal:null, fmt:"pct"},
-  {id:"first", label:"1st-time show", goal:null, fmt:"pct"},
+  {id:"first", label:"1st-time show (excl. our cancels)", goal:null, fmt:"pct"},
   {id:"dq",    label:"Showed, then DQ'd", goal:null, fmt:"pct", lower:true},
   {id:"des",   label:"Designs",       goal:4,  fmt:"n"},
 ];
@@ -947,7 +948,7 @@ function render(){
         <div class="sub"><button class="linkish" data-person="${esc(b.key)}" data-role="bdr" data-metric="all" data-title="${esc(b.name)}: all deals">See deals</button></div></div>
       <div class="track">${isPct ? barHTML((b.v||0)*100, null, pace, 100) : barHTML(b.v||0, goal, pace, topV)}
         <div class="bar-meta">${isPct && metric.id==="dq" ? `<span>${t.hdq.length} of ${t.had.length} held calls ended in DQ</span>` : isPct ? `<span>${t.had.length} of ${t.dueN} calls due held · 1st-time ${t.f1.length} of ${t.fdue.length}</span>` : (goal?`<span>Goal ${fmt(goal)}</span>${paceText(b.v||0, goal, pace)}`:"")}</div>
-        <div class="stats"><span>Books <b>${t.books.length}</b></span><span>Due <b>${t.dueN}</b></span><span>Had <b>${t.had.length}</b></span><span>Show <b>${pctS(t.show)}</b></span><span>1st-time <b>${pctS(t.first)}</b></span><span>DQ'd <b>${pctS(t.dqRate)}</b></span><span>Designs <b>${t.des.length}</b></span></div>
+        <div class="stats"><span>Books <b>${t.books.length}</b></span><span>Due <b>${t.dueN}</b></span><span>Had <b>${t.had.length}</b></span><span>Show <b>${pctS(t.show)}</b></span><span title="1st-time show excl. our cancels; all = nothing left out; excl. theirs = prospect cancels left out">1st-time <b>${pctS(t.first)}</b> <small>(all ${pctS(t.firstAll)} · excl. theirs ${pctS(t.firstExT)})</small></span><span>DQ'd <b>${pctS(t.dqRate)}</b></span><span>Designs <b>${t.des.length}</b></span></div>
       </div>
       <div class="score">${num(shown, b.key, "bdr", metricKey, `${b.name}: ${metric.label}`)}<small>${metric.label.toLowerCase()}</small></div>
     </div>`;
@@ -1048,7 +1049,18 @@ function renderReviewBar(){
     parts.push(`<div class="rv${n?" todo":""}"><b>${n} correction${n===1?"":"s"} waiting for approval</b>${n?`<button class="btn" data-approvals="1">Review</button>`:""}</div>`);
     parts.push(`<div class="rv"><span class="prog">Rep sign-off since Oct 1:</span>${REPS.map(rep=>{const a=reviewables(rep), d=a.filter(r=>reviewState(r,rep)==="true"); return `<button class="linkish" data-queue="${rep}">${rep} ${d.length}/${a.length}</button>`;}).join("")}</div>`);
   }
+  parts.push(...whoUnknownBar(me));
   el.innerHTML = parts.join("");
+}
+// Cancels/moves before the first slot that the who-cancelled check couldn't call (last 30 days). Approvers see everyone's; reps see their own.
+function last30(){ const y=new Date(); y.setHours(0,0,0,0); y.setDate(y.getDate()-1); const s=new Date(y); s.setDate(s.getDate()-29); return {s, e:y, start:ymd(s), end:ymd(y), label:"last 30 days", now:y}; }
+function whoUnknownBar(me){
+  const who = me.approver ? WHO_ALL : (me.rep && REPS.includes(me.rep) ? me.rep : null);
+  if(!who) return [];
+  const unk = showupStats(effShowup().filter(r=>!r.dropped && whoMatches(r, who, "bdr")), last30()).fUnk;
+  let ran = null; state.cattr.forEach(c=>{ if(c.decided_at && (!ran || c.decided_at>ran)) ran = c.decided_at; });
+  const n = unk.length, scope = who===WHO_ALL ? "" : " you booked";
+  return [`<div class="rv${n?" todo":""}"><b>${n ? n+" cancel"+(n===1?"":"s")+scope+": nobody can tell who cancelled" : "Who cancelled: all sorted"}</b><span class="prog">last 30 days${ran?" · checked "+nice(ran)+" ET":""}</span>${n?`<button class="btn" data-cunk="${esc(who)}">Pick ours or theirs</button>`:""}</div>`];
 }
 
 function updateLive(){
@@ -1307,6 +1319,7 @@ document.addEventListener("click", e=>{
   const rj = e.target.closest("[data-reject]"); if(rj){ act("/decide", {key:rj.dataset.reject, approve:false}, "Rejected, back to the rep"); return; }
   const q = e.target.closest("[data-queue]"); if(q){ openQueue(q.dataset.queue); return; }
   const aq = e.target.closest("[data-approvals]"); if(aq){ openApprovals(); return; }
+  const cu = e.target.closest("[data-cunk]"); if(cu){ openList(cu.dataset.cunk, "bdr", "cunk", "Who cancelled? Nobody can tell yet (last 30 days)", last30()); return; }
 });
 /* ---------- team trends: stacked bars by source, any range since Jul 1 ---------- */
 const TR_METRICS_ALL = [
@@ -1586,7 +1599,7 @@ function bkTiles(sec, row, bench, benchName, p){
   return tile("Books (new)", fmt(a.books.length), benchName+" "+fmt(b.books.length), 0) +
     tile("Runs had", fmt(a.had.length), "of "+a.dueN+" calls due", 2) +
     tile("Overall show", pctS(a.show), benchName+" "+pctS(b.show), 3) +
-    tile("1st-time show", pctS(a.first), benchName+" "+pctS(b.first), 4) +
+    tile("1st-time show (excl. our cancels)", pctS(a.first), "all "+pctS(a.firstAll)+" · excl. theirs "+pctS(a.firstExT)+" · "+benchName+" "+pctS(b.first), 4) +
     tile("Showed, DQ'd", pctS(a.dqRate), benchName+" "+pctS(b.dqRate), 5) +
     tile("Closes", fmt(a.won.length), benchName+" "+fmt(b.won.length), 10) +
     tile("MRR", fmt(a.cwd,true), benchName+" "+fmt(b.cwd,true), 11);

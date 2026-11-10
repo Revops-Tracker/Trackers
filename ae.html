@@ -204,14 +204,14 @@
     });
     return out.sort(function (a, b) { return a.x.at < b.x.at ? 1 : -1; });
   }
-  function convCard(co, rg) {
-    var n = co.length, a = co.filter(function (x) { return x.a; }), p = co.filter(function (x) { return x.p; }), w = co.filter(function (x) { return x.w; });
-    var pw = p.filter(function (x) { return x.w; });
-    function box(k, num, den) { return '<button type="button" class="cbox" data-conv="1"><div class="k">' + k + '</div><div class="v">' + pct(num, den) + '</div><div class="d">' + num + ' of ' + den + ' deals</div></button>'; }
-    return '<div class="card conv"><h2>Conversion &mdash; new process</h2><p class="sub">Deals whose first disco ran ' + (period === 'since' ? 'since ' + cutLabel() : 'in ' + rg.label.toLowerCase() + ' (from ' + cutLabel() + ' on)') +
-      ', followed to wherever they are now. ' + n + ' deal' + (n === 1 ? '' : 's') + '. Click a box to see each deal.</p><div class="grid">' +
-      box('Disco &rarr; Design/Audit', a.length, n) + box('Design/Audit &rarr; Prop Review/Contract', p.length, a.length) +
-      box('Prop Review/Contract &rarr; Closed won', pw.length, p.length) + box('Disco &rarr; Closed won', w.length, n) + '</div></div>';
+  // Conversion = ratios of the numbers shown in the stage boxes above (same period, same counts), so every % can be checked by eye.
+  function convCard(c, rg) {
+    function box(k, num, den, how) { return '<button type="button" class="cbox" data-conv="1"><div class="k">' + k + '</div><div class="v">' + pct(num, den) + '</div><div class="d">' + num + ' ' + how + ' &divide; ' + den + '</div></button>'; }
+    return '<div class="card conv"><h2>Conversion &mdash; ' + rg.label.toLowerCase() + '</h2><p class="sub">Worked out from the numbers in the boxes above. A deal can move stage in a later week than its disco, so short periods can look uneven; <b>Since ' + cutLabel() + '</b> gives the steadiest read. Click a box to follow each deal.</p><div class="grid">' +
+      box('Disco &rarr; Design/Audit', c.aBook, c.dRun, 'moved to Design/Audit') +
+      box('Design/Audit &rarr; Prop Review/Contract', c.pBook, c.aBook, 'moved to Prop Review') +
+      box('Prop Review/Contract &rarr; Closed won', c.won, c.pBook, 'closed') +
+      box('Disco &rarr; Closed won', c.won, c.dRun, 'closed') + '</div></div>';
   }
 
   // ---- views ----
@@ -235,20 +235,18 @@
   }
   function r(k, v, cls) { return '<div class="r"><span>' + k + '</span><b' + (cls ? ' class="' + cls + '"' : '') + '>' + v + '</b></div>'; }
 
-  function funnel(c, co) {
-    var na = co.filter(function (x) { return x.a; }).length, np = co.filter(function (x) { return x.p; }).length,
-      npw = co.filter(function (x) { return x.p && x.w; }).length;
+  function funnel(c) {
     return '<section class="funnel">' +
       stage('Discovery', c.dRun, 'discos run',
         r('BDR / Inbound', c.dRunB + ' / ' + c.dRunI) + r('No-shows', c.dNs) + r('Show rate', pct(c.dRun, c.dRun + c.dNs)) + (c.dPend ? r('Not confirmed yet', c.dPend, 'pend') : ''),
-        pct(na, co.length), 'disco') +
+        pct(c.aBook, c.dRun), 'disco') +
       stage('Design / Audit', c.aRun, 'audits run',
         r('Moved to Design/Audit', c.aBook) + r('No-shows', c.aNs) + r('Show rate', pct(c.aRun, c.aRun + c.aNs)) + (c.aPend ? r('Needs your answer', c.aPend, 'pend') : '') + (c.aUp ? r('Booked ahead', c.aUp) : ''),
-        pct(np, na), 'audit') +
+        pct(c.pBook, c.aBook), 'audit') +
       stage('Prop Review / Contract', c.pRun, 'prop reviews run',
         r('Moved to Prop Review', c.pBook) + r('No-shows', c.pNs) + r('Show rate', pct(c.pRun, c.pRun + c.pNs)) + (c.pPend ? r('Needs your answer', c.pPend, 'pend') : '') + (c.pUp ? r('Booked ahead', c.pUp) : ''),
-        pct(npw, np), 'prop') +
-      stage('Closed won', c.won, 'closes', r('MRR closed', money(c.mrr)) + r('HT / LT', c.wonHT + ' / ' + c.wonLT) + (c.wonNS ? r('Offer not set', c.wonNS, 'pend') : '') + r('DQ&rsquo;d', c.dq) + r('Disco &rarr; close (new)', pct(co.filter(function (x) { return x.w; }).length, co.length)), null, 'moves') +
+        pct(c.won, c.pBook), 'prop') +
+      stage('Closed won', c.won, 'closes', r('MRR closed', money(c.mrr)) + r('HT / LT', c.wonHT + ' / ' + c.wonLT) + (c.wonNS ? r('Offer not set', c.wonNS, 'pend') : '') + r('DQ&rsquo;d', c.dq) + r('Disco &rarr; close', pct(c.won, c.dRun)), null, 'moves') +
       '</section>';
   }
 
@@ -283,7 +281,7 @@
   }
 
   function listCard(rs, rg) {
-    var tabs = [['audit', 'Audits'], ['prop', 'Prop reviews'], ['disco', 'Discos'], ['moves', 'Stage moves'], ['funnel', 'Funnel']];
+    var tabs = [['audit', 'Audits'], ['prop', 'Prop reviews'], ['disco', 'Discos'], ['moves', 'Stage moves'], ['funnel', 'Follow each deal']];
     if (list === 'funnel') return funnelList(cohort(rs, rg), rg, tabs);
     var pick = rs.filter(function (x) {
       if (!inR(x.at, rg)) return false;
@@ -322,8 +320,8 @@
     var body = !co.length ? '<p class="empty">No new-process discos in ' + rg.label.toLowerCase() + '.</p>' :
       '<table><thead><tr><th>First disco</th><th>Deal</th><th>Design/Audit</th><th>Prop Review</th><th>Closed won</th></tr></thead><tbody>' + co.map(function (x) {
         return '<tr><td>' + fmtShow.format(new Date(x.x.at)) + '</td><td>' + dealLink(x.x) + (x.q ? ' <span class="why">DQ&rsquo;d</span>' : '') + '</td>' + ck(x.a) + ck(x.p) + ck(x.w) + '</tr>'; }).join('') + '</tbody></table>';
-    return '<div class="card" id="detail"><div class="bar" style="margin:0 0 10px"><h2 style="margin:0">' + rg.label + ' &mdash; funnel</h2><span class="grow"></span>' + listTabs(tabs) + '</div>' +
-      '<p class="sub">Every deal whose first disco ran in this period (new process, from ' + cutLabel() + '), and how far it has got so far.</p><div class="tablewrap">' + body + '</div></div>';
+    return '<div class="card" id="detail"><div class="bar" style="margin:0 0 10px"><h2 style="margin:0">' + rg.label + ' &mdash; follow each deal</h2><span class="grow"></span>' + listTabs(tabs) + '</div>' +
+      '<p class="sub">Every deal whose <b>first</b> disco ran in this period (from ' + cutLabel() + ', new process) and how far it has got since, even if it moved on in a later week. This is why it can differ from the boxes above, which count what happened in the period.</p><div class="tablewrap">' + body + '</div></div>';
   }
 
   function paceCard(rs) {
@@ -359,14 +357,15 @@
       '<li><strong>Audits / prop reviews run</strong> &mdash; MSP Audit and Proposal Review meetings (GHL calendars, synced to HubSpot). Held = Fathom recording or Completed outcome, or the deal moved past that stage after the call.</li>' +
       '<li><strong>No-shows</strong> &mdash; the deal went to the no-show stage, or you marked it. Rebooked calls aren&rsquo;t counted twice.</li>' +
       '<li><strong>Closed won</strong> &mdash; by close date, MRR in USD. HT/LT from the deal&rsquo;s Offer field.</li>' +
-      '<li><strong>Conversion</strong> (and the arrows between stages) follows each new-process deal from its first disco (on/after ' + cutLabel() + ', the official switch to the 3-call close) to wherever it is now. Design/Audit = the deal entered that stage or had an audit call; Prop Review = entered that stage or had a prop review call. Low-ticket deals can close straight from the audit, so they count in Disco &rarr; Closed won but not in Prop Review &rarr; Closed won.</li>' +
-      '<li>The stage boxes above count activity <em>in the period</em> (any deal). Click a box to see which calls were held and which were no-shows.</li></ul></div>';
+      '<li><strong>Conversion</strong> (and the arrows between the boxes) divides the box numbers: Moved to Design/Audit &divide; Discos run, Moved to Prop Review &divide; Moved to Design/Audit, Closes &divide; Moved to Prop Review, Closes &divide; Discos run. All for the period picked above.</li>' +
+      '<li><strong>Follow each deal</strong> (tab below) tracks every deal from its first disco (on/after ' + cutLabel() + ', the official switch to the 3-call close) to wherever it is now.</li>' +
+      '<li>Low-ticket deals can close straight from the audit without a prop review.</li></ul></div>';
   }
 
   function render() {
     renderBar();
-    var rs = rows(), rg = range(period), c = count(rs, rg), co = cohort(rs, rg);
-    $('view').innerHTML = funnel(c, co) + convCard(co, rg) + '<div class="cols"><div>' + needsCard(rs) + listCard(rs, rg) + '</div><div>' + paceCard(rs) + defsCard() + '</div></div>';
+    var rs = rows(), rg = range(period), c = count(rs, rg);
+    $('view').innerHTML = funnel(c) + convCard(c, rg) + '<div class="cols"><div>' + needsCard(rs) + listCard(rs, rg) + '</div><div>' + paceCard(rs) + defsCard() + '</div></div>';
     bind();
   }
 

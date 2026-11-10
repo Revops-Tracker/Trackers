@@ -300,8 +300,10 @@
     </div>
     <div class="card" id="revertBreakdownCard" style="display:none">
       <h2>Breakdown</h2>
-      <div class="kpi-row" id="revertBreakdown"></div>
-      <p class="revert-total" id="revertTotal"></p>
+      <div class="table-wrap"><table class="deals" id="revertBreakdown">
+        <thead><tr><th>Group</th><th>Count</th></tr></thead>
+        <tbody></tbody>
+      </table></div>
       <div class="toolbar" style="margin-top:10px">
         <button class="primary" id="revertDownloadBtn">Download CSV</button>
         <span class="msg" id="revertDownloadMsg"></span>
@@ -861,14 +863,24 @@ document.getElementById("exclClearBtn").onclick = function () {
 
 // ---- Exclude1 revert check ----
 var revertFileText = null, revertRunId = null, revertPollTimer = null;
-var REVERT_BUCKET_LABELS = {
-  revert_candidates: "Revert candidates", needs_human_review: "Needs human review",
-  deferred: "Deferred — active deal", customer_exclude: "Customer / permanent exclude",
-  permanent: "Permanent (never revert)", on_list_skipped: "Still on a BDR list",
-  too_recent: "Too recent (not yet stale)", unmatched: "Not matched to an exclude1=True contact",
-};
-var REVERT_BUCKET_ORDER = ["revert_candidates", "needs_human_review", "deferred", "customer_exclude", "permanent", "on_list_skipped", "too_recent", "unmatched"];
-var REVERT_BUCKET_KIND = { revert_candidates: "good", needs_human_review: "warn" };
+// Keys here are the exact "group" labels the backend tallies breakdown by (finer than its internal
+// bucket, e.g. needs_human_review is split by its specific reason) — any group not listed still renders,
+// just at the end, so a new group the backend starts returning is never silently dropped.
+var REVERT_GROUP_ORDER = [
+  "Revert candidates",
+  "Permanent (NLWC/DNC/NISL/Referred/CST Pipeline)",
+  "Customer / Permanent Exclude",
+  "Deferred — recent deal activity",
+  "Needs human review — Not Me",
+  "Needs human review — Needs Attention",
+  "Needs human review — no disposition found",
+  "Needs human review — note found but unparseable",
+  "Needs human review — no resolvable disposition date",
+  "Needs human review — BDR list IDs not configured",
+  "Skipped — still on active BDR list",
+  "Skipped — too recent",
+  "Unmatched to an exclude1=True contact",
+];
 
 function loadRevertFile(f) {
   var btn = document.getElementById("revertAnalyzeBtn");
@@ -942,13 +954,16 @@ function pollRevertStatus() {
 }
 
 function renderRevertBreakdown(breakdown) {
-  var box = document.getElementById("revertBreakdown");
+  var tbody = document.querySelector("#revertBreakdown tbody");
   var total = 0; for (var k in breakdown) total += breakdown[k];
-  box.innerHTML = REVERT_BUCKET_ORDER.filter(function (k) { return breakdown[k]; }).map(function (k) {
-    var kind = REVERT_BUCKET_KIND[k] || "muted";
-    return '<div class="kpi ' + kind + '"><div class="k">' + esc(REVERT_BUCKET_LABELS[k] || k) + '</div><div class="v">' + breakdown[k] + "</div></div>";
-  }).join("") || '<p class="empty">No exclude1=True contacts found among these rows.</p>';
-  document.getElementById("revertTotal").textContent = total ? total + " excluded contact(s) matched across the uploaded rows." : "";
+  // known groups first in a stable order, then any group the backend returns that isn't in the list yet
+  // (never silently dropped), then the bold Total row.
+  var keys = REVERT_GROUP_ORDER.filter(function (k) { return breakdown[k]; });
+  for (var g in breakdown) if (keys.indexOf(g) === -1) keys.push(g);
+  tbody.innerHTML = keys.map(function (k) {
+    return "<tr><td>" + esc(k) + "</td><td>" + breakdown[k] + "</td></tr>";
+  }).join("") || '<tr><td colspan="2" class="empty">No exclude1=True contacts found among these rows.</td></tr>';
+  if (total) tbody.innerHTML += '<tr style="font-weight:700"><td>Total</td><td>' + total + "</td></tr>";
   document.getElementById("revertBreakdownCard").style.display = "block";
 }
 

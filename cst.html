@@ -147,6 +147,8 @@
 <script>
 (function () {
   var BASE = '/api/cst';
+  // Under half a disco behind still counts as on pace (green). Vianney, 2026-11-10.
+  var PACE_BUFFER = 0.5;
   var state = null;
   var me = null; // signed-in person: { email, rep, role }
   var horizons = {};
@@ -288,7 +290,7 @@
     return {
       mw: mw, target: target, mtd: mtd, booked: booked, dials: dials, rates: rates,
       pace: pace, behind: behind,
-      onPace: behind <= 0.001,
+      onPace: behind < PACE_BUFFER,
       dailyBookTarget: dailyBookTarget,
       stdDialsDay: dailyBookTarget * rates.dialsPerBooking,
       dialDebt: Math.max(0, behind) * rates.dialsPerBooking,
@@ -406,7 +408,7 @@
       + '<tbody>' + paceRows + '</tbody></table></div>'
       + "<ul class='defs'>"
       + '<li><strong>Target</strong> &mdash; the CST aim is 20&ndash;30 discos a month; the tracker paces against 25 by default (adjustable on the rep tab). A disco = a <strong>Client Meeting Booked (DB)</strong> or an <strong>Analysis Booked (AB)</strong> &mdash; both count toward the target (an Analysis is an audit / external IT assessment, a Discovery is a Managed Services conversation).</li>'
-      + '<li><strong>Pace / Behind</strong> &mdash; where the month says they should be by today (target &times; share of working days gone), and how many discos they are short of it.</li>'
+      + '<li><strong>Pace / Behind</strong> &mdash; where the month says they should be by today (target &times; share of working days gone), and how many discos they are short of it. Anyone less than half a disco behind still shows <strong>On pace</strong>.</li>'
       + '<li><strong>Dial debt</strong> &mdash; the shortfall converted into dials: discos behind &times; their dials per booking. This is the catch-up work they owe on top of a standard day. It shrinks with every disco booked and grows every day they coast.</li>'
       + '<li><strong>Standard dials/day</strong> &mdash; what a normal day must look like to hit the monthly target: daily disco target &times; dials per booking. No team dial floor on the CST line (yet).</li>'
       + '<li><strong>Current dials/day</strong> &mdash; how hard they actually dial on the days they logged (total dials &divide; days logged). Not diluted by missing days.</li>'
@@ -700,7 +702,7 @@
     if (c.onPace) {
       gapCard = "<div class='card'><h2>Your dial math</h2>"
         + "<div class='row'><span>Standard day (" + f1(c.dailyBookTarget) + ' discos &times; ' + f0(c.rates.dialsPerBooking) + " dials/booking)</span><span class='ratebig'>" + f0(c.stdDialsDay) + ' dials/day</span></div>'
-        + "<div class='row'><span>Dial debt</span><span class='ratebig' style='color:var(--good)'>0 &mdash; on pace</span></div>"
+        + (c.dialDebt > 0.5 ? "<div class='row'><span>Dial debt</span><span class='ratebig' style='color:var(--good)'>&asymp; " + f0(c.dialDebt) + ' dials &mdash; within the ' + PACE_BUFFER + ' buffer</span></div>' : "<div class='row'><span>Dial debt</span><span class='ratebig' style='color:var(--good)'>0 &mdash; on pace</span></div>")
         + (c.cushionDials > 0 ? "<div class='row'><span>Cushion (booked ahead of pace)</span><span class='ratebig' style='color:var(--good)'>&asymp; " + f0(c.cushionDials) + ' dials</span></div>' : '')
         + "<p class='hint'>Hold the standard day and the month lands on " + f0(c.target) + ' discos.</p></div>';
     } else {

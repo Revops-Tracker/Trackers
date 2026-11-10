@@ -161,6 +161,8 @@
   // Team minimum: 780 dials a day across power + parallel. The rate math can ask for less than
   // this when a rep is converting well — the floor still stands, so it overrides the calculation.
   var DIAL_FLOOR = 780;
+  // Under half a meeting behind still counts as on pace (green). Vianney, 2026-11-10.
+  var PACE_BUFFER = 0.5;
   var state = null;
   var me = null; // signed-in person: { email, rep, role }
   // Reps who have left: hidden from the live tabs and summary, but their entries stay in History.
@@ -303,7 +305,7 @@
     return {
       mw: mw, target: target, mtd: mtd, booked: booked, dials: dials, rates: rates,
       pace: pace, behind: behind,
-      onPace: behind <= 0.001,
+      onPace: behind < PACE_BUFFER,
       dailyBookTarget: dailyBookTarget,
       stdDialsRaw: stdRaw,
       floored: stdRaw < DIAL_FLOOR,
@@ -422,7 +424,7 @@
       + "<th>Today's commit</th><th>Commits kept</th><th>Days logged</th><th>Dials per booking</th></tr></thead>"
       + '<tbody>' + paceRows + '</tbody></table></div>'
       + "<ul class='defs'>"
-      + '<li><strong>Pace / Behind</strong> &mdash; where the month says they should be by today (target &times; share of working days gone), and how many meetings they are short of it.</li>'
+      + '<li><strong>Pace / Behind</strong> &mdash; where the month says they should be by today (target &times; share of working days gone), and how many meetings they are short of it. Anyone less than half a meeting behind still shows <strong>On pace</strong>.</li>'
       + '<li><strong>Dial debt</strong> &mdash; the shortfall converted into dials: meetings behind &times; their dials per booking. This is the catch-up work they owe on top of a standard day. It shrinks with every meeting booked and grows every day they coast.</li>'
       + '<li><strong>Standard dials/day</strong> &mdash; what a normal day must look like to hit the monthly target: daily meetings target &times; dials per booking, or the <strong>' + f0(DIAL_FLOOR) + '-dial team minimum</strong> if the rate math asks for less. Marked <em>floor</em> when the minimum is what is showing &mdash; a rep converting well still owes the ' + f0(DIAL_FLOOR) + '.</li>'
       + '<li><strong>Current dials/day</strong> &mdash; how hard they actually dial on the days they logged (total dials &divide; days logged). Not diluted by missing days.</li>'
@@ -724,7 +726,7 @@
       gapCard = "<div class='card'><h2>Your dial math</h2>"
         + "<div class='row'><span>Standard day (" + f1(c.dailyBookTarget) + ' meetings &times; ' + f0(c.rates.dialsPerBooking) + " dials/booking)</span><span class='ratebig'>" + f0(c.stdDialsDay) + ' dials/day</span></div>'
         + floorNote
-        + "<div class='row'><span>Dial debt</span><span class='ratebig' style='color:var(--good)'>0 &mdash; on pace</span></div>"
+        + (c.dialDebt > 0.5 ? "<div class='row'><span>Dial debt</span><span class='ratebig' style='color:var(--good)'>&asymp; " + f0(c.dialDebt) + ' dials &mdash; within the ' + PACE_BUFFER + ' buffer</span></div>' : "<div class='row'><span>Dial debt</span><span class='ratebig' style='color:var(--good)'>0 &mdash; on pace</span></div>")
         + (c.cushionDials > 0 ? "<div class='row'><span>Cushion (booked ahead of pace)</span><span class='ratebig' style='color:var(--good)'>&asymp; " + f0(c.cushionDials) + ' dials</span></div>' : '')
         + "<p class='hint'>Hold the standard day and the month lands on " + f0(c.target) + ' meetings. Booking well does not buy a shorter day &mdash; ' + f0(DIAL_FLOOR) + ' dials is the floor either way.</p></div>';
     } else {

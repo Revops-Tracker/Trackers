@@ -702,7 +702,7 @@ function paceFraction(p){
 /* ---------- state ---------- */
 const state = { kind:"week", offset:0, rank:"had", aeRank:"cwd", me:null, showup:[], events:[], ov:new Map(), pend:new Map(), reviews:new Map(), lastRun:null,
   // Sales process era (Sales L10 only). Official switch to the 3-call close = lb_auto_config.process_cutover (2026-10-27).
-  era:(()=>{ try{ return sessionStorage.getItem("l10-era") || "new"; }catch(e){ return "new"; } })(), cutover:"2026-10-27", v2ev:[], cohort:new Map() };
+  era:(()=>{ try{ return sessionStorage.getItem("l10-era") || "new"; }catch(e){ return "new"; } })(), cutover:"2026-10-27", v2ev:[], cohort:new Map(), dealIdx:new Map() };
 const REVIEW_SINCE = "2026-10-01";   // reps sign off on everything from here on
 const REPS = ["Brandon","Issa","Dipen"];
 
@@ -756,7 +756,14 @@ function buildEra(r){
     return {id:"v2:"+x.key, key:"v2:"+x.key, v2:true, kind, deal_id:x.deal_id, deal_name:(x.deal_name||x.title||"Unlinked meeting").replace(/ ?-? ?(New )?Deal 2026 ?/,""), at:x.at,
       title:x.title||"", ae:AE_NAME[x.rep]||x.rep, booker:s0.booker||"Inbound", utm:s0.utm||null, edited:!!o};
   }).filter(Boolean);
+  const idx = new Map(), add = (id, k, iso) => { const d = torDay(iso); if(!id || !d) return; const key = String(id); if(!idx.has(key)) idx.set(key, []); idx.get(key).push({k, d}); };
+  state.v2ev.forEach(e=>add(e.deal_id, e.kind, e.at));
+  state.events.forEach(e=>{ if(e.kind==="design") add(e.deal_id, "abook", e.at); if(e.kind==="won") add(e.deal_id, "won", e.at); });
+  state.dealIdx = idx;
 }
+// did this deal reach any of these steps on/after the given time? (past tense conversion)
+const reachedSince = (id, kinds, iso) => { const d = torDay(iso); return !!d && (state.dealIdx.get(String(id))||[]).some(x=>kinds.includes(x.k) && x.d >= d); };
+const onePerDeal = (arr, at) => { const m = new Map(); arr.slice().sort((a,b)=>Date.parse(at(a))-Date.parse(at(b))).forEach(r=>{ const k=String(r.deal_id); if(!m.has(k)) m.set(k, r); }); return [...m.values()]; };
 const eraOf = r => { const d = state.cohort.get(String(r.deal_id)) || torDay(r.at || r.run_at || r.first_slot); return d && d >= state.cutover ? "new" : "old"; };
 const eraOk = r => !REPORTING || state.era==="all" || eraOf(r)===state.era;
 // metric lists: rows tagged era:"old" / era:"new" only show in that view (both in "Both")
@@ -829,6 +836,15 @@ const META_CH = {lead_form:" - Lead Form", vsl:" - VSL"};
 const utmOf = r => r.utm===META_UTM ? META_UTM + (META_CH[attrOf(r.deal_id).meta_lead_channel] || " - Unclear") : (r.utm || NO_UTM);
 const utmOk = (r,p) => !p || p.utm==null || (Array.isArray(p.utm) ? p.utm.includes(utmOf(r)) : utmOf(r)===p.utm);
 const utmName = u => u===NO_UTM ? "No UTM" : u.replace(/^Inbound - /,"");
+// past-tense conversion: start from calls that ran (one per deal), then: has that deal reached the next step since?
+function convOf(had, arun, prun){
+  const cvD = onePerDeal(had, r=>r.run_at), cvA = onePerDeal(arun, e=>e.at), cvP = onePerDeal(prun, e=>e.at);
+  return { cvD, cvA, cvP,
+    cvDn: cvD.filter(r=>reachedSince(r.deal_id, ["abook","arun","ans","apend"], r.run_at)),
+    cvDw: cvD.filter(r=>reachedSince(r.deal_id, ["won"], r.run_at)),
+    cvAn: cvA.filter(e=>reachedSince(e.deal_id, ["pbook","prun","pns","ppend"], e.at)),
+    cvPn: cvP.filter(e=>reachedSince(e.deal_id, ["won"], e.at)) };
+}
 function statsFor(person, role, p){
   const su = effShowup().filter(r=>!r.dropped && whoMatches(r, person, role) && utmOk(r,p) && eraOk(r));
   const ev = effEvents().filter(r=>!r.dropped && whoMatches(r, person, role) && utmOk(r,p) && inP(r.at,p) && eraOk(r));
@@ -837,7 +853,8 @@ function statsFor(person, role, p){
   const v2 = v2For(person, role, p), k2 = kind => v2.filter(e=>e.kind===kind);
   return {...s, des:k("design"), dheld:k("dheld"), prop:k("prop"), diag:k("diag"), con:k("contract"), won:k("won"),
     cwd: k("won").reduce((a,e)=>a+(Number(e.amount)||0),0),
-    abook:k2("abook"), arun:k2("arun"), ans:k2("ans"), apend:k2("apend"), pbook:k2("pbook"), prun:k2("prun"), pns:k2("pns"), ppend:k2("ppend")};
+    abook:k2("abook"), arun:k2("arun"), ans:k2("ans"), apend:k2("apend"), pbook:k2("pbook"), prun:k2("prun"), pns:k2("pns"), ppend:k2("ppend"),
+    ...convOf(s.had, k2("arun"), k2("prun"))};
 }
 const valOf = (t,id) => id==="had"?t.had.length : id==="books"?t.books.length : id==="des"?t.des.length : id==="show"?t.show : id==="dq"?t.dqRate : t.first;
 
@@ -1071,6 +1088,13 @@ function openList(person, role, metric, title, pOverride){
   else if(["arun","ans","ashow"].includes(metric)) groups.push(["Audits held", v2Of("arun")], ["Audit no-shows", v2Of("ans")], ["Not confirmed yet (the AE answers on the AE tracker)", v2Of("apend")]);
   else if(["prun","pns","pshow"].includes(metric)) groups.push(["Prop reviews held", v2Of("prun")], ["Prop review no-shows", v2Of("pns")], ["Not confirmed yet (the AE answers on the AE tracker)", v2Of("ppend")]);
   else if(metric==="pbook") groups.push([null, v2Of("pbook")]);
+  else if(["cvd","cva","cvp","cvw"].includes(metric)){
+    const t = statsFor(person, role, p), not = (all, yes) => all.filter(x=>!yes.includes(x));
+    if(metric==="cvd") groups.push(["Discos run, since moved to Design/Audit", t.cvDn], ["Discos run, not moved on yet", not(t.cvD, t.cvDn)]);
+    if(metric==="cva") groups.push(["Audits run, since moved to Prop Review", t.cvAn], ["Audits run, not moved on yet", not(t.cvA, t.cvAn)]);
+    if(metric==="cvp") groups.push(["Prop reviews run, since closed", t.cvPn], ["Prop reviews run, not closed yet", not(t.cvP, t.cvPn)]);
+    if(metric==="cvw") groups.push(["Discos run, since closed", t.cvDw], ["Discos run, not closed yet", not(t.cvD, t.cvDw)]);
+  }
   else if(["des","dheld","prop","diag","con","won"].includes(metric)) groups.push([null, evOf({des:"design",dheld:"dheld",prop:"prop",diag:"diag",con:"contract",won:"won"}[metric])]);
   else {
     groups.push(["Held", s.had], ["Due but not held", s.notHad], ["Booked, not due yet", s.books.filter(r=>!s.due.includes(r))]);
@@ -1806,7 +1830,6 @@ const SC_ROWS_ALL = [
   {id:"prop",     label:"Prop updates held",     f:t=>t.prop.length, list:"prop", era:"old"},
   {id:"con",      label:"Contracts sent",        f:t=>t.con.length, list:"con", era:"old"},
   {id:"des",      label:"Moved to Design/Audit", f:t=>t.des.length, list:"des", era:"new"},
-  {id:"r2dn",     label:"Run → Design/Audit",    ratio:true, f:t=>t.had.length?t.des.length/t.had.length:null, list:"des", era:"new"},
   {id:"arun",     label:"Audits run",            f:t=>t.arun.length, list:"arun", era:"new"},
   {id:"ans",      label:"Audit no-shows",        f:t=>t.ans.length, list:"ans", lower:true, era:"new"},
   {id:"ashow",    label:"Audit show rate",       ratio:true, f:t=>(t.arun.length+t.ans.length)?t.arun.length/(t.arun.length+t.ans.length):null, list:"ashow", sub:t=>(t.arun.length+t.ans.length)?t.arun.length+" of "+(t.arun.length+t.ans.length):"", era:"new"},
@@ -1824,8 +1847,11 @@ const SC_ROWS_ALL = [
   {id:"cwd",      label:"MRR closed",            money:true, f:t=>t.cwd, list:"won"},
   {id:"d2w",      label:"Design → close",        ratio:true, f:t=>t.des.length?t.won.length/t.des.length:null, list:"won", era:"old"},
   {id:"c2w",      label:"Contract → close",      ratio:true, f:t=>t.con.length?t.won.length/t.con.length:null, list:"won", era:"old"},
-  {id:"a2w",      label:"Audit run → close",     ratio:true, f:t=>t.arun.length?t.won.length/t.arun.length:null, list:"won", sub:t=>t.arun.length?t.won.length+" of "+t.arun.length:"", era:"new"},
-  {id:"p2w",      label:"Prop review run → close", ratio:true, f:t=>t.prun.length?t.won.length/t.prun.length:null, list:"won", sub:t=>t.prun.length?t.won.length+" of "+t.prun.length:"", era:"new"},
+  {grp:"Conversion (from calls that ran)", era:"new"},
+  {id:"cvd", label:"Disco → Design/Audit", ratio:true, f:t=>t.cvD.length?t.cvDn.length/t.cvD.length:null, list:"cvd", sub:t=>t.cvD.length?t.cvDn.length+" of "+t.cvD.length+" discos run":"", era:"new"},
+  {id:"cva", label:"Design/Audit → Prop Review/Contract", ratio:true, f:t=>t.cvA.length?t.cvAn.length/t.cvA.length:null, list:"cva", sub:t=>t.cvA.length?t.cvAn.length+" of "+t.cvA.length+" audits run":"", era:"new"},
+  {id:"cvp", label:"Prop Review/Contract → Closed won", ratio:true, f:t=>t.cvP.length?t.cvPn.length/t.cvP.length:null, list:"cvp", sub:t=>t.cvP.length?t.cvPn.length+" of "+t.cvP.length+" prop reviews run":"", era:"new"},
+  {id:"cvw", label:"Disco → Closed won", ratio:true, f:t=>t.cvD.length?t.cvDw.length/t.cvD.length:null, list:"cvw", sub:t=>t.cvD.length?t.cvDw.length+" of "+t.cvD.length+" discos run":"", era:"new"},
 ];
 let SC_ROWS = eraPick(SC_ROWS_ALL);
 const SC_SPLIT = [
@@ -2020,7 +2046,10 @@ const AX_COLS_ALL = [
   {id:"pns",   label:"Prop review no-shows", f:t=>t.pns.length, list:"pns", era:"new"},
   {id:"won",   label:"Closes",          f:t=>t.won.length, list:"won"},
   {id:"d2w",   label:"Design → close",  ratio:true, f:t=>t.des.length?t.won.length/t.des.length:null, list:"won", era:"old"},
-  {id:"p2w",   label:"Prop review → close", ratio:true, f:t=>t.prun.length?t.won.length/t.prun.length:null, list:"won", sub:t=>t.prun.length?t.won.length+" of "+t.prun.length:"", era:"new"},
+  {id:"cvd", label:"Disco → Design/Audit", ratio:true, f:t=>t.cvD.length?t.cvDn.length/t.cvD.length:null, list:"cvd", sub:t=>t.cvD.length?t.cvDn.length+" of "+t.cvD.length:"", era:"new"},
+  {id:"cva", label:"Design/Audit → Prop Review", ratio:true, f:t=>t.cvA.length?t.cvAn.length/t.cvA.length:null, list:"cva", sub:t=>t.cvA.length?t.cvAn.length+" of "+t.cvA.length:"", era:"new"},
+  {id:"cvp", label:"Prop Review → Closed won", ratio:true, f:t=>t.cvP.length?t.cvPn.length/t.cvP.length:null, list:"cvp", sub:t=>t.cvP.length?t.cvPn.length+" of "+t.cvP.length:"", era:"new"},
+  {id:"cvw", label:"Disco → Closed won", ratio:true, f:t=>t.cvD.length?t.cvDw.length/t.cvD.length:null, list:"cvw", sub:t=>t.cvD.length?t.cvDw.length+" of "+t.cvD.length:"", era:"new"},
   {id:"cwd",   label:"MRR",             money:true, f:t=>t.cwd, list:"won"},
 ];
 let AX_COLS = eraPick(AX_COLS_ALL);

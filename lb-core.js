@@ -390,11 +390,12 @@ function rtbOf(r){
   if(hits.length) return {...base, inv:false, cat:RTB_CATS[3], first:hits[0]};
   return {...base, inv:false, cat:RTB_CATS[4]};
 }
+const rtbDay = d => new Date(d+"T12:00:00").toLocaleDateString("en-US", {month:"short", day:"numeric"});
 const rtbNote = r => { const x = rtbOf(r);
-  if(x.list){ const c = x.lc[x.lc.length-1]; return `From the RTB list: dialled ${x.lc.length} time${x.lc.length===1?"":"s"}, last ${nice(c.d+"T12:00:00")}${x.lcBook?" (the booking call)":""}`; }
+  if(x.list){ const c = x.lc[x.lc.length-1]; return `From the RTB list: dialled ${x.lc.length} time${x.lc.length===1?"":"s"}, last ${rtbDay(c.d)}${x.lcBook?" (the booking call)":""}`; }
   if(x.utm) return "RTB hit (deal first touch)";
-  if(x.last) return `RTB hit ${nice(x.last.d+"T12:00:00")}${x.last.high?" (high intent)":""}, ${x.days} day${x.days===1?"":"s"} before booking${x.n>1?" ("+x.n+" hits)":""}`;
-  if(x.first) return `RTB hit only after booking (${nice(x.first.d+"T12:00:00")})`;
+  if(x.last) return `RTB hit ${rtbDay(x.last.d)}${x.last.high?" (high intent)":""}, ${x.days} day${x.days===1?"":"s"} before booking${x.n>1?" ("+x.n+" hits)":""}`;
+  if(x.first) return `RTB hit only after booking (${rtbDay(x.first.d)})`;
   return ""; };
 const META_UTM = "Inbound - META PPC";
 // Sales L10 only: Meta PPC is split into Lead Form / VSL (HubSpot deal property meta_lead_channel, stamped by n8n 5vpYcV7EhNRUzi6X); unlabelled or unclear = Unclear

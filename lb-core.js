@@ -369,21 +369,29 @@ const attrOf = id => (state.attrs && state.attrs.get(String(id))) || {};
    Deal attrs carry the company's RTB hit days (p.rtb_hits "YYYY-MM-DD[:h],..." from n8n GFmBhA4xG16yAgWS + Supabase
    rtb_hits_for_domains). A booking "involved an RTB hit" when the company had a hit in the 90 days BEFORE the booking day.
    Hits on or after the booking day don't count (people visit the site after booking; last-touch RTB is not evidence).
-   Fallback: deal first-touch UTM = "Inbound - RTB Hit". */
+   Fallback: deal first-touch UTM = "Inbound - RTB Hit".
+   "Booked from the RTB list" = a BDR dialled the company from an RTB list (Nooks tag "[Jules RTB]" / "[Sequence: <BDR> RTB ...]")
+   in the 90 days up to the booking day. p.rtb_list "YYYY-MM-DD[:b],..." (:b = that call booked the disco) comes from Supabase
+   lb_rtb_list_calls (n8n x26Cy7ybVORRYEQq, daily 8:15). RTB list dialling started Apr 15, 2026. */
 const RTB_DAYS = 90;
-const RTB_CATS = ["RTB hit, then booked (within 90 days)", "RTB hit 90+ days before booking", "RTB hit only on/after the booking day", "No RTB hit"];
+const RTB_CATS = ["Booked from the RTB list", "RTB hit, booked another way", "RTB hit 90+ days before booking", "RTB hit only on/after the booking day", "No RTB hit"];
 function rtbOf(r){
   const a = attrOf(r.deal_id), book = torDay(r.booked_at || r.first_slot);
   const hits = String(a.rtb_hits||"").split(",").filter(Boolean).map(x=>({d:x.slice(0,10), high:x.endsWith(":h")}));
   const before = book ? hits.filter(h=>h.d < book) : [];
   const last = before[before.length-1], days = last ? Math.round((Date.parse(book) - Date.parse(last.d))/864e5) : null;
-  if(last && days <= RTB_DAYS) return {inv:true, cat:RTB_CATS[0], last, days, n:before.length};
-  if(a.utm_first_touch==="Inbound - RTB Hit") return {inv:true, cat:RTB_CATS[0], utm:true};
-  if(last) return {inv:false, cat:RTB_CATS[1], last, days};
-  if(hits.length) return {inv:false, cat:RTB_CATS[2], first:hits[0]};
-  return {inv:false, cat:RTB_CATS[3]};
+  const dayDiff = d => Math.round((Date.parse(book) - Date.parse(d))/864e5);
+  const lc = book ? String(a.rtb_list||"").split(",").filter(Boolean).map(x=>({d:x.slice(0,10), b:x.endsWith(":b")})).filter(c=>c.d <= book && dayDiff(c.d) <= RTB_DAYS) : [];
+  const base = {last, days, n:before.length, lc, lcBook: lc.some(c=>c.b && dayDiff(c.d) <= 1)};
+  if(lc.length) return {...base, inv:true, list:true, cat:RTB_CATS[0]};
+  if(last && days <= RTB_DAYS) return {...base, inv:true, cat:RTB_CATS[1]};
+  if(a.utm_first_touch==="Inbound - RTB Hit") return {...base, inv:true, cat:RTB_CATS[1], utm:true};
+  if(last) return {...base, inv:false, cat:RTB_CATS[2]};
+  if(hits.length) return {...base, inv:false, cat:RTB_CATS[3], first:hits[0]};
+  return {...base, inv:false, cat:RTB_CATS[4]};
 }
 const rtbNote = r => { const x = rtbOf(r);
+  if(x.list){ const c = x.lc[x.lc.length-1]; return `From the RTB list: dialled ${x.lc.length} time${x.lc.length===1?"":"s"}, last ${nice(c.d+"T12:00:00")}${x.lcBook?" (the booking call)":""}`; }
   if(x.utm) return "RTB hit (deal first touch)";
   if(x.last) return `RTB hit ${nice(x.last.d+"T12:00:00")}${x.last.high?" (high intent)":""}, ${x.days} day${x.days===1?"":"s"} before booking${x.n>1?" ("+x.n+" hits)":""}`;
   if(x.first) return `RTB hit only after booking (${nice(x.first.d+"T12:00:00")})`;
@@ -673,7 +681,8 @@ function openList(person, role, metric, title, pOverride){
   const groups = [];
   const evOf = k => ev.filter(e=>e.kind===k);
   if(metric==="books") groups.push(["New books (booked in period)", s.books]);
-  else if(metric==="rtb"){ const y = s.books.filter(r=>rtbOf(r).inv); groups.push(["Booked within 90 days after an RTB hit", y], ["Other new books", s.books.filter(r=>!y.includes(r))]); }
+  else if(metric==="rtb" || metric==="rtbl"){ const by = c => s.books.filter(r=>rtbOf(r).cat===c);
+    groups.push(["Booked from the RTB list (dialled from an RTB sequence in the 90 days before booking)", by(RTB_CATS[0])], ["RTB hit in the 90 days before booking, booked another way (inbound, hot list, cold list)", by(RTB_CATS[1])], ["Other new books", s.books.filter(r=>!rtbOf(r).inv)]); }
   else if(metric==="had") groups.push(["Runs had", s.had]);
   else if(metric==="due") groups.push(["Held", s.had], ["Missed calls (a deal can be in both lists)", s.notHad]);
   else if(metric==="rec") groups.push(["Missed, then held at a later slot", s.recBack], ["Missed, not held since", s.rec.filter(r=>!s.recBack.includes(r))]);

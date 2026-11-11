@@ -1179,3 +1179,47 @@ if(REPORTING){ let t0 = "sc"; try{ t0 = localStorage.getItem("jf_l10_tab") || "s
   document.addEventListener("keydown", e => { if(e.key==="Escape") hide(); });
   addEventListener("scroll", () => { if(!pop.hidden) hide(); }, true);
 })();
+
+/* ---------- Scorecard date row follows the page scroll (11-11) ----------
+   The table scrolls sideways in its own box, which stops CSS sticky working against the page,
+   so a copy of the header row is pinned under the time bar while the real one is off screen. */
+(function(){
+  if(!REPORTING) return;
+  const wrap = document.getElementById("scTable"), bar = document.getElementById("l10Time");
+  if(!wrap) return;
+  const fl = document.createElement("div"); fl.id = "scFloat"; fl.hidden = true; document.body.appendChild(fl);
+  let real = [], copy = [], nat = [], built = false;
+  function build(){
+    const tb = wrap.querySelector("table"), th = tb && tb.querySelector("thead");
+    fl.innerHTML = ""; built = false; if(!th) return;
+    const t = document.createElement("table"); t.className = tb.className; t.style.tableLayout = "fixed";
+    const c = th.cloneNode(true); c.querySelectorAll("button,[id]").forEach(el => { el.removeAttribute("id"); });
+    t.appendChild(c); fl.appendChild(t);
+    real = [...th.querySelectorAll("th")]; copy = [...c.querySelectorAll("th")];
+    real.forEach((r, i) => { const w = r.getBoundingClientRect().width; copy[i].style.width = copy[i].style.minWidth = copy[i].style.maxWidth = w+"px"; copy[i].style.boxSizing = "border-box"; });
+    t.style.width = tb.getBoundingClientRect().width+"px";
+    built = true; nat = null; place();
+  }
+  function place(){
+    if(!built || !wrap.offsetParent){ fl.hidden = true; return; }
+    const th = real[0] && real[0].closest("thead"); if(!th){ fl.hidden = true; return; }
+    const top = bar && getComputedStyle(bar).position==="sticky" ? Math.max(0, bar.getBoundingClientRect().bottom) : 0;
+    const hr = th.getBoundingClientRect(), wr = wrap.getBoundingClientRect();
+    const show = hr.top < top && wr.bottom - hr.height > top + 8;
+    fl.hidden = !show; if(!show) return;
+    fl.style.top = top+"px"; fl.style.left = wr.left+"px"; fl.style.width = wrap.clientWidth+"px"; fl.style.height = hr.height+"px";
+    if(!nat){ copy.forEach(c => c.style.transform = ""); nat = copy.map(c => c.getBoundingClientRect().left); }
+    real.forEach((r, i) => { const d = r.getBoundingClientRect().left - nat[i]; copy[i].style.transform = "translateX("+d+"px)";
+      copy[i].style.zIndex = r.classList.contains("cmpc") || i===0 ? 2 : 1; });
+  }
+  let q = 0; const later = () => { if(!q) q = requestAnimationFrame(() => { q = 0; build(); }); };
+  new MutationObserver(later).observe(wrap, {childList:true, subtree:true});
+  addEventListener("scroll", place, {passive:true}); wrap.addEventListener("scroll", place, {passive:true});
+  addEventListener("resize", later);
+  document.addEventListener("click", () => setTimeout(place, 0));
+  later();
+})();
+// pinned time bar: drop the hint line so it takes less room
+(function(){ const b = document.getElementById("l10Time"); if(!b || !REPORTING) return;
+  const f = () => b.classList.toggle("stuck", b.getBoundingClientRect().top <= 0.5 && scrollY > 40);
+  addEventListener("scroll", f, {passive:true}); f(); })();

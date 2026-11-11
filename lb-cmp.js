@@ -15,8 +15,8 @@
           <option value="8w" selected>8 weeks before</option>
           <option value="jul">since Jul 1</option></select></label>
         <label class="ib-pick">Count a step within <select id="cmpAge">
-          <option value="7">7 days of the disco</option>
-          <option value="14" selected>14 days of the disco</option>
+          <option value="7" selected>7 days of the disco</option>
+          <option value="14">14 days of the disco</option>
           <option value="21">21 days of the disco</option>
           <option value="30">30 days of the disco</option>
           <option value="0">any time (not same-age)</option></select></label>

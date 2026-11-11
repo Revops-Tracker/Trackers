@@ -5,9 +5,9 @@
 (function () {
   var C = window.JF_CONFIG, KEY = 'jf_token';
   var PAGES = { bdr: ['bdr.html', 'BDR tracker'], ae: ['ae.html', 'AE tracker'], cst: ['cst.html', 'CST tracker'], leaderboard: ['leaderboard-auto.html', 'Leaderboard'], reporting: ['reporting.html', 'Sales L10'], revops: ['revops.html', 'RevOps L10'], hygiene: ['hygiene.html', 'CRM Hygiene'] }; // auto leaderboard (HubSpot-driven, daily); Max's leaderboard.html still reachable by URL
-  var ORDER = ['bdr', 'ae', 'cst', 'leaderboard', 'reporting', 'revops', 'hygiene']; // reporting = admins only (granted by jf-sso); hygiene = only whoever jf-sso's roster grants 'hygiene' to
-  var NEEDS = { revops: 'reporting', access: 'reporting' }; // pages that ride on another page's access (RevOps L10 + Access = admins, same as Sales L10)
-  function can(u, k) { return u.access.indexOf(NEEDS[k] || k) !== -1; }
+  var ORDER = ['bdr', 'ae', 'cst', 'leaderboard', 'reporting', 'revops', 'hygiene']; // reporting (Sales L10) + revops (RevOps L10): admins always, others when ticked on the Access page (11-11); hygiene = only whoever jf-sso's roster grants 'hygiene' to
+  // each page has its own access key; the Access page itself is for the admin role only (11-11: L10s became grantable per person)
+  function can(u, k) { return k === 'access' ? u.role === 'admin' : u.access.indexOf(k) !== -1; }
 
   function get() { try { return localStorage.getItem(KEY); } catch (e) { return null; } }
   function set(t) { try { localStorage.setItem(KEY, t); } catch (e) {} }

@@ -5,7 +5,7 @@
   window.JF_PAGE = 'access';
   if (/^(localhost|127\.0\.0\.1)$/.test(location.hostname) && /[?&]demo=1/.test(location.search)) window.JF_DEMO = window.JF_LOGIN = true;
 </script>
-<script src="config.js"></script><script src="sso.js?v=20261109a"></script>
+<script src="config.js"></script><script src="sso.js?v=20261111a"></script>
 <meta charset="utf-8">
 <link rel="icon" type="image/svg+xml" href="favicon.svg">
 <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -90,7 +90,7 @@
       '<p class="hint" id="f-rolehint" style="grid-column:auto;align-self:end">' + ROLE[e.role] + '</p>' +
       '<fieldset><legend>Pages</legend><div class="checks">' + S.pages.map(function (p) {
         return '<label><input type="checkbox" value="' + p.key + '"' + (e.access.indexOf(p.key) >= 0 ? ' checked' : '') + '> ' + esc(p.label) + '</label>'; }).join('') + '</div></fieldset>' +
-      '<p class="hint">Pick a tracker name only for reps who log their own numbers &mdash; it decides whose rows they can edit. Admins see the trackers anyway; Hygiene always has to be ticked.</p>' +
+      '<p class="hint">Pick a tracker name only for reps who log their own numbers &mdash; it decides whose rows they can edit. Admins see every tracker and both L10s anyway; Hygiene always has to be ticked. Tick Sales L10 or RevOps L10 to give a non-admin just that page.</p>' +
       '<div class="row"><button class="btn" type="submit" id="f-save">' + (editing ? 'Save changes' : 'Add') + '</button>' + (editing ? '<button class="ghost" type="button" id="f-cancel">Cancel</button>' : '') + '</div></form></div>';
   }
   function table() {

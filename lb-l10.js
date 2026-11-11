@@ -1221,5 +1221,8 @@ if(REPORTING){ let t0 = "sc"; try{ t0 = localStorage.getItem("jf_l10_tab") || "s
 })();
 // pinned time bar: drop the hint line so it takes less room
 (function(){ const b = document.getElementById("l10Time"); if(!b || !REPORTING) return;
-  const f = () => b.classList.toggle("stuck", b.getBoundingClientRect().top <= 0.5 && scrollY > 40);
+  // sit under the site menu bar (nav.jfnav, sticky) when there is one
+  const off = () => { const n = document.querySelector("nav.jfnav"); const p = n && getComputedStyle(n).position; return n && (p==="sticky"||p==="fixed") ? n.offsetHeight : 0; };
+  const f = () => { const t = off(); b.style.top = t+"px"; b.classList.toggle("stuck", b.getBoundingClientRect().top <= t + 0.5 && scrollY > 40); };
+  addEventListener("resize", f);
   addEventListener("scroll", f, {passive:true}); f(); })();

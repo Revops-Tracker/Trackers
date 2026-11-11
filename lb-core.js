@@ -218,7 +218,7 @@ function paceFraction(p){
 /* ---------- state ---------- */
 const state = { kind:"week", offset:0, rank:"had", aeRank:"cwd", me:null, showup:[], events:[], ov:new Map(), pend:new Map(), reviews:new Map(), cattr:new Map(), lastRun:null,
   // Sales process era (Sales L10 only). Official switch to the 3-call close = lb_auto_config.process_cutover (2026-10-27).
-  era:(()=>{ try{ return sessionStorage.getItem("l10-era") || "new"; }catch(e){ return "new"; } })(), cutover:"2026-10-27", v2ev:[], cohort:new Map(), dealIdx:new Map() };
+  era:(()=>{ try{ return sessionStorage.getItem("l10-era2") || "all"; }catch(e){ return "all"; } })(), cutover:"2026-10-27", v2ev:[], cohort:new Map(), dealIdx:new Map() };
 const REVIEW_SINCE = "2026-10-01";   // reps sign off on everything from here on
 const REPS = ["Brandon","Issa","Dipen"];
 
@@ -782,8 +782,8 @@ function applyEra(){
   const d = new Date(state.cutover+"T12:00:00"), cut = MON[d.getMonth()]+" "+d.getDate()+", "+d.getFullYear();
   document.querySelectorAll("#eraSeg button").forEach(b=>{
     b.setAttribute("aria-pressed", b.dataset.era===state.era);
-    if(b.dataset.era==="old") b.textContent = "Old (before "+MON[d.getMonth()]+" "+d.getDate()+")";
-    if(b.dataset.era==="new") b.textContent = "New 3-call close (from "+MON[d.getMonth()]+" "+d.getDate()+")";
+    if(b.dataset.era==="old") b.textContent = "Old process only (before "+MON[d.getMonth()]+" "+d.getDate()+")";
+    if(b.dataset.era==="new") b.textContent = "3-call close only (from "+MON[d.getMonth()]+" "+d.getDate()+")";
   });
   const el = document.getElementById("eraNote");
   if(el) el.textContent = state.era==="compare"

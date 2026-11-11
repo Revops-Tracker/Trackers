@@ -5,9 +5,9 @@
   <div class="l10-era" id="l10Era" role="group" aria-label="Sales process">
     <span class="lbl">Sales process</span>
     <div class="era-seg" id="eraSeg">
-      <button type="button" data-era="old" aria-pressed="false">Old (before Oct 27)</button>
-      <button type="button" data-era="new" aria-pressed="true">New 3-call close (from Oct 27)</button>
-      <button type="button" data-era="all" aria-pressed="false">Both</button>
+      <button type="button" data-era="all" aria-pressed="true">All deals</button>
+      <button type="button" data-era="old" aria-pressed="false">Old process only (before Oct 27)</button>
+      <button type="button" data-era="new" aria-pressed="false">3-call close only (from Oct 27)</button>
     </div>
     <details class="era-help"><summary>How deals are split</summary><p class="note" id="eraNote"></p></details>
   </div>
@@ -27,6 +27,7 @@
     </div>
     <span class="g-dates" id="gDates" hidden><input type="date" id="gFrom" aria-label="From"> to <input type="date" id="gTo" aria-label="To"></span>
     <label class="g-cmp"><input type="checkbox" id="gCmp"> vs previous period <span id="gPrevLbl"></span></label>
+    <span class="g-warn" id="gWarn"></span>
     <span class="g-hint" id="gHint"></span>
   </div>
   <nav class="l10-tabs" id="l10Tabs" role="tablist" aria-label="Sales L10 views">
@@ -269,8 +270,8 @@ function dl(cur, prev, o){
   const txt = pctT ? Math.round(Math.abs(d)*100)+" pts" : o && o.money ? fmt(Math.abs(d),true) : fmt(Math.abs(Math.round(d*10)/10));
   return `<small class="dlt ${good?"up":"dn"}" title="Previous period: ${pctT?pctS(prev):o&&o.money?fmt(prev,true):fmt(prev)}">${d>0?"▲":"▼"} ${txt}</small>`;
 }
-const G_HINT = {sc:"Scorecard: the columns lead up to the chosen period (Weekly / Monthly sets the columns). The change vs the previous period shows on BDRs, Inbound, AEs and Deals.", tr:"Trends: the chart covers the chosen period.",
-  cmp:"Compare: pick “the period in the time bar” to compare it with the one before, or choose any two ranges.", ax:"The AE trend chart below the table always shows since Jan 1."};
+const G_HINT = {sc:"Scorecard: the columns lead up to the chosen period (Weekly / Monthly sets the columns). Tick “vs previous period” to add a Chosen period column with the change.", tr:"Trends: the chart covers the chosen period.",
+  scCmp:"", cmp:"Compare: pick “the period in the time bar” to compare it with the one before, or choose any two ranges.", ax:"The AE trend chart below the table always shows since Jan 1."};
 function gUI(){
   const p = gP(), pv = gPrev(), y = gYest(), arrows = !!G_KIND[G.kind];
   document.getElementById("gKind").value = G.kind;
@@ -284,9 +285,16 @@ function gUI(){
   document.getElementById("gPrevLbl").textContent = pv ? "("+pv.label+")" : "(nothing earlier: data starts Jan 1)";
   let tab = (document.querySelector("#l10Tabs [aria-selected=true]")||{}).dataset?.t; if(tab==="pp") tab = PP.sub;
   document.getElementById("gHint").textContent = G_HINT[tab] || "";
+  const cut = state.cutover, cutD = new Date(cut+"T12:00:00"), cutT = MON[cutD.getMonth()]+" "+cutD.getDate();
+  document.getElementById("gWarn").textContent =
+      state.era==="new" && p.start < cut ? "Filtered to the 3-call close: only deals whose first disco was on or after "+cutT+" are counted, so anything before that is missing. Pick “All deals” to see everything."
+    : state.era==="old" && p.end >= cut ? "Filtered to the old process: deals that started on or after "+cutT+" are left out. Pick “All deals” to see everything." : "";
 }
 function gChanged(retrend){
   gSave(); if(retrend) G.retrend = true;
+  // long ranges read better as monthly scorecard columns
+  if(retrend && (G.kind==="ytd" || G.kind==="custom")){ const p = gP(); SC.kind = (p.e - p.s)/864e5 > 120 ? "month" : "week"; }
+  else if(retrend && (G.kind==="w")) SC.kind = "week";
   render();
   const tab = (document.querySelector("#l10Tabs [aria-selected=true]")||{}).dataset?.t;
   if(tab==="tr") renderTrends();
@@ -304,10 +312,10 @@ if(REPORTING){ const base = renderTrends; renderTrends = function(){
   const p = gP(); trend.range = "custom"; trend.from = p.start; trend.to = p.end < gYest() ? p.end : gYest();
   if(G.retrend){ const n = Math.round((p.e - p.s)/864e5) + 1; trend.scale = n <= 16 ? "day" : n <= 120 ? "week" : "month"; G.retrend = false; }
   return base.apply(this, arguments); }; }
-if(state.era==="compare"){ state.era = "new"; try{ sessionStorage.setItem("l10-era", "new"); }catch(e){} }
+if(state.era==="compare") state.era = "all";
 /* ---------- Sales process toggle buttons (applyEra lives in lb-core.js) ---------- */
 document.querySelectorAll("#eraSeg button").forEach(b=>b.onclick=()=>{
-  state.era = b.dataset.era; try{ sessionStorage.setItem("l10-era", state.era); }catch(e){}
+  state.era = b.dataset.era; try{ sessionStorage.setItem("l10-era2", state.era); }catch(e){}
   applyEra(); render(); if(typeof renderScorecard==="function" && state.act) renderScorecard();
 });
 /* ---------- Sales L10: BDR + Inbound breakdowns (same table engine) ---------- */
@@ -664,7 +672,7 @@ const SC_ROWS_ALL = [
   {id:"connects", label:"Connects", core:true, tip:"Nooks connects",              act:true, f:a=>a.c},
   {id:"rate",     label:"Connect rate", tip:"Connects ÷ dials",          act:true, ratio:true, f:a=>a.d?a.c/a.d:null, sub:a=>a.d?a.c+" of "+a.d.toLocaleString():""},
   {id:"conv",     label:"Conversations", tip:"Nooks meaningful conversations",         act:true, f:a=>a.v},
-  {id:"c2b",      label:"Conversation → book", tip:"BDR books ÷ Nooks conversations",   act:true, ratio:true, f:(a,t)=>a.v?t.bdrBooks/a.v:null, sub:(a,t)=>a.v?t.bdrBooks+" of "+a.v:""},
+  {id:"c2b",      label:"Conversation → book", tip:"Outbound BDR books (cold call / RTB, any sales process) ÷ Nooks conversations. Nooks data starts in June.",   act:true, ratio:true, f:(a,t)=>a.v?t.bdrBooks/a.v:null, sub:(a,t)=>a.v?t.bdrBooks+" of "+a.v:""},
   {grp:"Discovery calls"},
   {id:"books",    label:"Books (new)", core:true, tip:"New calls booked, counted on the day they were booked",           f:t=>t.books.length, list:"books", split:true},
   {id:"due",      label:"Runs due (calls)", tip:"Calls whose slot came up (a no-show that is rebooked counts again)",      f:t=>t.dueN, list:"due"},
@@ -748,7 +756,13 @@ function scSlots(view, p){
 }
 function scStats(view, p){
   const t = view.ae ? statsFor(view.ae, "ae", p) : statsFor(view.key, "bdr", p);
-  t.bdrBooks = view.ae ? 0 : statsFor(view.id==="team"||view.id==="bdrs" ? "sc:bdrs" : view.key, "bdr", p).books.length;
+  if(!view.ae && view.nooks){
+    // Nooks counts every cold call whatever the deal's process, so the books here ignore the Sales process filter
+    const key = view.id==="team"||view.id==="bdrs" ? "sc:split:out" : "sc:out:"+view.id;
+    if(!PRED.has(key)) PRED.set(key, r=>r.booker===view.id && !isInbLead(r));
+    const e0 = state.era; state.era = "all";
+    try{ t.bdrBooks = statsFor(key, "bdr", p).books.length; } finally { state.era = e0; }
+  } else t.bdrBooks = 0;
   return t;
 }
 // one column = a period. The in-progress one is compared against the goal pro-rated to yesterday.
@@ -845,7 +859,9 @@ function renderScorecard(){
   const SRC = {act:{cols:A, avg:avgA, show:!!view.nooks}, slot:{cols:SL, avg:avgSL, show:!!view.slots}};
   const n = done.length;
   const showAct = !!view.nooks;
-  let html = `<table class="sc-tbl"><thead><tr><th>${esc(view.name)}</th><th class="goal">Goal<small>per ${SC.kind}</small></th>${cols.map(c=>`<th class="${c.cur?"cur":""}">${c.p.end>=DOUBLE_BOOK_FROM?'<span class="db" title="Double booking on">● </span>':""}${c.head}<small>${c.cur?"so far":c.sub}</small></th>`).join("")}<th class="avg">Avg</th></tr></thead><tbody>`;
+  const CMP = REPORTING && gCmpOn() ? {p:gP(), q:gPrev()} : null;
+  if(CMP && CMP.p.end > scYest()) CMP.p = {...CMP.p, end:scYest()};
+  let html = `<table class="sc-tbl"><thead><tr><th>${esc(view.name)}</th><th class="goal">Goal<small>per ${SC.kind}</small></th>${cols.map(c=>`<th class="${c.cur?"cur":""}">${c.p.end>=DOUBLE_BOOK_FROM?'<span class="db" title="Double booking on">● </span>':""}${c.head}<small>${c.cur?"so far":c.sub}</small></th>`).join("")}<th class="avg">Avg</th>${CMP?`<th class="cmpc">Chosen period<small>${esc(CMP.p.label)}</small><small>vs ${esc(CMP.q.label)}</small></th>`:""}</tr></thead><tbody>`;
   const cut = state.cutover, cutTxt = (d=>MON[d.getMonth()]+" "+d.getDate())(new Date(cut+"T12:00:00"));
   // a column the chosen process can't fill: New + before the cutover, Old + after it; 3-call-close rows before the cutover
   const offEra = c => (state.era==="new" && c.p.end < cut) || (state.era==="old" && c.p.start >= cut);
@@ -855,6 +871,11 @@ function renderScorecard(){
   // average over the finished columns this row can use (counts = per column, ratios pooled over the span)
   const rowAvg = (m, key) => { const ok = done.filter(c=>!rowOff(m,c)); if(!ok.length) return null;
     const v = m.f(stAt(key, {start:ok[0].p.start, end:ok[ok.length-1].p.end})); return v==null ? null : m.ratio ? v : v/ok.length; };
+  // value of a row over any span (for the chosen-period column)
+  const valAt = (m, key, sp) => { if(m.act){ const a = scActivity(view, sp); return a ? m.f(a, stAt(null, sp)) : null; }
+    if(m.slot){ const x = scSlots(view, sp); return x ? m.f(x) : null; } return m.f(stAt(key, sp)); };
+  const cmpCell = (m, key) => { if(!CMP) return ""; const v = valAt(m, key, CMP.p), w = valAt(m, key, CMP.q);
+    return `<td class="cmpc">${scFmt(m, v)}${dl(v, w, {pct:m.ratio, money:m.money, lower:m.lower})}</td>`; };
   const offCell = (m, v, sub, click, c) => { const z = v==null || v===0, shown = z ? "–" : scFmt(m, v);
     return `<td class="${c.cur?"cur ":""}pre" title="${esc(offTitle(c))}">${!z && click ? `<span class="click" ${click}>${shown}</span>` : shown}${!z && sub ? `<small>${sub}</small>` : ""}</td>`; };
   const splitRows = view.split ? SC_SPLIT.filter(x=>x.key!=="sc:split:ae" || cols.some(c=>statsFor(x.key,"bdr",c.p).books.length || statsFor(x.key,"bdr",c.p).had.length)) : [];
@@ -870,7 +891,7 @@ function renderScorecard(){
   document.getElementById("scAll").textContent = SC.groups.every(n=>SC.open.has(n)) ? "Headline rows only" : "Show all rows";
   shown.forEach(gr=>{
   const open = SC.open.has(gr.name), more = gr.rows.filter(r=>!r.m.core).length;
-  html += `<tr class="grp${more?" tog":""}"${more?` data-grp="${esc(gr.name)}" title="${open?"Show headline rows only":"Show all "+gr.name+" rows"}"`:""}><td colspan="${cols.length+3}">${gr.name}${more?`<span class="grp-more">${open?"fewer ▴":more+" more ▾"}</span>`:""}</td></tr>`;
+  html += `<tr class="grp${more?" tog":""}"${more?` data-grp="${esc(gr.name)}" title="${open?"Show headline rows only":"Show all "+gr.name+" rows"}"`:""}><td colspan="${cols.length+3+(CMP?1:0)}">${gr.name}${more?`<span class="grp-more">${open?"fewer ▴":more+" more ▾"}</span>`:""}</td></tr>`;
   gr.rows.forEach(({m, mi})=>{
     if(!open && !m.core) return;
     const src = m.act ? "act" : m.slot ? "slot" : null;
@@ -892,13 +913,18 @@ function renderScorecard(){
     // average of finished columns: counts / n, ratios pooled over the span
     let av = null, avSub = "";
     if(n){
-      if(src){ const aa = SRC[src].avg, nd = cols.filter((c,ci)=>!c.cur && SRC[src].cols[ci]).length; if(aa && nd){ const v = m.f(aa, avgT); av = v==null ? null : (m.ratio||m.dec) ? v : v/nd; } }
+      if(src){
+        // only the finished columns that have this data (Nooks uploads start in June), so the books side matches
+        const okc = cols.filter((c,ci)=>!c.cur && SRC[src].cols[ci]);
+        if(okc.length){ const sp = {start:okc[0].p.start, end:okc[okc.length-1].p.end};
+          const aa = src==="act" ? scActivity(view, sp) : scSlots(view, sp), v = aa ? m.f(aa, stAt(null, sp)) : null;
+          av = v==null ? null : (m.ratio||m.dec) ? v : v/okc.length; } }
       else av = rowAvg(m, null);
     }
     const avTxt = scFmt(m, av);
     let avCls = "";
     if(av!=null && goal!=null) avCls = (m.lower ? av<=goal : av>=goal) ? "ok" : "bad";
-    html += `<td class="avg ${avCls}">${avTxt}</td></tr>`;
+    html += `<td class="avg ${avCls}">${avTxt}</td>${cmpCell(m, null)}</tr>`;
     // Whole team: split books / runs had / show into outbound vs inbound leads
     if(open && m.split && splitRows.length){
       splitRows.forEach(x=>{
@@ -909,13 +935,14 @@ function renderScorecard(){
           html += scCell({...m}, v, null, c.pace, m.sub ? m.sub(t) : "", `data-sc="${mi}|${ci}|${x.key}"`).replace("<td class=\"", `<td class="${c.cur?"cur ":""}`);
         });
         const av2 = n ? rowAvg(m, x.key) : null;
-        html += `<td class="avg">${scFmt(m, av2)}</td></tr>`;
+        html += `<td class="avg">${scFmt(m, av2)}</td>${cmpCell(m, x.key)}</tr>`;
       });
     }
   });
   });
   html += `</tbody></table>`;
   box.innerHTML = html;
+  box.scrollLeft = box.scrollWidth;   // newest columns (and the chosen-period column) in view
   const last = (state.act && state.act.rows.length) ? state.act.rows.reduce((a,r)=>r.week_ending>a?r.week_ending:a, "") : null;
   document.getElementById("scNote").textContent = !showAct ? "" :
     !state.act ? "Loading Nooks activity…" : state.act.failed ? "Could not load Nooks activity (dials, connects)." :

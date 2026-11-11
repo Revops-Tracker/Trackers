@@ -155,3 +155,7 @@ small.dlt.eq{color:var(--muted);font-weight:500}
 .pp-bar{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:10px;margin:-8px 0 14px}
 .pp-bar[hidden]{display:none}
 #ppAll{font-size:13.5px}
+/* Scorecard chosen-period column + process filter warning (11-11) */
+.sc-tbl th.cmpc,.sc-tbl td.cmpc{border-left:2px solid var(--fill);background:color-mix(in srgb,var(--fill) 5%,var(--panel));position:sticky;right:0;z-index:1}
+.g-warn{flex:1 1 100%;font-size:13px;font-weight:600;color:var(--behind)}
+.g-warn:empty{display:none}

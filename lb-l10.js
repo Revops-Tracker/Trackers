@@ -210,6 +210,7 @@
           <option value="self">Self-claimed</option>
           <option value="jf">JF verified</option>
         </select><select data-flt="band" aria-label="Revenue band"></select></span></label>
+        <label class="cl-f"><span>RTB hit</span><select data-flt="rtb" aria-label="RTB hit before booking"></select></label>
         <button type="button" class="linkish" id="clClear" hidden>Clear filters</button>
       </div>
       <details class="cl-more" id="clMore"><summary>More filters<span id="clMoreN"></span></summary>
@@ -602,7 +603,7 @@ function renderCloses(){
   });
   const filtered = !!(CL.lead!=="all" || CL.utmVal || (hist && CL.utmTxt.trim()) || Object.values(CL.flt).some(Boolean));
   document.getElementById("clClear").hidden = !filtered;
-  const moreOn = Object.entries(CL.flt).filter(([k,v])=>v && k!=="band").length;
+  const moreOn = Object.entries(CL.flt).filter(([k,v])=>v && k!=="band" && k!=="rtb").length;
   document.getElementById("clMoreN").textContent = moreOn ? " ("+moreOn+" on)" : "";
   const rows = clFilter(cohort), t = clStats(rows);
   CL.rows = {}; CL.rows["__all"] = {name:"All runs shown", list:rows};

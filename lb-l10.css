@@ -162,3 +162,9 @@ small.dlt.eq{color:var(--muted);font-weight:500}
 .sc-tbl tr.grp td:first-child{position:static}
 .sc-tbl .grp-lbl{position:sticky;left:10px;display:inline-block}
 #scSec .ib-pick[hidden]{display:none}
+/* Scorecard: the date header row stays in view while scrolling down (11-11). The table scrolls inside its own box. */
+html.view-reporting #scTable.sc-wrap{max-height:calc(100vh - 90px);overflow:auto;border-radius:12px}
+.sc-tbl thead th{position:sticky;top:0;z-index:3;background:var(--panel);box-shadow:inset 0 -1px 0 var(--line)}
+.sc-tbl thead th.cur{background:color-mix(in srgb,var(--fill) 6%,var(--panel))}
+.sc-tbl thead th:first-child{left:0;z-index:5}
+.sc-tbl thead th.cmpc{right:0;z-index:5;background:color-mix(in srgb,var(--fill) 5%,var(--panel))}

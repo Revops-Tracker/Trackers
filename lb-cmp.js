@@ -4,16 +4,28 @@
    - Conversion = a cohort per process: deals whose FIRST disco was in that process (eraOf), disco run in the window,
      followed for the same number of days, and only deals that have had that many days. Same age = fair comparison. */
 (() => {
-  document.getElementById("eraSeg").insertAdjacentHTML("beforeend", `<button type="button" data-era="compare" aria-pressed="false">Compare before vs after</button>`);
+  document.getElementById("eraSeg").insertAdjacentHTML("beforeend", `<button type="button" data-era="compare" aria-pressed="false">Compare</button>`);
   document.getElementById("l10Era").insertAdjacentHTML("afterend", `
   <section id="cmpSec" class="l10-sec cmp-sec">
     <div class="sec-head">
-      <h2>Before vs after the 3-call close</h2>
+      <h2 id="cmpTitle">Before vs after the 3-call close</h2>
       <div class="sc-ctl cmp-ctl">
-        <label class="ib-pick">Before = <select id="cmpOld">
+        <label class="ib-pick">Compare <select id="cmpMode">
+          <option value="era">old vs new sales process</option>
+          <option value="dates">two time frames</option></select></label>
+        <label class="ib-pick cmp-era">Before = <select id="cmpOld">
           <option value="same">same number of days before</option>
           <option value="8w" selected>8 weeks before</option>
           <option value="ytd">since Jan 1</option></select></label>
+        <label class="ib-pick cmp-dates">Quick pick <select id="cmpPreset">
+          <option value="">custom dates</option>
+          <option value="l30">last 30 days vs the 30 before</option>
+          <option value="l8w">last 8 weeks vs the 8 before</option>
+          <option value="mtd">this month vs same days last month</option>
+          <option value="lm">last month vs the month before</option>
+          <option value="q">this quarter vs last quarter</option></select></label>
+        <span class="cmp-dates cmp-range"><b>A</b> <input type="date" id="cmpA1"> to <input type="date" id="cmpA2"></span>
+        <span class="cmp-dates cmp-range"><b>B</b> <input type="date" id="cmpB1"> to <input type="date" id="cmpB2"></span>
         <label class="ib-pick">Count a step within <select id="cmpAge">
           <option value="7" selected>7 days of the disco</option>
           <option value="14">14 days of the disco</option>
@@ -29,7 +41,8 @@
     <div class="sc-wrap" id="cmpTable"></div>
     <p class="sc-note" id="cmpNote"></p>
     <details class="how"><summary>How this is counted</summary><div>
-      <p><b>Before</b> = the old process (Disco &rarr; Design &rarr; Prop update &rarr; Contract), <b>After</b> = the 3-call close (Disco &rarr; Design/Audit &rarr; Prop Review/Contract) from the cutover date. Pick how far back Before goes.</p>
+      <p><b>Two time frames</b>: pick any two date ranges since Jan 1. A = the range you compare against, B = the range you are judging; Change = B vs A. Conversion uses every deal whose disco ran in the range, whichever process it was in.</p>
+      <p><b>Old vs new sales process</b>: <b>Before</b> = the old process (Disco &rarr; Design &rarr; Prop update &rarr; Contract), <b>After</b> = the 3-call close (Disco &rarr; Design/Audit &rarr; Prop Review/Contract) from the cutover date. Pick how far back Before goes.</p>
       <p><b>Volume and show rates</b> = what happened in each date window, per week so windows of different lengths compare. Show rates use the same rules as the Scorecard (per call; 1st-time show three ways).</p>
       <p><b>Conversion</b> = deals whose first discovery call was in that process and ran in the window, one per deal. A step counts only if it happened within the chosen number of days of the disco, and only deals that have had that many days are included, so new deals aren't compared against old deals that had months to close. "Any time" drops that rule (Before will look better simply because its deals are older). Second meeting = Design held (before) or Audit run (after); proposal meeting = Prop update held or Prop review run. Small numbers swing a lot: read the "x of y" under each rate.</p>
       <p><b>Audit / prop review show rates</b> only exist for the new process (the AE tracker records no-shows); the old process didn't track design no-shows.</p>
@@ -40,7 +53,9 @@
     state.era = "compare"; try{ sessionStorage.setItem("l10-era", "compare"); }catch(e){}
     applyEra(); render();
   };
-  ["cmpOld","cmpAge","cmpSrc"].forEach(id=>document.getElementById(id).onchange = renderCompare);
+  ["cmpOld","cmpAge","cmpSrc","cmpMode"].forEach(id=>document.getElementById(id).onchange = renderCompare);
+  ["cmpA1","cmpA2","cmpB1","cmpB2"].forEach(id=>document.getElementById(id).onchange = ()=>{ document.getElementById("cmpPreset").value = ""; renderCompare(); });
+  document.getElementById("cmpPreset").onchange = e=>{ cmpPreset(e.target.value); renderCompare(); };
   document.getElementById("cmpTable").addEventListener("click", e=>{
     const b = e.target.closest("[data-cmp]"); if(!b) return;
     const x = CMP_LISTS.get(b.dataset.cmp); if(x) showDialog(x.title, x.sub, x.groups);
@@ -53,15 +68,41 @@ const dayDiff = (a, b) => Math.round((Date.parse(b+"T12:00:00") - Date.parse(a+"
 const mkP = (start, end) => ({s:new Date(start+"T00:00:00"), e:new Date(end+"T00:00:00"), start, end,
   label:`${MON[+start.slice(5,7)-1]} ${+start.slice(8)} to ${MON[+end.slice(5,7)-1]} ${+end.slice(8)}`, now:new Date(end+"T00:00:00")});
 
+const cmpYest = () => { const d = new Date(); d.setDate(d.getDate()-1); return ymd(d); };
+// fill the A/B date inputs from a quick pick (B = the recent range)
+function cmpPreset(v){
+  const y = cmpYest(), set = (a1,a2,b1,b2) => { [["cmpA1",a1],["cmpA2",a2],["cmpB1",b1],["cmpB2",b2]].forEach(([id,val])=>document.getElementById(id).value = val < DATA_FROM ? DATA_FROM : val); };
+  const mStart = d => d.slice(0,8)+"01";
+  const prevM = d => { const x = new Date(d.slice(0,8)+"01T12:00:00"); x.setMonth(x.getMonth()-1); return ymd(x); };
+  const mEnd = d => { const x = new Date(d.slice(0,8)+"01T12:00:00"); x.setMonth(x.getMonth()+1); x.setDate(0); return ymd(x); };
+  if(v==="l30") set(dayAdd(y,-59), dayAdd(y,-30), dayAdd(y,-29), y);
+  else if(v==="l8w") set(dayAdd(y,-111), dayAdd(y,-56), dayAdd(y,-55), y);
+  else if(v==="mtd"){ const b1 = mStart(y), a1 = prevM(b1), n = dayDiff(b1, y), a2 = dayAdd(a1, n); set(a1, a2 < mEnd(a1) ? a2 : mEnd(a1), b1, y); }
+  else if(v==="lm"){ const b1 = prevM(mStart(y)), a1 = prevM(b1); set(a1, mEnd(a1), b1, mEnd(b1)); }
+  else if(v==="q"){ const m = +y.slice(5,7), qs = y.slice(0,5)+String(Math.floor((m-1)/3)*3+1).padStart(2,"0")+"-01"; const x = new Date(qs+"T12:00:00"); x.setMonth(x.getMonth()-3); set(ymd(x), dayAdd(qs,-1), qs, y); }
+}
 function renderCompare(){
   const on = REPORTING && state.era === "compare";
   document.documentElement.classList.toggle("cmp-mode", on);
   if(!on || !state.lastRun) return;
-  const yest = (() => { const d = new Date(); d.setDate(d.getDate()-1); return ymd(d); })();
+  const yest = cmpYest();
   const cut = state.cutover, newDays = dayDiff(cut, yest) + 1;
-  const oldSel = document.getElementById("cmpOld").value;
-  const oldStart = oldSel === "ytd" ? DATA_FROM : dayAdd(cut, oldSel === "same" ? -newDays : -56);
-  const P = { old: mkP(oldStart < DATA_FROM ? DATA_FROM : oldStart, dayAdd(cut, -1)), new: mkP(cut, yest) };
+  const dates = document.getElementById("cmpMode").value === "dates";
+  document.querySelectorAll(".cmp-era").forEach(el=>el.hidden = dates);
+  document.querySelectorAll(".cmp-dates").forEach(el=>el.hidden = !dates);
+  document.getElementById("cmpTitle").textContent = dates ? "Compare two time frames" : "Before vs after the 3-call close";
+  let P;
+  if(dates){
+    if(!document.getElementById("cmpB2").value){ document.getElementById("cmpPreset").value = "l30"; cmpPreset("l30"); }
+    const clamp = v => v < DATA_FROM ? DATA_FROM : v > yest ? yest : v;
+    const rng = (a, b) => { let x = clamp(document.getElementById(a).value || DATA_FROM), z = clamp(document.getElementById(b).value || yest); if(x > z) [x, z] = [z, x]; return mkP(x, z); };
+    P = { old: rng("cmpA1","cmpA2"), new: rng("cmpB1","cmpB2") };
+    ["cmpA1","cmpA2","cmpB1","cmpB2"].forEach(id=>{ const el = document.getElementById(id); el.min = DATA_FROM; el.max = yest; });
+  } else {
+    const oldSel = document.getElementById("cmpOld").value;
+    const oldStart = oldSel === "ytd" ? DATA_FROM : dayAdd(cut, oldSel === "same" ? -newDays : -56);
+    P = { old: mkP(oldStart < DATA_FROM ? DATA_FROM : oldStart, dayAdd(cut, -1)), new: mkP(cut, yest) };
+  }
   const age = +document.getElementById("cmpAge").value;
   const src = document.getElementById("cmpSrc").value;
   const srcOk = r => src === "all" || (src === "out" ? isOutb(r) : isLeadIn(r));
@@ -93,7 +134,7 @@ function renderCompare(){
     const v2 = state.v2ev.filter(e=>inP(e.at, p) && srcOk(e)), k2 = k => v2.filter(e=>e.kind===k);
     // conversion cohort: first disco in this process, run in the window, old enough to have had `age` days
     const lastRun = age ? dayAdd(yest, -age) : yest;
-    const cohort = onePerDeal(s.had.filter(r=>eraOf(r)===era && torDay(r.run_at) <= lastRun), r=>r.run_at);
+    const cohort = onePerDeal(s.had.filter(r=>(dates || eraOf(r)===era) && torDay(r.run_at) <= lastRun), r=>r.run_at);
     const steps = {};
     Object.entries(STEP).forEach(([k, st])=>{
       const yes = [], no = [];
@@ -111,7 +152,7 @@ function renderCompare(){
 
   CMP_LISTS.clear();
   const cell = (era, id, shown, sub, groups, title) => {
-    if(groups){ CMP_LISTS.set(era+"|"+id, {title:(era==="old"?"Before: ":"After: ")+title, sub:col[era].p.label+". Click a deal name to open it in HubSpot.", groups}); }
+    if(groups){ CMP_LISTS.set(era+"|"+id, {title:(dates ? (era==="old"?"A: ":"B: ") : (era==="old"?"Before: ":"After: "))+title, sub:col[era].p.label+". Click a deal name to open it in HubSpot.", groups}); }
     return `<td>${groups?`<span class="click" data-cmp="${era}|${id}">${shown}</span>`:shown}${sub?`<small>${sub}</small>`:""}</td>`;
   };
   const pt = v => v==null ? null : Math.round(v*100);
@@ -135,10 +176,10 @@ function renderCompare(){
   const fmt1 = v => (Math.round(v*10)/10).toLocaleString();
 
   grp("Volume (per week)");
-  row("Books (new)", "books", e=>{ const n=col[e].s.books.length; return {v:perWk(n,e), shown:fmt1(perWk(n,e)), sub:n+" total", groups:[[null, col[e].s.books]]}; }, "n");
-  row("Discos run", "had", e=>{ const n=col[e].s.had.length; return {v:perWk(n,e), shown:fmt1(perWk(n,e)), sub:n+" total", groups:[[null, col[e].s.had]]}; }, "n");
-  row("Closed won (by close date)", "wonv", e=>{ const n=col[e].won.length; return {v:perWk(n,e), shown:fmt1(perWk(n,e)), sub:n+" total", groups:[[null, col[e].won]]}; }, "n", false, "includes older deals closing in the window");
-  row("MRR closed", "mrr", e=>{ const m=col[e].mrr; return {v:perWk(m,e), shown:fmt(perWk(m,e), true), sub:fmt(m, true)+" total", groups:[[null, col[e].won]]}; }, "n");
+  row("Books (new)", "books", e=>{ const n=col[e].s.books.length; return {n, v:perWk(n,e), shown:fmt1(perWk(n,e)), sub:n+" total", groups:[[null, col[e].s.books]]}; }, "n");
+  row("Discos run", "had", e=>{ const n=col[e].s.had.length; return {n, v:perWk(n,e), shown:fmt1(perWk(n,e)), sub:n+" total", groups:[[null, col[e].s.had]]}; }, "n");
+  row("Closed won (by close date)", "wonv", e=>{ const n=col[e].won.length; return {n, v:perWk(n,e), shown:fmt1(perWk(n,e)), sub:n+" total", groups:[[null, col[e].won]]}; }, "n", false, "includes older deals closing in the window");
+  row("MRR closed", "mrr", e=>{ const m=col[e].mrr; return {n:col[e].won.length, v:perWk(m,e), shown:fmt(perWk(m,e), true), sub:fmt(m, true)+" total", groups:[[null, col[e].won]]}; }, "n");
 
   grp("Discovery show rates");
   const sOf = e => col[e].s;
@@ -152,7 +193,7 @@ function renderCompare(){
 
   grp("Later meetings: show rate");
   const shRow = (label, id, run, ns) => row(label, id, e=>{
-    if(e==="old") return {v:null, shown:"not tracked", sub:""};
+    if(col[e].p.end < cut) return {v:null, shown:"not tracked", sub:""};
     const r=col[e][run], n=col[e][ns], v=(r.length+n.length)?r.length/(r.length+n.length):null;
     return {v, shown:pctS(v), sub:(r.length+n.length)?r.length+" of "+(r.length+n.length):"", groups:[["Held", r], ["No-show", n]]};
   }, "pct");
@@ -167,11 +208,11 @@ function renderCompare(){
   row("Days from disco to close", "days", e=>({n:col[e].steps.won.yes.length, v:col[e].days, shown:col[e].days==null?"–":fmt1(col[e].days)+" days", sub:col[e].steps.won.yes.length?"avg of "+col[e].steps.won.yes.length+" closes":""}), "n", true);
   row("MRR per close", "avgmrr", e=>({n:col[e].steps.won.yes.length, v:col[e].avgMrr, shown:col[e].avgMrr==null?"–":fmt(col[e].avgMrr, true), sub:""}), "n");
 
-  const head = era => { const c = col[era]; return `<th>${era==="old"?"Before":"After"}<small>${c.p.label}</small><small>${era==="old"?"old process":"3-call close"}</small></th>`; };
+  const head = era => { const c = col[era]; return dates ? `<th>${era==="old"?"A":"B"}<small>${c.p.label}</small><small>${dayDiff(c.p.start, c.p.end)+1} days</small></th>` : `<th>${era==="old"?"Before":"After"}<small>${c.p.label}</small><small>${era==="old"?"old process":"3-call close"}</small></th>`; };
   document.getElementById("cmpTable").innerHTML = `<table class="sc-tbl cmp-tbl"><thead><tr><th></th>${head("old")}${head("new")}<th>Change</th></tr></thead><tbody>${rows.join("")}</tbody></table>`;
   const n = col.new.cohort.length;
   document.getElementById("cmpNote").textContent = age
-    ? `Conversion only includes deals whose disco ran at least ${age} days ago (after: discos up to ${col.new.lastRun}, ${n} deal${n===1?"":"s"}). With few deals, one close moves the rate a lot; the "x of y" is the real story until the After group grows.`
-    : `Any time: Before deals have had weeks or months longer to move, so Before will look better on conversion. Use a day limit for a fair read.`;
+    ? `Conversion only includes deals whose disco ran at least ${age} days ago (${dates?"B":"after"}: discos up to ${col.new.lastRun}, ${n} deal${n===1?"":"s"}${dates?"; A: "+col.old.cohort.length+" deals":""}). With few deals, one close moves the rate a lot; read the "x of y" under each rate.`
+    : `Any time: the earlier range has had longer for its deals to move, so it will look better on conversion. Use a day limit for a fair read.`;
 }
 (() => { const base = render; render = function(){ base.apply(this, arguments); renderCompare(); }; })();

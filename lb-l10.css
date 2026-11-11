@@ -102,3 +102,7 @@ html.cmp-mode .l10-tabs,html.cmp-mode section[data-tab]{display:none!important}
 .cmp-tbl td.chg{color:var(--muted);font-size:13px}
 .cmp-tbl td.chg.ok{color:var(--ahead);font-weight:600}
 .cmp-tbl td.chg.bad{color:var(--behind);font-weight:600}
+
+.cmp-range{display:inline-flex;align-items:center;gap:6px;font-size:13px}
+.cmp-range input{font:inherit;padding:4px 6px;border:1px solid var(--line);border-radius:6px;background:var(--panel);color:inherit}
+.cmp-ctl [hidden]{display:none!important}

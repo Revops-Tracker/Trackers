@@ -641,8 +641,8 @@ function mapCsv(rows){
   const iN = ix("sequence name"), iD = ix("dials"), iC = ix("connects"), iV = ix("conversations");
   if(iN < 0 || iD < 0 || iC < 0 || iV < 0) throw new Error("This does not look like the Nooks Sequence performance export (it needs Sequence Name, Dials, Connects and Conversations columns).");
   const roster = {}; (S.data.bdrs||[]).forEach(b=>{ roster[b.bdr.toLowerCase()] = b.bdr; });
-  const agg = {}, skipped = [];
-  let srcDials = 0, usedDials = 0, lines = 0;
+  const agg = {}, flat = {}, skipped = [], unlisted = [];
+  let srcDials = 0, usedDials = 0, lines = 0, flatDials = 0;
   rows.slice(1).forEach(r=>{
     const name = String(r[iN]||"").trim(); if(!name) return;
     const dials = parseInt(r[iD],10)||0, conn = parseInt(r[iC],10)||0, conv = parseInt(r[iV],10)||0;
@@ -650,16 +650,28 @@ function mapCsv(rows){
     const first = name.split(/\s+/)[0], rest = name.slice(first.length).trim();
     const bdr = roster[first.toLowerCase()];
     if(!bdr){ skipped.push({ name, dials, why:"not on the BDR roster" }); return; }
+    // Older weeks (before the tier scheme) are saved as one total per BDR, whatever the list was called.
+    if(!/do not use|direct dial|\(cloned\)/i.test(name)){
+      const f = flat[bdr] || (flat[bdr] = { bdr, tier:LEGACY_TIER, list:LEGACY_LIST, dials:0, connects:0, conversations:0, from:[] });
+      f.dials += dials; f.connects += conn; f.conversations += conv; f.from.push(name); flatDials += dials;
+    }
     const hit = canonList(rest) || canonList(name);
-    if(!hit){ skipped.push({ name, dials, why:"list is not in the tier scheme" }); return; }
+    if(!hit){ unlisted.push({ name, dials, why:"list is not in the tier scheme" }); return; }
     const k = bdr+"|"+hit.tier+"|"+hit.list_name;
     const a = agg[k] || (agg[k] = { bdr, tier:hit.tier, list:hit.list_name, dials:0, connects:0, conversations:0, from:[] });
     a.dials += dials; a.connects += conn; a.conversations += conv; a.from.push(name);
     usedDials += dials;
   });
-  const out = Object.values(agg);
-  if(!out.length) throw new Error("No rows matched a BDR and a tier list, so nothing would be saved. Check that this is the right file.");
-  return { rows:out, skipped, srcDials, usedDials, lines };
+  const out = Object.values(agg), flatRows = Object.values(flat);
+  if(!out.length && !flatRows.length) throw new Error("No rows matched a BDR, so nothing would be saved. Check that this is the right file.");
+  return { rows:out, flat:flatRows, flatDials, unlisted, skipped, srcDials, usedDials, lines };
+}
+// Weeks ending before this date were dialed before the tier scheme existed: no tier, one total per BDR (same as the rebuilt Jan to May weeks).
+const LEGACY_BEFORE = "2026-06-06", LEGACY_TIER = "None", LEGACY_LIST = "All lists (no tier)";
+function viewOf(P, end){   // what gets saved for this week: tiered rows for current weeks, per-BDR totals for older weeks
+  const legacy = end < LEGACY_BEFORE && !cst();   // JF only
+  return legacy ? { legacy, rows:P.flat, usedDials:P.flatDials, skipped:P.skipped }
+                : { legacy, rows:P.rows, usedDials:P.usedDials, skipped:P.skipped.concat(P.unlisted) };
 }
 function sundayValue(){
   const v = $("crSunday").value; if(!v) return null;
@@ -675,7 +687,8 @@ function renderPreview(){
   if(!S.parsed){ box.innerHTML = ""; return; }
   const sun = sundayValue();
   if(!sun){ box.innerHTML = '<div class="cr-warn">Pick the week this file is for.</div>'; return; }
-  const end = add(sun, 6), P = S.parsed;
+  const end = add(sun, 6), P = Object.assign({}, S.parsed, viewOf(S.parsed, end));
+  if(!P.rows.length){ box.innerHTML = '<div class="cr-bad">None of the lists in this file are in the tier scheme, so nothing would be saved for a week this recent. Check the week you picked.</div>'; return; }
   const cur = (S.data.connectRate||[]).filter(r=>r.week_ending===end);
   const curBy = {}; cur.forEach(r=>{ const b = curBy[r.bdr] || (curBy[r.bdr] = { d:0, c:0 }); b.d += r.dials; b.c += r.connects; });
   const newBy = {}; P.rows.forEach(r=>{ const b = newBy[r.bdr] || (newBy[r.bdr] = { d:0, c:0, v:0 }); b.d += r.dials; b.c += r.connects; b.v += r.conversations; });
@@ -688,7 +701,7 @@ function renderPreview(){
     tb += '<tr><td>'+h(n)+'</td><td>'+(a?num(a.d):"–")+'</td><td>'+(a?num(a.c):"–")+'</td><td>'+(a?rateCell(a.c,a.d):"–")+'</td><td>'+(c?num(c.d):"–")+'</td><td>'+(c?rateCell(c.c,c.d):"–")+'</td></tr>';
   });
   tb += '<tr class="team"><td>Team</td><td>'+num(nd)+'</td><td>'+num(nc)+'</td><td>'+rateCell(nc,nd)+'</td><td>'+(cd?num(cd):"–")+'</td><td>'+(cd?rateCell(cc,cd):"–")+'</td></tr></tbody></table>';
-  let warn = "";
+  let warn = P.legacy ? '<div class="cr-warn">This week is from before the tier lists, so it saves as one total per BDR (no tier, no list breakdown), like the other January to May weeks.</div>' : "";
   if(cd && nd < cd) warn += '<div class="cr-warn"><b>Heads up:</b> this file has fewer dials ('+num(nd)+') than what is already saved for this week ('+num(cd)+'). It may be an older export or the wrong week. Check the dates before you save.</div>';
   else if(cd) warn += '<div class="cr-warn">This week already has data. Saving replaces it with this file.</div>';
   const skipDials = P.skipped.reduce((a,r)=>a+r.dials,0);
@@ -706,7 +719,7 @@ async function save(){
   const end = add(sun, 6);
   S.saving = true; renderPreview();
   try{
-    const P = S.parsed;
+    const P = Object.assign({}, S.parsed, viewOf(S.parsed, end));
     const r = await call("/nooks", { method:"POST", headers:{ "Content-Type":"application/json" }, body: JSON.stringify({
       weekEnding: end, filename: S.file, sourceRows: P.lines,
       rows: P.rows.map(x=>({ bdr:x.bdr, tier:x.tier, list:x.list, dials:x.dials, connects:x.connects, conversations:x.conversations })),

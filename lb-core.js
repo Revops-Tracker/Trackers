@@ -81,6 +81,7 @@ document.currentScript.insertAdjacentHTML("beforebegin", `
         <label class="tr-range">Range
           <select id="trRange">
             <option value="q3">Since Jul 1</option>
+            <option value="ytd">Since Jan 1</option>
             <option value="thisq">This quarter</option>
             <option value="lastq">Last quarter</option>
             <option value="l14d">Last 14 days</option>
@@ -139,7 +140,7 @@ const AE_RANK = [
   {id:"won",  label:"Closes",           goal:2,     fmt:"n",     f:t=>t.won.length,    list:"won"},
   {id:"show", label:"Overall show",     goal:null,  fmt:"pct",   f:t=>t.show,          list:"due"},
 ];
-const DATA_FROM = "2026-07-01";   // history is backfilled from the start of Q3
+const DATA_FROM = "2026-01-01";   // history backfilled from Jan 1 2026 (was Jul 1 until 2026-11-11)
 const NOT_A_BDR = new Set(["Inbound","CloseBot AI"]);
 // Reps who have left (e.g. Jules, Hannah, Armin in Q3; Erich in Oct) are not shown by name: their numbers roll up into one "Former reps" bucket.
 const FORMER = "Former reps", OTHER = "Other", INB_ALL = "All inbound", WHO_ALL = "Everyone";
@@ -814,7 +815,7 @@ document.addEventListener("click", e=>{
   const aq = e.target.closest("[data-approvals]"); if(aq){ openApprovals(); return; }
   const cu = e.target.closest("[data-cunk]"); if(cu){ openList(cu.dataset.cunk, "bdr", "cunk", "Who cancelled? Nobody can tell yet (last 30 days)", last30()); return; }
 });
-/* ---------- team trends: stacked bars by source, any range since Jul 1 ---------- */
+/* ---------- team trends: stacked bars by source, any range since Jan 1 ---------- */
 const TR_METRICS_ALL = [
   {id:"books", label:"Books",           f:t=>t.books.length, list:"books"},
   {id:"had",   label:"Runs had",        f:t=>t.had.length,   list:"had"},
@@ -875,7 +876,8 @@ function trendRange(){
   else if(trend.range==="l8w"){ f = new Date(y); f.setDate(f.getDate()-((f.getDay()+6)%7)-49); }
   else if(trend.range==="l3m") f = new Date(y.getFullYear(), y.getMonth()-2, 1);
   else if(trend.range==="custom"){ f = trend.from ? dOf(trend.from) : dOf(DATA_FROM); t = trend.to ? dOf(trend.to) : y; }
-  else f = dOf(DATA_FROM);
+  else if(trend.range==="ytd") f = dOf(DATA_FROM);
+  else f = dOf("2026-07-01");
   if(f < dOf(DATA_FROM)) f = dOf(DATA_FROM);
   if(t > y) t = y;
   if(t < f) t = new Date(f);

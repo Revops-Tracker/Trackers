@@ -145,7 +145,7 @@
         <div class="seg" id="clKind" role="group" aria-label="Period">
           <button data-k="month" aria-pressed="false">Month</button>
           <button data-k="quarter" aria-pressed="true">Quarter</button>
-          <button data-k="all" aria-pressed="false">Since Jul 1</button>
+          <button data-k="all" aria-pressed="false">Since Jan 1</button>
         </div>
         <div class="nav">
           <button type="button" id="clPrev" aria-label="Previous period">‹</button>
@@ -365,7 +365,7 @@ const CL_DIMS = [
 ];
 const dimOf = id => CL_DIMS.find(d=>d.id===id);
 function clPeriod(){
-  if(CL.kind==="all"){ const y = new Date(); y.setHours(0,0,0,0); y.setDate(y.getDate()-1); return {start:DATA_FROM, end:ymd(y), label:"Jul 1 to "+MON[y.getMonth()]+" "+y.getDate()+", "+y.getFullYear()}; }
+  if(CL.kind==="all"){ const y = new Date(); y.setHours(0,0,0,0); y.setDate(y.getDate()-1); return {start:DATA_FROM, end:ymd(y), label:"Jan 1 to "+MON[y.getMonth()]+" "+y.getDate()+", "+y.getFullYear()}; }
   return periodFor(CL.kind, CL.offset);
 }
 // one cohort row per deal: the held disco, plus that deal's design / close events (any date)

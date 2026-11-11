@@ -13,7 +13,8 @@
         <label class="ib-pick">Before = <select id="cmpOld">
           <option value="same">same number of days before</option>
           <option value="8w" selected>8 weeks before</option>
-          <option value="jul">since Jul 1</option></select></label>
+          <option value="jul">since Jul 1</option>
+          <option value="ytd">since Jan 1</option></select></label>
         <label class="ib-pick">Count a step within <select id="cmpAge">
           <option value="7" selected>7 days of the disco</option>
           <option value="14">14 days of the disco</option>
@@ -60,7 +61,7 @@ function renderCompare(){
   const yest = (() => { const d = new Date(); d.setDate(d.getDate()-1); return ymd(d); })();
   const cut = state.cutover, newDays = dayDiff(cut, yest) + 1;
   const oldSel = document.getElementById("cmpOld").value;
-  const oldStart = oldSel === "jul" ? DATA_FROM : dayAdd(cut, oldSel === "same" ? -newDays : -56);
+  const oldStart = oldSel === "ytd" ? DATA_FROM : oldSel === "jul" ? "2026-07-01" : dayAdd(cut, oldSel === "same" ? -newDays : -56);
   const P = { old: mkP(oldStart < DATA_FROM ? DATA_FROM : oldStart, dayAdd(cut, -1)), new: mkP(cut, yest) };
   const age = +document.getElementById("cmpAge").value;
   const src = document.getElementById("cmpSrc").value;

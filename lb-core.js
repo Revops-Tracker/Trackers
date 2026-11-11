@@ -704,7 +704,7 @@ function fixForm(key, isEv){
   const cats = ["first_time_show","moved_show","recovered_show","cst_show","no_show","cancelled_ahead","closed_no_mtg","pending","not_a_booking"];
   const prev = rec.pend || rec.ov;
   slot.innerHTML = `<div class="fixbox">
-    ${isEv ? `<label><span><input type="checkbox" id="fx-ex" checked> This should not count</span></label>`
+    ${isEv ? `<label><span><input type="checkbox" id="fx-ex" checked> <b>Remove this</b>: it should not count at all (e.g. the deal was moved to this stage by mistake)</span></label>`
            : `<label>What actually happened<select id="fx-cat">${cats.map(c=>`<option value="${c}" ${(rec.cat===c)?"selected":""}>${LABEL[c]}</option>`).join("")}</select></label>`}
     <label>Credit to<select id="fx-bk">${["Inbound","Brandon Cameron","Issa Hattar"].map(n=>`<option ${rec.booker===n?"selected":""}>${n}</option>`).join("")}</select></label>
     <label>Why (required, e.g. "prospect joined late, Fathom missed it")<textarea id="fx-note">${esc(prev?prev.note:"")}</textarea></label>
@@ -716,7 +716,8 @@ function fixForm(key, isEv){
     if(isEv) body.exclude = slot.querySelector("#fx-ex").checked;
     else { const c = slot.querySelector("#fx-cat").value; if(c!==rec.engineCat) body.cat = c; if(c==="not_a_booking"){ body.exclude = true; } }
     const bk = slot.querySelector("#fx-bk"); if(bk && bk.value!==rec.engineBooker) body.booker = bk.value;
-    if(!body.cat && !body.booker && !body.exclude){ slot.querySelector("#fx-err").textContent = "That is what it already says. If it is right, use True instead."; return; }
+    if(!body.cat && !body.booker && !body.exclude){ slot.querySelector("#fx-err").textContent = isEv ? "Nothing to change yet. Tick “Remove this” to take it out, or pick who should get the credit. If it is right as it is, use Confirm instead." : "That is what it already says. If it is right, use Confirm instead."; return; }
+    if(!body.note.trim()){ slot.querySelector("#fx-err").textContent = "Please add a short reason."; return; }
     const r = await call("/correct", body);
     if(r.ok){ toast(approver?"Correction saved":"Sent to Vianney / Max for approval"); await refresh(); reopen(); }
     else slot.querySelector("#fx-err").textContent = r.error || "Could not save";

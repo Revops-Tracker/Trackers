@@ -285,10 +285,10 @@ function buildEra(r){
 const reachedSince = (id, kinds, iso) => { const d = torDay(iso); return !!d && (state.dealIdx.get(String(id))||[]).some(x=>kinds.includes(x.k) && x.d >= d); };
 const onePerDeal = (arr, at) => { const m = new Map(); arr.slice().sort((a,b)=>Date.parse(at(a))-Date.parse(at(b))).forEach(r=>{ const k=String(r.deal_id); if(!m.has(k)) m.set(k, r); }); return [...m.values()]; };
 const eraOf = r => { const d = state.cohort.get(String(r.deal_id)) || torDay(r.at || r.run_at || r.first_slot); return d && d >= state.cutover ? "new" : "old"; };
-const eraOk = r => !REPORTING || state.era==="all" || eraOf(r)===state.era;
+const eraOk = r => !REPORTING || state.era==="all" || state.era==="compare" || eraOf(r)===state.era;
 // metric lists: rows tagged era:"old" / era:"new" only show in that view (both in "Both")
 // leaderboard: no toggle, the classic (old-process) metric set only
-const eraPick = arr => arr.filter(x=>!REPORTING ? x.era!=="new" : (!x.era || state.era==="all" || x.era===state.era));
+const eraPick = arr => arr.filter(x=>!REPORTING ? x.era!=="new" : (!x.era || state.era==="all" || state.era==="compare" || x.era===state.era));
 const v2For = (person, role, p) => state.v2ev.filter(e=>whoMatches(e, person, role) && utmOk(e,p) && inP(e.at,p) && eraOk(e));
 
 /* ---------- rep sign-off ---------- */
@@ -786,7 +786,9 @@ function applyEra(){
     if(b.dataset.era==="new") b.textContent = "New 3-call close (from "+MON[d.getMonth()]+" "+d.getDate()+")";
   });
   const el = document.getElementById("eraNote");
-  if(el) el.textContent = state.era==="all"
+  if(el) el.textContent = state.era==="compare"
+    ? "Before (old process) and after (3-call close, from "+cut+") side by side. Conversion compares deals of the same age."
+    : state.era==="all"
     ? "Showing every deal. Old and new metrics sit side by side; rates mix both processes."
     : "Official switch to the 3-call close (Disco → Design/Audit → Prop Review/Contract): "+cut+". A deal counts in the process its first discovery call was in, so an older deal that closes after "+cut+" still counts as Old."
       + (state.era==="new" ? " Audit and prop review calls come from the AE tracker (no-shows the AE confirms there)." : "");

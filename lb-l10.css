@@ -91,3 +91,14 @@ details.how > div{margin-top:8px;line-height:1.5}
 .sc-tbl td.goal small{display:block;font-size:11px}
 /* Sales L10 keeps its original dotted underline (the leaderboard's "under" position drops it into the sub-line on the big tile numbers) */
 html.view-reporting .click{text-underline-position:auto}
+
+/* Compare before vs after (lb-cmp.js) */
+.cmp-sec{display:none}
+html.cmp-mode .cmp-sec{display:block}
+html.cmp-mode .l10-tabs,html.cmp-mode section[data-tab]{display:none!important}
+.cmp-ctl{flex-wrap:wrap;gap:10px 14px}
+.cmp-tbl{min-width:640px}
+.cmp-tbl td:first-child small{display:block;font-size:11px;color:var(--muted);font-weight:400}
+.cmp-tbl td.chg{color:var(--muted);font-size:13px}
+.cmp-tbl td.chg.ok{color:var(--ahead);font-weight:600}
+.cmp-tbl td.chg.bad{color:var(--behind);font-weight:600}

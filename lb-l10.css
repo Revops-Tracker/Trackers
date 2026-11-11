@@ -109,8 +109,10 @@ html.view-reporting .click{text-underline-position:auto}
 .sc-tbl tr.grp.tog:hover td{color:var(--ink)}
 .sc-tbl .grp-more{margin-left:12px;font-family:var(--body);text-transform:none;letter-spacing:0;font-size:12.5px;font-weight:600;color:var(--fill)}
 .sc-tbl td.pre{color:var(--muted);font-weight:400;background-image:repeating-linear-gradient(135deg,transparent 0 6px,color-mix(in srgb,var(--line) 45%,transparent) 6px 7px)}
-.sc-tbl .tip{color:var(--muted);font-size:11.5px;cursor:help;margin-left:5px;opacity:.7}
-.sc-tbl .tip:hover{opacity:1}
+.sc-tbl .tip{border:0;background:transparent;padding:2px 4px;margin-left:2px;font:inherit;font-size:13px;line-height:1;color:var(--muted);cursor:pointer;border-radius:50%;opacity:.75}
+.sc-tbl .tip:hover,.sc-tbl .tip:focus-visible{opacity:1;color:var(--fill)}
+.tip-pop{position:fixed;z-index:1000;max-width:300px;padding:9px 12px;border-radius:9px;background:var(--ink);color:var(--panel);font-size:13px;line-height:1.45;font-weight:500;box-shadow:0 6px 24px rgba(0,0,0,.18);pointer-events:auto}
+.tip-pop[hidden]{display:none}
 #scAll{font-size:13.5px}
 .cl-more summary{cursor:pointer;font-size:13.5px;font-weight:600;color:var(--fill);list-style:none;display:inline-block}
 .cl-more summary::-webkit-details-marker{display:none}

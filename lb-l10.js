@@ -876,7 +876,7 @@ function renderScorecard(){
     const src = m.act ? "act" : m.slot ? "slot" : null;
     const g = m.base ? (baseSL ? m.f(baseSL) : null) : scGoal(m, view.g), goal = g==null ? null : ((m.ratio||m.dec) ? g : g*mult);
     const goalTxt = goal==null ? "" : scFmt(m, goal) + (m.base ? "<small>Jan 1–Oct 4</small>" : "");
-    html += `<tr><td>${m.label}${m.tip?`<span class="tip" title="${esc(m.tip)}">ⓘ</span>`:""}</td><td class="goal">${goalTxt}</td>`;
+    html += `<tr><td>${m.label}${m.tip?`<button type="button" class="tip" data-tip="${esc(m.tip)}" aria-label="What is ${esc(m.label)}?">ⓘ</button>`:""}</td><td class="goal">${goalTxt}</td>`;
     cols.forEach((c,ci)=>{
       const t = T[ci], a = src ? SRC[src].cols[ci] : null;
       if(src){
@@ -1115,3 +1115,26 @@ document.querySelectorAll("#l10Tabs button").forEach(b=>b.onclick=()=>l10Tab(b.d
 document.querySelectorAll("#ppSeg button").forEach(b=>b.onclick=()=>{ PP.sub = b.dataset.p; ppSave(); l10Tab("pp"); });
 document.getElementById("ppAll").onclick = ()=>{ PP.all = !PP.all; ppSave(); renderBdrBreakdown(); renderInboundBreakdown(); renderAEs(); l10Tab("pp"); };
 if(REPORTING){ let t0 = "sc"; try{ t0 = localStorage.getItem("jf_l10_tab") || "sc"; }catch(e){} l10Tab(["sc","pp","bd","ib","ax","tr","cl","cmp"].includes(t0)?t0:"sc"); }
+
+/* ---------- ⓘ definitions: hover or tap shows a bubble; a tap keeps it open until you tap elsewhere ---------- */
+(() => {
+  const pop = document.createElement("div"); pop.className = "tip-pop"; pop.hidden = true; pop.setAttribute("role", "tooltip"); document.body.appendChild(pop);
+  let cur = null, pinned = false;
+  const show = b => {
+    cur = b; pop.textContent = b.dataset.tip; pop.hidden = false;
+    const r = b.getBoundingClientRect(), w = pop.offsetWidth, h = pop.offsetHeight;
+    const x = Math.max(8, Math.min(r.left + r.width/2 - w/2, innerWidth - w - 8));
+    const y = r.bottom + 8 + h > innerHeight - 8 ? r.top - h - 8 : r.bottom + 8;
+    pop.style.left = x + "px"; pop.style.top = y + "px";
+  };
+  const hide = () => { pop.hidden = true; cur = null; pinned = false; };
+  document.addEventListener("click", e => {
+    const b = e.target.closest(".tip[data-tip]");
+    if(b){ e.stopPropagation(); e.preventDefault(); if(cur===b && pinned) hide(); else { show(b); pinned = true; } return; }
+    if(!e.target.closest(".tip-pop")) hide();
+  }, true);
+  document.addEventListener("mouseover", e => { const b = e.target.closest(".tip[data-tip]"); if(b && !pinned) show(b); });
+  document.addEventListener("mouseout", e => { const b = e.target.closest(".tip[data-tip]"); if(b && !pinned && !b.contains(e.relatedTarget)) hide(); });
+  document.addEventListener("keydown", e => { if(e.key==="Escape") hide(); });
+  addEventListener("scroll", () => { if(!pop.hidden) hide(); }, true);
+})();

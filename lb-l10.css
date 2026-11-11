@@ -149,3 +149,7 @@ small.dlt.up{color:var(--ahead)}
 small.dlt.dn{color:var(--behind)}
 small.dlt.eq{color:var(--muted);font-weight:500}
 .ib-tile small.dlt{font-size:12px;margin:2px 0}
+/* People tab (11-11): BDRs / AEs / Inbound behind one switch */
+.pp-bar{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:10px;margin:-8px 0 14px}
+.pp-bar[hidden]{display:none}
+#ppAll{font-size:13.5px}

@@ -31,13 +31,19 @@
   </div>
   <nav class="l10-tabs" id="l10Tabs" role="tablist" aria-label="Sales L10 views">
     <button role="tab" data-t="sc" aria-selected="true">Scorecard</button>
-    <button role="tab" data-t="bd" aria-selected="false">BDRs</button>
-    <button role="tab" data-t="ib" aria-selected="false">Inbound</button>
-    <button role="tab" data-t="ax" aria-selected="false">AEs</button>
+    <button role="tab" data-t="pp" aria-selected="false">People</button>
     <button role="tab" data-t="tr" aria-selected="false">Trends</button>
     <button role="tab" data-t="cl" aria-selected="false">Deals</button>
     <button role="tab" data-t="cmp" aria-selected="false">Compare</button>
   </nav>
+  <div class="pp-bar" id="ppBar" hidden>
+    <div class="seg" id="ppSeg" role="group" aria-label="Whose numbers">
+      <button data-p="bd" aria-pressed="true">BDRs</button>
+      <button data-p="ax" aria-pressed="false">AEs</button>
+      <button data-p="ib" aria-pressed="false">Inbound leads</button>
+    </div>
+    <button type="button" class="linkish" id="ppAll">Show all columns</button>
+  </div>
 
   <section id="scSec" class="l10-sec" data-tab="sc">
     <div class="sec-head">
@@ -276,7 +282,7 @@ function gUI(){
   if(G.kind==="custom"){ const f = document.getElementById("gFrom"), t = document.getElementById("gTo"); [f,t].forEach(el=>{ el.min = DATA_FROM; el.max = y; }); f.value = p.start; t.value = p.end; }
   const c = document.getElementById("gCmp"); c.checked = G.cmp; c.disabled = !pv;
   document.getElementById("gPrevLbl").textContent = pv ? "("+pv.label+")" : "(nothing earlier: data starts Jan 1)";
-  const tab = (document.querySelector("#l10Tabs [aria-selected=true]")||{}).dataset?.t;
+  let tab = (document.querySelector("#l10Tabs [aria-selected=true]")||{}).dataset?.t; if(tab==="pp") tab = PP.sub;
   document.getElementById("gHint").textContent = G_HINT[tab] || "";
 }
 function gChanged(retrend){
@@ -311,25 +317,29 @@ const isInbLead = r => NOT_A_BDR.has(r.booker) || (/^Inbound - /.test(r.utm||"")
 const repOf = r => CUR_BDR.has(r.booker) ? r.booker : FORMER;
 const srcName = u => u===NO_UTM ? "No UTM" : u.replace(/^(Inbound|Outbound) - /,"");
 const BK_COLS_ALL = [
-  {label:"Books",           f:t=>t.books.length, list:"books"},
+  {label:"Books", core:true,           f:t=>t.books.length, list:"books"},
   {label:"Runs due",        f:t=>t.dueN,         list:"due"},
-  {label:"Runs had",        f:t=>t.had.length,   list:"had"},
-  {label:"Overall show",    f:t=>t.show,  pct:true, list:"due",  sub:t=>t.dueN?t.had.length+" of "+t.dueN:""},
-  {label:"1st-time show (excl. our cancels)", f:t=>t.first, pct:true, list:"fdue", sub:t=>t.fdue.length?t.f1.length+" of "+t.fdue.length:""},
+  {label:"Runs had", core:true,        f:t=>t.had.length,   list:"had"},
+  {label:"Overall show", core:true,    f:t=>t.show,  pct:true, list:"due",  sub:t=>t.dueN?t.had.length+" of "+t.dueN:""},
+  {label:"1st-time show (excl. our cancels)", core:true, f:t=>t.first, pct:true, list:"fdue", sub:t=>t.fdue.length?t.f1.length+" of "+t.fdue.length:""},
   {label:"1st-time show, all", f:t=>t.firstAll, pct:true, list:"fall", sub:t=>t.fall.length?t.f1.length+" of "+t.fall.length:""},
   {label:"1st-time show (excl. their cancels)", f:t=>t.firstExT, pct:true, list:"fext", sub:t=>t.fdueT.length?t.f1.length+" of "+t.fdueT.length:""},
   {label:"Showed, DQ'd",   f:t=>t.dqRate, pct:true, lower:true, list:"dq", sub:t=>t.had.length?t.hdq.length+" of "+t.had.length:""},
   {label:"No-shows",        f:t=>t.ns.length,    lower:true, list:"ns"},
   {label:"Cancelled ahead", f:t=>t.ca.length,    lower:true, list:"ca"},
   {label:"Recovery",        f:t=>t.recovery, pct:true, list:"rec", sub:t=>t.rec.length?t.recBack.length+" of "+t.rec.length:""},
-  {label:"Designs",         f:t=>t.des.length,   list:"des", era:"old"},
-  {label:"Design/Audit",    f:t=>t.des.length,   list:"des", era:"new"},
-  {label:"Audits run",      f:t=>t.arun.length,  list:"arun", era:"new"},
-  {label:"Closes",          f:t=>t.won.length,   list:"won"},
-  {label:"MRR",             f:t=>t.cwd, money:true, list:"won"},
+  {label:"Designs", core:true,         f:t=>t.des.length,   list:"des", era:"old"},
+  {label:"Design/Audit", core:true,    f:t=>t.des.length,   list:"des", era:"new"},
+  {label:"Audits run", core:true,      f:t=>t.arun.length,  list:"arun", era:"new"},
+  {label:"Closes", core:true,          f:t=>t.won.length,   list:"won"},
+  {label:"MRR", core:true,             f:t=>t.cwd, money:true, list:"won"},
 ];
 let BK_COLS = eraPick(BK_COLS_ALL);
 const bkShown = (c,v) => c.pct ? pctS(v) : c.money ? fmt(v||0,true) : fmt(v||0);
+// People tab: which group is shown + whether every column shows
+const PP = (()=>{ const d = {sub:"bd", all:false}; try{ return {...d, ...JSON.parse(localStorage.getItem("l10-pp")||"{}")}; }catch(e){ return d; } })();
+const ppSave = () => { try{ localStorage.setItem("l10-pp", JSON.stringify({sub:PP.sub, all:PP.all})); }catch(e){} };
+const ppCol = c => PP.all || c.core;
 const L10 = {
   bd: {kind:"month", offset:0, rep:"all", rows:{}},
   ib: {kind:"month", offset:0, who:"all", rows:{}},
@@ -339,9 +349,9 @@ function bkRow(sec, key, name, pred, cls){ const pk = "l10:"+sec+":"+key; PRED.s
 const bkStats = (r, p) => statsFor(r.pk, "bdr", p);
 function bkTable(sec, rows, p){
   const pp = gCmpOn() ? gPrev() : null;
-  return `<table class="ib-tbl"><thead><tr><th></th>${BK_COLS.map(c=>`<th>${c.label}</th>`).join("")}</tr></thead><tbody>${rows.map(r=>{
+  return `<table class="ib-tbl"><thead><tr><th></th>${BK_COLS.map(c=>ppCol(c)?`<th>${c.label}</th>`:"").join("")}</tr></thead><tbody>${rows.map(r=>{
     const t = bkStats(r, p), tp = pp ? bkStats(r, pp) : null;
-    return `<tr class="${r.cls||""}"><td>${esc(r.name)}</td>${BK_COLS.map((c,i)=>`<td><span class="click" data-bk="${sec}|${esc(r.key)}" data-bkc="${i}">${bkShown(c, c.f(t))}</span>${c.sub&&c.sub(t)?`<small>${c.sub(t)}</small>`:""}${tp?dl(c.f(t), c.f(tp), {pct:c.pct, money:c.money, lower:c.lower}):""}</td>`).join("")}</tr>`;
+    return `<tr class="${r.cls||""}"><td>${esc(r.name)}</td>${BK_COLS.map((c,i)=>!ppCol(c) ? "" : `<td><span class="click" data-bk="${sec}|${esc(r.key)}" data-bkc="${i}">${bkShown(c, c.f(t))}</span>${c.sub&&c.sub(t)?`<small>${c.sub(t)}</small>`:""}${tp?dl(c.f(t), c.f(tp), {pct:c.pct, money:c.money, lower:c.lower}):""}</td>`).join("")}</tr>`;
   }).join("") || `<tr><td class="empty" colspan="${BK_COLS.length+1}">Nothing in this period.</td></tr>`}</tbody></table>`;
 }
 function bkTiles(sec, row, bench, benchName, p){
@@ -502,11 +512,11 @@ const clStats = rows => { const d = rows.filter(x=>x.des), w = rows.filter(x=>x.
   return {rows, n:rows.length, d, w, mrr, rate: rows.length ? w.length/rows.length : null, drate: rows.length ? d.length/rows.length : null}; };
 const CL_COLS_ALL = [
   {label:"Runs", f:t=>fmt(t.n), list:"runs"},
-  {label:"Designs", f:t=>fmt(t.d.length), list:"des", era:"old"},
+  {label:"Designs", core:true, f:t=>fmt(t.d.length), list:"des", era:"old"},
   {label:"Run → design", f:t=>pctS(t.drate), list:"des", era:"old"},
-  {label:"Design/Audit", f:t=>fmt(t.d.length), list:"des", era:"new"},
+  {label:"Design/Audit", core:true, f:t=>fmt(t.d.length), list:"des", era:"new"},
   {label:"Run → Design/Audit", f:t=>pctS(t.drate), list:"des", era:"new"},
-  {label:"Closes", f:t=>fmt(t.w.length), list:"won"},
+  {label:"Closes", core:true, f:t=>fmt(t.w.length), list:"won"},
   {label:"Close rate", f:t=>pctS(t.rate), list:"won", sub:t=>t.n ? t.w.length+" of "+t.n : ""},
   {label:"MRR", f:t=>fmt(t.mrr,true), list:"won"},
 ];
@@ -658,40 +668,40 @@ const SC_ROWS_ALL = [
   {grp:"Discovery calls"},
   {id:"books",    label:"Books (new)", core:true, tip:"New calls booked, counted on the day they were booked",           f:t=>t.books.length, list:"books", split:true},
   {id:"due",      label:"Runs due (calls)", tip:"Calls whose slot came up (a no-show that is rebooked counts again)",      f:t=>t.dueN, list:"due"},
-  {id:"had",      label:"Runs had", core:true, tip:"Calls that happened",              f:t=>t.had.length, list:"had", split:true},
+  {id:"had", core:true,      label:"Runs had", core:true, tip:"Calls that happened",              f:t=>t.had.length, list:"had", split:true},
   {id:"ns",       label:"No-shows", tip:"Slot came up, prospect did not show",              f:t=>t.ns.length, list:"ns", lower:true},
   {id:"ca",       label:"Cancelled ahead", tip:"Cancelled before the slot",       f:t=>t.ca.length, list:"ca", lower:true},
-  {id:"show",     label:"Overall show", core:true, tip:"Calls held ÷ calls due",          ratio:true, f:t=>t.show, list:"due", sub:t=>t.dueN?t.had.length+" of "+t.dueN:"", split:true},
+  {id:"show", core:true,     label:"Overall show", core:true, tip:"Calls held ÷ calls due",          ratio:true, f:t=>t.show, list:"due", sub:t=>t.dueN?t.had.length+" of "+t.dueN:"", split:true},
   {id:"rec",      label:"No-show recovery", tip:"Deals that missed a call and were held at a later slot",      ratio:true, f:t=>t.recovery, list:"rec", sub:t=>t.rec.length?t.recBack.length+" of "+t.rec.length:""},
-  {id:"first",    label:"1st-time show (excl. our cancels)", core:true, tip:"Held at the first slot ÷ new books whose first slot passed. Calls we pulled (not an MSP, DQ) are left out. The headline show rate.", ratio:true, f:t=>t.first, list:"fdue", sub:t=>t.fdue.length?t.f1.length+" of "+t.fdue.length:""},
+  {id:"first", core:true,    label:"1st-time show (excl. our cancels)", core:true, tip:"Held at the first slot ÷ new books whose first slot passed. Calls we pulled (not an MSP, DQ) are left out. The headline show rate.", ratio:true, f:t=>t.first, list:"fdue", sub:t=>t.fdue.length?t.f1.length+" of "+t.fdue.length:""},
   {id:"firstAll", label:"1st-time show, all", tip:"Held at the first slot ÷ new books whose first slot passed, nothing left out",    ratio:true, f:t=>t.firstAll, list:"fall", sub:t=>t.fall.length?t.f1.length+" of "+t.fall.length:""},
   {id:"firstExT", label:"1st-time show (excl. their cancels)", tip:"Same, with prospect cancels and reschedules left out", ratio:true, f:t=>t.firstExT, list:"fext", sub:t=>t.fdueT.length?t.f1.length+" of "+t.fdueT.length:""},
   {id:"cunk",     label:"Cancelled ahead, who unknown", tip:"Cancels nobody has marked ours or theirs yet (count as a miss)", f:t=>t.fUnk.length, list:"cunk", lower:true},
   {id:"dq",       label:"Showed, then DQ'd", tip:"Calls held where the deal was then disqualified",     ratio:true, lower:true, f:t=>t.dqRate, list:"dq", sub:t=>t.had.length?t.hdq.length+" of "+t.had.length:""},
   {grp:"Pipeline"},
-  {id:"des",      label:"Designs created", core:true, tip:"Deals moved to Design",       f:t=>t.des.length, list:"des", era:"old"},
+  {id:"des", core:true,      label:"Designs created", core:true, tip:"Deals moved to Design",       f:t=>t.des.length, list:"des", era:"old"},
   {id:"b2d",      label:"Book → design", tip:"Designs ÷ books",         ratio:true, f:t=>t.books.length?t.des.length/t.books.length:null, list:"des", era:"old"},
   {id:"r2d",      label:"Run → design", tip:"Designs ÷ runs had",          ratio:true, f:t=>t.had.length?t.des.length/t.had.length:null, list:"des", era:"old"},
-  {id:"dheld",    label:"Designs held", core:true, tip:"Design calls that happened",          f:t=>t.dheld.length, list:"dheld", era:"old"},
+  {id:"dheld", core:true,    label:"Designs held", core:true, tip:"Design calls that happened",          f:t=>t.dheld.length, list:"dheld", era:"old"},
   {id:"diag",     label:"Moved to diagnosis", tip:"Deals moved to Diagnosis",    f:t=>t.diag.length, list:"diag", era:"old"},
   {id:"prop",     label:"Prop updates held", tip:"Prop update calls that happened",     f:t=>t.prop.length, list:"prop", era:"old"},
   {id:"con",      label:"Contracts sent", core:true, tip:"Contracts sent",        f:t=>t.con.length, list:"con", era:"old"},
-  {id:"des",      label:"Moved to Design/Audit", core:true, tip:"Deals moved to the Design/Audit stage (audit booked)", f:t=>t.des.length, list:"des", era:"new"},
-  {id:"arun",     label:"Audits run", core:true, tip:"Audit calls that happened (from the AE tracker)",            f:t=>t.arun.length, list:"arun", era:"new"},
+  {id:"des", core:true,      label:"Moved to Design/Audit", core:true, tip:"Deals moved to the Design/Audit stage (audit booked)", f:t=>t.des.length, list:"des", era:"new"},
+  {id:"arun", core:true,     label:"Audits run", core:true, tip:"Audit calls that happened (from the AE tracker)",            f:t=>t.arun.length, list:"arun", era:"new"},
   {id:"ans",      label:"Audit no-shows", tip:"Audit calls the prospect missed",        f:t=>t.ans.length, list:"ans", lower:true, era:"new"},
   {id:"ashow",    label:"Audit show rate", tip:"Audits run ÷ (run + no-shows)",       ratio:true, f:t=>(t.arun.length+t.ans.length)?t.arun.length/(t.arun.length+t.ans.length):null, list:"ashow", sub:t=>(t.arun.length+t.ans.length)?t.arun.length+" of "+(t.arun.length+t.ans.length):"", era:"new"},
   {id:"pbook",    label:"Moved to Prop Review/Contract", tip:"Deals moved to Prop Review / Contract (call booked)", f:t=>t.pbook.length, list:"pbook", era:"new"},
-  {id:"prun",     label:"Prop reviews run", core:true, tip:"Prop review calls that happened (from the AE tracker)",      f:t=>t.prun.length, list:"prun", era:"new"},
+  {id:"prun", core:true,     label:"Prop reviews run", core:true, tip:"Prop review calls that happened (from the AE tracker)",      f:t=>t.prun.length, list:"prun", era:"new"},
   {id:"pns",      label:"Prop review no-shows", tip:"Prop review calls the prospect missed",  f:t=>t.pns.length, list:"pns", lower:true, era:"new"},
   {id:"pshow",    label:"Prop review show rate", tip:"Prop reviews run ÷ (run + no-shows)", ratio:true, f:t=>(t.prun.length+t.pns.length)?t.prun.length/(t.prun.length+t.pns.length):null, list:"pshow", sub:t=>(t.prun.length+t.pns.length)?t.prun.length+" of "+(t.prun.length+t.pns.length):"", era:"new"},
   {grp:"AE time (slots)"},
   {id:"slots", label:"AE slots that came up", tip:"One AE + one start time that came up", slot:true, f:x=>x.slots},
   {id:"cps",   label:"Calls per slot", tip:"Calls due ÷ slots (1.0 = no double booking)",        slot:true, dec:true, base:true, f:x=>x.slots?x.calls/x.slots:null, sub:x=>x.slots?x.calls+" calls":""},
   {id:"sran",  label:"Slots that ran", tip:"Slots where at least one call was held",        slot:true, f:x=>x.used},
-  {id:"rps",   label:"Run rate per slot", core:true, tip:"Slots that ran ÷ slots that came up",     slot:true, ratio:true, base:true, f:x=>x.slots?x.used/x.slots:null, sub:x=>x.slots?x.used+" of "+x.slots:""},
+  {id:"rps", core:true,   label:"Run rate per slot", core:true, tip:"Slots that ran ÷ slots that came up",     slot:true, ratio:true, base:true, f:x=>x.slots?x.used/x.slots:null, sub:x=>x.slots?x.used+" of "+x.slots:""},
   {grp:"Revenue"},
-  {id:"won",      label:"Closed won", core:true, tip:"Deals closed won, by close date",            f:t=>t.won.length, list:"won"},
-  {id:"cwd",      label:"MRR closed", core:true, tip:"Closed-won MRR (USD/month), by close date",            money:true, f:t=>t.cwd, list:"won"},
+  {id:"won", core:true,      label:"Closed won", core:true, tip:"Deals closed won, by close date",            f:t=>t.won.length, list:"won"},
+  {id:"cwd", core:true,      label:"MRR closed", core:true, tip:"Closed-won MRR (USD/month), by close date",            money:true, f:t=>t.cwd, list:"won"},
   {id:"d2w",      label:"Design → close", tip:"Closes ÷ designs",        ratio:true, f:t=>t.des.length?t.won.length/t.des.length:null, list:"won", era:"old"},
   {id:"c2w",      label:"Contract → close", tip:"Closes ÷ contracts",      ratio:true, f:t=>t.con.length?t.won.length/t.con.length:null, list:"won", era:"old"},
   {grp:"Conversion (from calls that ran)", era:"new"},
@@ -951,33 +961,33 @@ function axSlots(v, p){
 const axStats = (v, p) => v.ae ? statsFor(v.ae, "ae", p) : v.aeFormer ? statsFor(FORMER, "ae", p) : statsFor(v.key, "bdr", p);
 const AX_COLS_ALL = [
   {id:"due",   label:"Runs due",        f:t=>t.dueN, list:"due"},
-  {id:"had",   label:"Runs had",        f:t=>t.had.length, list:"had"},
+  {id:"had", core:true,   label:"Runs had",        f:t=>t.had.length, list:"had"},
   {id:"slots", label:"Slots",           slot:true, f:x=>x.slots},
   {id:"cps",   label:"Calls per slot",  slot:true, dec:true, f:x=>x.slots?x.calls/x.slots:null},
-  {id:"rps",   label:"Run rate per slot", slot:true, ratio:true, f:x=>x.slots?x.used/x.slots:null, sub:x=>x.slots?x.used+" of "+x.slots:""},
-  {id:"show",  label:"Overall show",    ratio:true, f:t=>t.show, list:"due", sub:t=>t.dueN?t.had.length+" of "+t.dueN:""},
+  {id:"rps", core:true,   label:"Run rate per slot", slot:true, ratio:true, f:x=>x.slots?x.used/x.slots:null, sub:x=>x.slots?x.used+" of "+x.slots:""},
+  {id:"show", core:true,  label:"Overall show",    ratio:true, f:t=>t.show, list:"due", sub:t=>t.dueN?t.had.length+" of "+t.dueN:""},
   {id:"rec",   label:"No-show recovery", ratio:true, f:t=>t.recovery, list:"rec", sub:t=>t.rec.length?t.recBack.length+" of "+t.rec.length:""},
-  {id:"first", label:"1st-time show (excl. our cancels)", ratio:true, f:t=>t.first, list:"fdue", sub:t=>t.fdue.length?t.f1.length+" of "+t.fdue.length:""},
+  {id:"first", core:true, label:"1st-time show (excl. our cancels)", ratio:true, f:t=>t.first, list:"fdue", sub:t=>t.fdue.length?t.f1.length+" of "+t.fdue.length:""},
   {id:"firstAll", label:"1st-time show, all", ratio:true, f:t=>t.firstAll, list:"fall", sub:t=>t.fall.length?t.f1.length+" of "+t.fall.length:""},
   {id:"firstExT", label:"1st-time show (excl. their cancels)", ratio:true, f:t=>t.firstExT, list:"fext", sub:t=>t.fdueT.length?t.f1.length+" of "+t.fdueT.length:""},
   {id:"dq",    label:"Showed, then DQ'd", ratio:true, f:t=>t.dqRate, list:"dq", sub:t=>t.had.length?t.hdq.length+" of "+t.had.length:""},
-  {id:"des",   label:"Designs",         f:t=>t.des.length, list:"des", era:"old"},
+  {id:"des", core:true,   label:"Designs",         f:t=>t.des.length, list:"des", era:"old"},
   {id:"r2d",   label:"Run → design",    ratio:true, f:t=>t.had.length?t.des.length/t.had.length:null, list:"des", era:"old"},
-  {id:"dheld", label:"Designs held",    f:t=>t.dheld.length, list:"dheld", era:"old"},
+  {id:"dheld", core:true, label:"Designs held",    f:t=>t.dheld.length, list:"dheld", era:"old"},
   {id:"prop",  label:"Prop updates",    f:t=>t.prop.length, list:"prop", era:"old"},
   {id:"con",   label:"Contracts",       f:t=>t.con.length, list:"con", era:"old"},
-  {id:"desn",  label:"Design/Audit",    f:t=>t.des.length, list:"des", era:"new"},
-  {id:"arun",  label:"Audits run",      f:t=>t.arun.length, list:"arun", era:"new"},
+  {id:"desn", core:true,  label:"Design/Audit",    f:t=>t.des.length, list:"des", era:"new"},
+  {id:"arun", core:true,  label:"Audits run",      f:t=>t.arun.length, list:"arun", era:"new"},
   {id:"ans",   label:"Audit no-shows",  f:t=>t.ans.length, list:"ans", era:"new"},
-  {id:"prun",  label:"Prop reviews run", f:t=>t.prun.length, list:"prun", era:"new"},
+  {id:"prun", core:true,  label:"Prop reviews run", f:t=>t.prun.length, list:"prun", era:"new"},
   {id:"pns",   label:"Prop review no-shows", f:t=>t.pns.length, list:"pns", era:"new"},
-  {id:"won",   label:"Closes",          f:t=>t.won.length, list:"won"},
+  {id:"won", core:true,   label:"Closes",          f:t=>t.won.length, list:"won"},
   {id:"d2w",   label:"Design → close",  ratio:true, f:t=>t.des.length?t.won.length/t.des.length:null, list:"won", era:"old"},
   {id:"cvd", label:"Disco → Design/Audit", ratio:true, f:t=>t.cvD.length?t.cvDn.length/t.cvD.length:null, list:"cvd", sub:t=>t.cvD.length?t.cvDn.length+" of "+t.cvD.length:"", era:"new"},
   {id:"cva", label:"Design/Audit → Prop Review", ratio:true, f:t=>t.cvA.length?t.cvAn.length/t.cvA.length:null, list:"cva", sub:t=>t.cvA.length?t.cvAn.length+" of "+t.cvA.length:"", era:"new"},
   {id:"cvp", label:"Prop Review → Closed won", ratio:true, f:t=>t.cvP.length?t.cvPn.length/t.cvP.length:null, list:"cvp", sub:t=>t.cvP.length?t.cvPn.length+" of "+t.cvP.length:"", era:"new"},
   {id:"cvw", label:"Disco → Closed won", ratio:true, f:t=>t.cvD.length?t.cvDw.length/t.cvD.length:null, list:"cvw", sub:t=>t.cvD.length?t.cvDw.length+" of "+t.cvD.length:"", era:"new"},
-  {id:"cwd",   label:"MRR",             money:true, f:t=>t.cwd, list:"won"},
+  {id:"cwd", core:true,   label:"MRR",             money:true, f:t=>t.cwd, list:"won"},
 ];
 let AX_COLS = eraPick(AX_COLS_ALL);
 const axVal = (c, v, p) => c.slot ? c.f(axSlots(v, p)) : c.f(axStats(v, p));
@@ -996,8 +1006,9 @@ function renderAEs(){
   document.getElementById("axPrev").disabled = p.start <= DATA_FROM;
   document.getElementById("axNext").disabled = AX.offset >= 0;
   const rows = [...axWhoList(p).map(w=>({who:w, ...axView(w)})), {who:"all", ...axView("all"), cls:"tot"}];
-  box.innerHTML = `<table class="ib-tbl"><thead><tr><th></th>${AX_COLS.map(c=>`<th>${c.label}</th>`).join("")}</tr></thead><tbody>${rows.map(r=>
+  box.innerHTML = `<table class="ib-tbl"><thead><tr><th></th>${AX_COLS.map(c=>ppCol(c)?`<th>${c.label}</th>`:"").join("")}</tr></thead><tbody>${rows.map(r=>
     `<tr class="${r.cls||""}"><td>${esc(r.name)}</td>${AX_COLS.map((c,ci)=>{
+      if(!ppCol(c)) return "";
       const v = axVal(c, r, p), sub = axSub(c, r, p);
       const txt = scFmt(c, v);
       const cell = c.list && v!=null ? `<span class="click" data-ax="${esc(r.who)}|${ci}">${txt}</span>` : txt;
@@ -1087,13 +1098,20 @@ let axResize; window.addEventListener("resize", ()=>{ clearTimeout(axResize); ax
 
 /* ---------- Sales L10 tabs ---------- */
 function l10Tab(t){
+  if(["bd","ib","ax"].includes(t)){ PP.sub = t; ppSave(); t = "pp"; }   // old saved tabs / links land on People
+  const show = t==="pp" ? PP.sub : t;
   document.querySelectorAll("#l10Tabs button").forEach(b=>b.setAttribute("aria-selected", b.dataset.t===t));
-  document.querySelectorAll("section[data-tab]").forEach(sec=>sec.hidden = sec.dataset.tab!==t);
+  document.querySelectorAll("section[data-tab]").forEach(sec=>sec.hidden = sec.dataset.tab!==show);
+  document.getElementById("ppBar").hidden = t!=="pp";
+  document.querySelectorAll("#ppSeg button").forEach(b=>b.setAttribute("aria-pressed", b.dataset.p===PP.sub));
+  document.getElementById("ppAll").textContent = PP.all ? "Key columns only" : "Show all columns";
   try{ localStorage.setItem("jf_l10_tab", t); }catch(e){}
   if(t==="tr") renderTrends();
-  if(t==="ax") requestAnimationFrame(renderAEs);
+  if(show==="ax") requestAnimationFrame(renderAEs);
   if(t==="cmp" && typeof renderCompare==="function") renderCompare();
   if(typeof gUI==="function") gUI();
 }
 document.querySelectorAll("#l10Tabs button").forEach(b=>b.onclick=()=>l10Tab(b.dataset.t));
-if(REPORTING){ let t0 = "sc"; try{ t0 = localStorage.getItem("jf_l10_tab") || "sc"; }catch(e){} l10Tab(["sc","bd","ib","ax","tr","cl","cmp"].includes(t0)?t0:"sc"); }
+document.querySelectorAll("#ppSeg button").forEach(b=>b.onclick=()=>{ PP.sub = b.dataset.p; ppSave(); l10Tab("pp"); });
+document.getElementById("ppAll").onclick = ()=>{ PP.all = !PP.all; ppSave(); renderBdrBreakdown(); renderInboundBreakdown(); renderAEs(); l10Tab("pp"); };
+if(REPORTING){ let t0 = "sc"; try{ t0 = localStorage.getItem("jf_l10_tab") || "sc"; }catch(e){} l10Tab(["sc","pp","bd","ib","ax","tr","cl","cmp"].includes(t0)?t0:"sc"); }

@@ -10,7 +10,8 @@ document.currentScript.insertAdjacentHTML("beforebegin", `
       <h1 id="pageTitle">Sales floor leaderboard <span class="auto-tag">Auto</span></h1>
       <div class="live"><span class="dot" id="liveDot"></span><span id="liveText">Loading</span></div>
     </div>
-    <button class="btn ghost" type="button" id="refreshBtn" hidden title="Pull the latest numbers from HubSpot now (Vianney / Max only)">Refresh now</button>
+    <div class="top-btns"><button class="btn ghost" type="button" id="peopleBtn" hidden title="Who is on the board (admins)">People</button>
+    <button class="btn ghost" type="button" id="refreshBtn" hidden title="Pull the latest numbers from HubSpot now (Vianney / Max only)">Refresh now</button></div>
   </header>
 
   <div class="banner lb-only" id="banner">Every number here comes straight from HubSpot and refreshes at 8 AM each day, covering everything up to the end of yesterday. Click any underlined number to see the deals behind it. Reps: each morning, go through your new deals and mark each one <b>True</b> or <b>False</b> (Oct 1 to 8 is already confirmed). A "False" needs a short note and goes to Vianney or Max to approve before the numbers change.</div>
@@ -124,7 +125,9 @@ if(REPORTING) document.getElementById("pageTitle").innerHTML = 'Sales L10 <span 
 const PORTAL = "1905790";
 const TZ = "America/Toronto";
 
-/* ---------- roster and goals (weekly goals from Max's leaderboard / L10 scorecard) ---------- */
+/* ---------- roster and goals (weekly goals from Max's leaderboard / L10 scorecard) ----------
+   The roster below is only the starting point: /state returns lb_roster (admins edit it with the People button, 11-11)
+   and applyRoster() refills BDRS / AES / CUR_* / BDR_NAMES / REPS in place before anything is drawn. */
 const BDRS = [
   {key:"Brandon Cameron", name:"Brandon Cameron"},
   {key:"Issa Hattar",     name:"Issa Hattar"},
@@ -220,7 +223,7 @@ const state = { kind:"week", offset:0, rank:"had", aeRank:"cwd", me:null, showup
   // Sales process era (Sales L10 only). Official switch to the 3-call close = lb_auto_config.process_cutover (2026-10-27).
   era:(()=>{ try{ return sessionStorage.getItem("l10-era2") || "all"; }catch(e){ return "all"; } })(), cutover:"2026-10-27", v2ev:[], cohort:new Map(), dealIdx:new Map() };
 const REVIEW_SINCE = "2026-10-01";   // reps sign off on everything from here on
-const REPS = ["Brandon","Issa","Dipen"];
+const REPS = ["Brandon","Issa","Dipen"];   // refilled from the roster by applyRoster()
 
 /* ---------- corrections applied on top of the engine (approved only; pending ones are shown, not counted) ---------- */
 function effShowup(){
@@ -301,6 +304,20 @@ const firstName = s => String(s||"").split(" ")[0];
 const credited = (r, rep) => !!rep && [r.booker, r.ae].some(n=>firstName(n)===rep);
 // one reviewer per record: the BDR who booked it; deals with no BDR (inbound, CloseBot) go to the AE
 const BDR_NAMES = [...BDRS.map(b=>b.key), "Erich Roeder"];   // former BDRs still own their records (no AE queue spill-over)
+// People on the board come from lb_roster. Arrays and sets are refilled in place so every reference stays valid.
+const isAdmin = () => !!(state.me && (state.me.approver || state.me.role==="admin"));
+function applyRoster(list){
+  if(!Array.isArray(list) || !list.length) return;
+  state.roster = list;
+  const fill = (arr, items) => { arr.splice(0, arr.length, ...items); };
+  const on = list.filter(p=>p.active);
+  fill(BDRS, on.filter(p=>p.role==="bdr").map(p=>({key:p.name, name:p.name})));
+  fill(AES, on.filter(p=>p.role==="ae").map(p=>({key:p.name, name:p.name})));
+  CUR_BDR.clear(); BDRS.forEach(b=>CUR_BDR.add(b.key));
+  CUR_AE.clear(); AES.forEach(a=>CUR_AE.add(a.key));
+  fill(BDR_NAMES, list.filter(p=>p.role==="bdr").map(p=>p.name));
+  fill(REPS, [...new Set(on.map(p=>firstName(p.name)))]);
+}
 const reviewOwner = r => BDR_NAMES.includes(r.booker) ? firstName(r.booker) : firstName(r.ae);
 const labelOf = r => r.kind ? r.kind : (r.dropped ? "not_a_booking" : r.cat);
 const happened = r => r.kind ? torDay(r.at) >= REVIEW_SINCE
@@ -561,6 +578,7 @@ function render(){
   updateLive();
   renderReviewBar();
   document.getElementById("refreshBtn").hidden = !(state.me && state.me.approver);
+  document.getElementById("peopleBtn").hidden = !isAdmin();
   renderTrends();
   if(REPORTING) renderL10();
 }
@@ -746,7 +764,7 @@ function fixForm(key, isEv){
   slot.innerHTML = `<div class="fixbox">
     ${isEv ? `<label><span><input type="checkbox" id="fx-ex" checked> <b>Remove this</b>: it should not count at all (e.g. the deal was moved to this stage by mistake)</span></label>`
            : `<label>What actually happened<select id="fx-cat">${cats.map(c=>`<option value="${c}" ${(rec.cat===c)?"selected":""}>${LABEL[c]}</option>`).join("")}</select></label>`}
-    <label>Credit to<select id="fx-bk">${["Inbound","Brandon Cameron","Issa Hattar"].map(n=>`<option ${rec.booker===n?"selected":""}>${n}</option>`).join("")}</select></label>
+    <label>Credit to<select id="fx-bk">${[...new Set(["Inbound", ...BDRS.map(b=>b.key), ...(rec.booker && rec.booker!=="Inbound" ? [rec.booker] : [])])].map(n=>`<option ${rec.booker===n?"selected":""}>${n}</option>`).join("")}</select></label>
     <label>Why (required, e.g. "prospect joined late, Fathom missed it")<textarea id="fx-note">${esc(prev?prev.note:"")}</textarea></label>
     <div class="err" id="fx-err" style="padding:0"></div>
     <div class="row"><button class="btn ghost" type="button" data-cancel="1">Cancel</button><button class="btn" type="button" id="fx-save">${approver?"Save correction":"Send for approval"}</button></div></div>`;
@@ -796,6 +814,7 @@ async function refresh(){
   state.reviews = new Map((r.reviews||[]).map(v=>[v.key+"|"+v.rep, v]));
   state.cattr = new Map((r.cattr||[]).map(c=>[c.key, c]));
   state.attrs = new Map((r.attrs||[]).map(a=>[String(a.deal_id), a.p||{}]));
+  applyRoster(r.roster);
   buildEra(r);
   applyEra();
   render();
@@ -1095,3 +1114,62 @@ document.getElementById("closeBtn").onclick=()=>document.getElementById("dlg").c
 document.getElementById("dlgX").onclick=()=>document.getElementById("dlg").close();
 // clicking the dark area outside the box also closes it
 document.getElementById("dlg").addEventListener("click", e=>{ if(e.target.id==="dlg") e.target.close(); });
+
+/* ---------- People on the board (admins, 11-11) ----------
+   Add a BDR or AE (name exactly as HubSpot has it: "BDR who booked" for BDRs, deal owner for AEs) or mark someone as left.
+   Left = their numbers roll into "Former reps"; history is never deleted. Saved in lb_roster via lb-auto /roster. */
+function rosterNamesInData(){
+  const seen = new Map();   // name -> {bdr, ae} counts
+  const add = (n, k) => { if(!n || NOT_A_BDR.has(n) || n==="Unassigned") return; const o = seen.get(n) || {bdr:0, ae:0}; o[k]++; seen.set(n, o); };
+  (state.showup||[]).forEach(r=>{ add(r.booker, "bdr"); add(r.ae, "ae"); });
+  return seen;
+}
+function openRoster(msg){
+  lastOpen = null;
+  const list = state.roster || [...BDRS.map(b=>({name:b.key, role:"bdr", active:true})), ...AES.map(a=>({name:a.key, role:"ae", active:true}))];
+  const on = list.filter(p=>p.active), off = list.filter(p=>!p.active);
+  const seen = rosterNamesInData(), onBoard = new Set(list.map(p=>p.name));
+  const sugg = [...seen.entries()].filter(([n])=>!onBoard.has(n)).sort((a,b)=>(b[1].bdr+b[1].ae)-(a[1].bdr+a[1].ae)).map(([n])=>n);
+  const ROLE = {bdr:"BDR", ae:"AE"};
+  const what = n => { const s = seen.get(n); if(!s) return "No deals under this name yet";
+    return [s.bdr ? s.bdr+" bookings" : "", s.ae ? s.ae+" calls as AE" : ""].filter(Boolean).join(" · "); };
+  const row = (p, btn) => `<li class="deal"><div class="top"><span class="nm">${esc(p.name)}</span><span class="pill">${ROLE[p.role]}</span></div>
+    <div class="meta">${what(p.name)}${p.left_at ? " · left "+nice(p.left_at) : ""}</div>
+    <div class="acts">${btn}</div></li>`;
+  document.getElementById("dlgTitle").textContent = "People on the board";
+  document.getElementById("dlgSub").textContent = "Who gets their own row on the leaderboard and the Sales L10. Marking someone as left moves their numbers into \"Former reps\"; nothing is deleted.";
+  document.getElementById("dlgList").innerHTML = `
+    ${msg ? `<p class="roster-msg">${esc(msg)}</p>` : ""}
+    <h4 class="grp">On the board (${on.length})</h4><ul class="deal-list">${on.map(p=>row(p, `<button class="linkish" data-roster-left="${esc(p.name)}">Mark as left</button>`)).join("") || '<li class="deal empty">Nobody yet</li>'}</ul>
+    <h4 class="grp">Add someone</h4>
+    <div class="fixbox roster-add">
+      <label>Name, exactly as HubSpot has it<input id="rs-name" list="rs-sugg" autocomplete="off" placeholder="e.g. Jordan Smith"><datalist id="rs-sugg">${sugg.map(n=>`<option value="${esc(n)}">`).join("")}</datalist></label>
+      <label>Role<select id="rs-role"><option value="bdr">BDR (credited by "BDR who booked")</option><option value="ae">AE (credited as the deal owner)</option></select></label>
+      <div class="err" id="rs-err" style="padding:0"></div>
+      <div class="row"><button class="btn" type="button" id="rs-add">Add to the board</button></div>
+    </div>
+    ${off.length ? `<h4 class="grp">Left (${off.length})</h4><ul class="deal-list">${off.map(p=>row(p, `<button class="linkish" data-roster-back="${esc(p.name)}" data-role="${p.role}">Bring back</button>`)).join("")}</ul>` : ""}`;
+  const d = document.getElementById("dlg"); if(!d.open) d.showModal();
+  const nm = document.getElementById("rs-name"), role = document.getElementById("rs-role");
+  nm.oninput = () => { const s = seen.get(nm.value.trim()); if(s) role.value = s.ae > s.bdr ? "ae" : "bdr"; };
+  document.getElementById("rs-add").onclick = () => {
+    const name = nm.value.replace(/\s+/g, " ").trim(), err = document.getElementById("rs-err");
+    if(!name){ err.textContent = "Type a name."; return; }
+    const ex = list.find(p=>p.name===name);
+    if(ex && ex.active){ err.textContent = name+" is already on the board."; return; }
+    if(!seen.has(name) && !confirm(name+" has no deals under this exact name yet. Add anyway? (Check the spelling matches HubSpot, or their numbers won't line up.)")) return;
+    saveRoster({name, role:role.value}, name+" added as "+(role.value==="ae"?"an AE":"a BDR"));
+  };
+}
+async function saveRoster(body, msg){
+  const r = await call("/roster", body);
+  if(!r.ok){ toast(r.error || "Could not save"); return; }
+  applyRoster(r.roster); render(); toast(msg); openRoster(msg);
+}
+document.getElementById("peopleBtn").onclick = () => openRoster();
+document.addEventListener("click", e => {
+  const l = e.target.closest("[data-roster-left]");
+  if(l){ const n = l.dataset.rosterLeft; if(confirm("Mark "+n+" as left? Their numbers move into \"Former reps\". You can bring them back any time.")) saveRoster({name:n, active:false}, n+" marked as left"); return; }
+  const b = e.target.closest("[data-roster-back]");
+  if(b) saveRoster({name:b.dataset.rosterBack, role:b.dataset.role}, b.dataset.rosterBack+" is back on the board");
+});

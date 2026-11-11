@@ -214,3 +214,11 @@ html.view-reporting .lb-only{display:none!important}
 .tr-custom{display:inline-flex;align-items:center;gap:6px;font-size:14px;color:var(--muted)}
 .tr-custom[hidden]{display:none}
 .tr-sub{font-size:13px;color:var(--muted);margin-bottom:8px}
+
+/* People on the board (11-11) */
+.top-btns{display:flex;gap:8px;align-items:center}
+.roster-add{display:grid;grid-template-columns:1fr 1fr;gap:10px 14px}
+.roster-add .row,.roster-add .err{grid-column:1/-1}
+.roster-add input{border:1px solid var(--line);background:var(--panel);color:var(--ink);border-radius:8px;padding:8px 10px;font:inherit;font-size:14px}
+.roster-msg{margin:0 0 6px;padding:8px 12px;border-radius:8px;background:color-mix(in srgb,var(--fill) 10%,var(--panel));font-size:14px;font-weight:600}
+@media (max-width:640px){.roster-add{grid-template-columns:1fr}}

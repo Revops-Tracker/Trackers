@@ -748,7 +748,7 @@ async function call(path, body){
   }catch(e){ return {ok:false, error:"Network error"}; }
 }
 async function refresh(){
-  const r = await call("/state?since=2026-06-01");
+  const r = await call("/state?since=2025-12-01");   // a month before DATA_FROM so early-January reschedules have their first slot
   if(!r.ok){ document.getElementById("liveText").textContent = r.error || "Could not load numbers"; return; }
   state.me = r.me; state.showup = r.showup||[]; state.events = r.events||[]; state.lastRun = r.lastRun;
   state.ov = new Map((r.overrides||[]).filter(o=>o.status==="approved").map(o=>[o.key,o]));

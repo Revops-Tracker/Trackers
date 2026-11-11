@@ -365,6 +365,29 @@ function showupStats(rows, p){
 }
 const NO_UTM = "(no first-touch UTM)", NO_UTM_KEY = NO_UTM;
 const attrOf = id => (state.attrs && state.attrs.get(String(id))) || {};
+/* ---------- RTB hit before booking (11-11) ----------
+   Deal attrs carry the company's RTB hit days (p.rtb_hits "YYYY-MM-DD[:h],..." from n8n GFmBhA4xG16yAgWS + Supabase
+   rtb_hits_for_domains). A booking "involved an RTB hit" when the company had a hit in the 90 days BEFORE the booking day.
+   Hits on or after the booking day don't count (people visit the site after booking; last-touch RTB is not evidence).
+   Fallback: deal first-touch UTM = "Inbound - RTB Hit". */
+const RTB_DAYS = 90;
+const RTB_CATS = ["RTB hit, then booked (within 90 days)", "RTB hit 90+ days before booking", "RTB hit only on/after the booking day", "No RTB hit"];
+function rtbOf(r){
+  const a = attrOf(r.deal_id), book = torDay(r.booked_at || r.first_slot);
+  const hits = String(a.rtb_hits||"").split(",").filter(Boolean).map(x=>({d:x.slice(0,10), high:x.endsWith(":h")}));
+  const before = book ? hits.filter(h=>h.d < book) : [];
+  const last = before[before.length-1], days = last ? Math.round((Date.parse(book) - Date.parse(last.d))/864e5) : null;
+  if(last && days <= RTB_DAYS) return {inv:true, cat:RTB_CATS[0], last, days, n:before.length};
+  if(a.utm_first_touch==="Inbound - RTB Hit") return {inv:true, cat:RTB_CATS[0], utm:true};
+  if(last) return {inv:false, cat:RTB_CATS[1], last, days};
+  if(hits.length) return {inv:false, cat:RTB_CATS[2], first:hits[0]};
+  return {inv:false, cat:RTB_CATS[3]};
+}
+const rtbNote = r => { const x = rtbOf(r);
+  if(x.utm) return "RTB hit (deal first touch)";
+  if(x.last) return `RTB hit ${nice(x.last.d+"T12:00:00")}${x.last.high?" (high intent)":""}, ${x.days} day${x.days===1?"":"s"} before booking${x.n>1?" ("+x.n+" hits)":""}`;
+  if(x.first) return `RTB hit only after booking (${nice(x.first.d+"T12:00:00")})`;
+  return ""; };
 const META_UTM = "Inbound - META PPC";
 // Sales L10 only: Meta PPC is split into Lead Form / VSL (HubSpot deal property meta_lead_channel, stamped by n8n 5vpYcV7EhNRUzi6X); unlabelled or unclear = Unclear
 const META_CH = {lead_form:" - Lead Form", vsl:" - VSL"};
@@ -579,6 +602,7 @@ function canFix(rec){
 function whyShowup(r){
   const bits = [];
   if(r.booked_at) bits.push(`Booked ${nice(r.booked_at)}`);
+  const rn = rtbNote(r); if(rn) bits.push(rn);
   bits.push(`First slot ${nice(r.first_slot)}`);
   if(r.run_at) bits.push(`held ${nice(r.run_at)}`);
   const due = (r.due_ts||[]).filter(t=>!r.run_at || Math.abs(Date.parse(t)-Date.parse(r.run_at))>3*3600e3);
@@ -649,6 +673,7 @@ function openList(person, role, metric, title, pOverride){
   const groups = [];
   const evOf = k => ev.filter(e=>e.kind===k);
   if(metric==="books") groups.push(["New books (booked in period)", s.books]);
+  else if(metric==="rtb"){ const y = s.books.filter(r=>rtbOf(r).inv); groups.push(["Booked within 90 days after an RTB hit", y], ["Other new books", s.books.filter(r=>!y.includes(r))]); }
   else if(metric==="had") groups.push(["Runs had", s.had]);
   else if(metric==="due") groups.push(["Held", s.had], ["Missed calls (a deal can be in both lists)", s.notHad]);
   else if(metric==="rec") groups.push(["Missed, then held at a later slot", s.recBack], ["Missed, not held since", s.rec.filter(r=>!s.recBack.includes(r))]);

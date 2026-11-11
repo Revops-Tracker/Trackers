@@ -496,6 +496,7 @@ const CL_DIMS = [
   {id:"mc", title:"Meta channel", filter:true, order:["Meta Lead Form","Meta VSL","Meta, unclear","Meta, not labelled yet","Not Meta PPC"],
     f:a => ({lead_form:"Meta Lead Form", vsl:"Meta VSL", unclear:"Meta, unclear"})[a.meta_lead_channel]
       || (a.utm_first_touch==="Inbound - META PPC" || a.utm_last_touch==="Inbound - META PPC" ? "Meta, not labelled yet" : "Not Meta PPC")},
+  {id:"rtb", title:"RTB hit before booking", filter:true, order:RTB_CATS, f:a => a._rtb || RTB_CATS[3]},
   {id:"lead", title:"Lead type", order:["Inbound","Outbound",UNK], f:a => a.lead_type__outbound_inbound_ || UNK},
   {id:"utm1", title:"First-touch UTM", order:null, f:a => a.utm_first_touch || UNK},
   {id:"utml", title:"Last-touch UTM", order:null, f:a => a.utm_last_touch || UNK},
@@ -514,7 +515,7 @@ function clCohort(p){
   const seen = new Set(), out = [];
   effShowup().filter(r=>!r.dropped && r.run_at && inP(r.run_at, p) && eraOk(r)).sort((a,b)=>Date.parse(a.run_at)-Date.parse(b.run_at)).forEach(r=>{
     if(seen.has(r.deal_id)) return; seen.add(r.deal_id);
-    out.push({run:r, a:attrOf(r.deal_id), des:des.get(r.deal_id)||null, won:won.get(r.deal_id)||null});
+    out.push({run:r, a:{...attrOf(r.deal_id), _rtb:rtbOf(r).cat}, des:des.get(r.deal_id)||null, won:won.get(r.deal_id)||null});
   });
   return out;
 }
@@ -693,6 +694,7 @@ const SC_ROWS_ALL = [
   {id:"c2b",      label:"Conversation → book", tip:"Outbound BDR books (cold call / RTB, any sales process) ÷ Nooks conversations. Nooks data starts in June.",   act:true, ratio:true, f:(a,t)=>a.v?t.bdrBooks/a.v:null, sub:(a,t)=>a.v?t.bdrBooks+" of "+a.v:""},
   {grp:"Discovery calls"},
   {id:"books",    label:"Books (new)", core:true, tip:"New calls booked, counted on the day they were booked",           f:t=>t.books.length, list:"books", split:true},
+  {id:"rtb",      label:"Books after an RTB hit", core:true, tip:"New books whose company had an RTB hit (visited our site) in the 90 days before the call was booked. Hits on or after the booking day don't count. Shows how much the RTB channel feeds bookings.", f:t=>t.books.filter(r=>rtbOf(r).inv).length, list:"rtb", sub:t=>t.books.length ? Math.round(100*t.books.filter(r=>rtbOf(r).inv).length/t.books.length)+"% of "+t.books.length : ""},
   {id:"due",      label:"Runs due (calls)", tip:"Calls whose slot came up (a no-show that is rebooked counts again)",      f:t=>t.dueN, list:"due"},
   {id:"had", core:true,      label:"Runs had", core:true, tip:"Calls that happened",              f:t=>t.had.length, list:"had", split:true},
   {id:"ns",       label:"No-shows", tip:"Slot came up, prospect did not show",              f:t=>t.ns.length, list:"ns", lower:true},

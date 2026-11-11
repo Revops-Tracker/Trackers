@@ -11,6 +11,24 @@
     </div>
     <details class="era-help"><summary>How deals are split</summary><p class="note" id="eraNote"></p></details>
   </div>
+  <div class="l10-time" id="l10Time" role="group" aria-label="Time period">
+    <span class="lbl">Period</span>
+    <select id="gKind" aria-label="Period type">
+      <option value="w">Week</option>
+      <option value="m">Month</option>
+      <option value="q">Quarter</option>
+      <option value="ytd">Since Jan 1</option>
+      <option value="custom">Custom dates…</option>
+    </select>
+    <div class="nav" id="gNav">
+      <button type="button" id="gPrev" aria-label="Earlier">‹</button>
+      <div class="period" id="gLabel" aria-live="polite"></div>
+      <button type="button" id="gNext" aria-label="Later">›</button>
+    </div>
+    <span class="g-dates" id="gDates" hidden><input type="date" id="gFrom" aria-label="From"> to <input type="date" id="gTo" aria-label="To"></span>
+    <label class="g-cmp"><input type="checkbox" id="gCmp"> vs previous period <span id="gPrevLbl"></span></label>
+    <span class="g-hint" id="gHint"></span>
+  </div>
   <nav class="l10-tabs" id="l10Tabs" role="tablist" aria-label="Sales L10 views">
     <button role="tab" data-t="sc" aria-selected="true">Scorecard</button>
     <button role="tab" data-t="bd" aria-selected="false">BDRs</button>
@@ -18,6 +36,7 @@
     <button role="tab" data-t="ax" aria-selected="false">AEs</button>
     <button role="tab" data-t="tr" aria-selected="false">Trends</button>
     <button role="tab" data-t="cl" aria-selected="false">Deals</button>
+    <button role="tab" data-t="cmp" aria-selected="false">Compare</button>
   </nav>
 
   <section id="scSec" class="l10-sec" data-tab="sc">
@@ -26,7 +45,7 @@
       <div class="sc-ctl">
         <button type="button" class="linkish" id="scAll">Show all rows</button>
         <label class="ib-pick">View <select id="scView"></select></label>
-        <label class="ib-pick">Range <select id="scRange">
+        <label class="ib-pick" hidden>Range <select id="scRange">
           <option value="">Latest</option>
           <option value="q">This quarter</option>
           <option value="lq">Last quarter</option>
@@ -208,6 +227,78 @@
   const lg = tr.querySelector(":scope > .legend");
   lg.outerHTML = '<details class="how"><summary>How this is counted</summary><div>' + lg.innerHTML + '</div></details>';
 })();
+/* ---------- one time bar for every tab (11-11) ---------- */
+// G.kind: w / m / q (+ offset, arrows) | ytd | custom (from/to). G.cmp = show change vs the previous period.
+const G = (()=>{ const d = {kind:"m", off:0, from:"", to:"", cmp:false}; try{ return {...d, ...JSON.parse(sessionStorage.getItem("l10-time")||"{}")}; }catch(e){ return d; } })();
+const gSave = () => { try{ sessionStorage.setItem("l10-time", JSON.stringify(G)); }catch(e){} };
+const gYest = () => { const d = new Date(); d.setHours(0,0,0,0); d.setDate(d.getDate()-1); return ymd(d); };
+const gMk = (start, end) => { const s = new Date(start+"T00:00:00"), e = new Date(end+"T00:00:00"), y = new Date(gYest()+"T00:00:00");
+  const lab = d => MON[d.getMonth()]+" "+d.getDate();
+  return {s, e, start, end, now:y, label: lab(s)+(start===end ? "" : " to "+lab(e))+", "+e.getFullYear()}; };
+const G_KIND = {w:"week", m:"month", q:"quarter"};
+function gP(){
+  const y = gYest();
+  if(G.kind==="ytd") return gMk(DATA_FROM, y);
+  if(G.kind==="custom"){ const c = v => v < DATA_FROM ? DATA_FROM : v > y ? y : v; let a = c(G.from || DATA_FROM), b = c(G.to || y); if(a > b) [a, b] = [b, a]; return gMk(a, b); }
+  return periodFor(G_KIND[G.kind], G.off);
+}
+// the period before, same length. A period still in progress is compared with the same number of days of the one before.
+function gPrev(){
+  const p = gP(), y = gYest();
+  if(G.kind==="ytd") return null;
+  if(G.kind==="custom"){ const n = Math.round((p.e - p.s)/864e5) + 1, e = new Date(p.s); e.setDate(e.getDate()-1); const s = new Date(e); s.setDate(s.getDate()-n+1);
+    if(ymd(e) < DATA_FROM) return null; return gMk(ymd(s) < DATA_FROM ? DATA_FROM : ymd(s), ymd(e)); }
+  const q = periodFor(G_KIND[G.kind], G.off-1);
+  if(q.end < DATA_FROM) return null;
+  if(p.end > y){ const n = Math.round((new Date(y+"T00:00:00") - p.s)/864e5); const e = new Date(q.s); e.setDate(e.getDate()+n); return gMk(q.start < DATA_FROM ? DATA_FROM : q.start, ymd(e) < q.end ? ymd(e) : q.end); }
+  return q.start < DATA_FROM ? gMk(DATA_FROM, q.end) : q;
+}
+const gCmpOn = () => G.cmp && !!gPrev();
+// change vs the previous period, as a small line under a number. o: {pct, money, lower}
+function dl(cur, prev, o){
+  if(!gCmpOn() || cur==null || prev==null || (typeof cur==="number" && isNaN(cur))) return "";
+  const pctT = o && o.pct, d = cur - prev;
+  if(Math.abs(d) < (pctT ? 0.005 : 0.5)) return `<small class="dlt eq" title="Previous period: ${pctT?pctS(prev):o&&o.money?fmt(prev,true):fmt(prev)}">= same</small>`;
+  const good = (d > 0) !== !!(o && o.lower);
+  const txt = pctT ? Math.round(Math.abs(d)*100)+" pts" : o && o.money ? fmt(Math.abs(d),true) : fmt(Math.abs(Math.round(d*10)/10));
+  return `<small class="dlt ${good?"up":"dn"}" title="Previous period: ${pctT?pctS(prev):o&&o.money?fmt(prev,true):fmt(prev)}">${d>0?"▲":"▼"} ${txt}</small>`;
+}
+const G_HINT = {sc:"Scorecard: the columns lead up to the chosen period (Weekly / Monthly sets the columns). The change vs the previous period shows on BDRs, Inbound, AEs and Deals.", tr:"Trends: the chart covers the chosen period.",
+  cmp:"Compare: pick “the period in the time bar” to compare it with the one before, or choose any two ranges.", ax:"The AE trend chart below the table always shows since Jan 1."};
+function gUI(){
+  const p = gP(), pv = gPrev(), y = gYest(), arrows = !!G_KIND[G.kind];
+  document.getElementById("gKind").value = G.kind;
+  document.getElementById("gLabel").textContent = p.label + (arrows && p.end > y ? " (so far)" : "");
+  document.getElementById("gPrev").disabled = !arrows || p.start <= DATA_FROM;
+  document.getElementById("gNext").disabled = !arrows || G.off >= 0;
+  document.getElementById("gNav").classList.toggle("no-arrows", !arrows);
+  const dt = document.getElementById("gDates"); dt.hidden = G.kind!=="custom";
+  if(G.kind==="custom"){ const f = document.getElementById("gFrom"), t = document.getElementById("gTo"); [f,t].forEach(el=>{ el.min = DATA_FROM; el.max = y; }); f.value = p.start; t.value = p.end; }
+  const c = document.getElementById("gCmp"); c.checked = G.cmp; c.disabled = !pv;
+  document.getElementById("gPrevLbl").textContent = pv ? "("+pv.label+")" : "(nothing earlier: data starts Jan 1)";
+  const tab = (document.querySelector("#l10Tabs [aria-selected=true]")||{}).dataset?.t;
+  document.getElementById("gHint").textContent = G_HINT[tab] || "";
+}
+function gChanged(retrend){
+  gSave(); if(retrend) G.retrend = true;
+  render();
+  const tab = (document.querySelector("#l10Tabs [aria-selected=true]")||{}).dataset?.t;
+  if(tab==="tr") renderTrends();
+}
+document.getElementById("gKind").onchange = e=>{ G.kind = e.target.value; G.off = 0;
+  if(G.kind==="custom" && !G.from){ G.from = periodFor("month", -1).start; G.to = gYest(); }
+  gChanged(true); };
+document.getElementById("gPrev").onclick = ()=>{ G.off--; gChanged(true); };
+document.getElementById("gNext").onclick = ()=>{ if(G.off<0){ G.off++; gChanged(true); } };
+document.getElementById("gFrom").onchange = e=>{ if(e.target.value){ G.from = e.target.value; gChanged(true); } };
+document.getElementById("gTo").onchange = e=>{ if(e.target.value){ G.to = e.target.value; gChanged(true); } };
+document.getElementById("gCmp").onchange = e=>{ G.cmp = e.target.checked; gChanged(false); };
+// Trends (lb-core) follows the time bar on the Sales L10; its own range picker is hidden here
+if(REPORTING){ const base = renderTrends; renderTrends = function(){
+  const p = gP(); trend.range = "custom"; trend.from = p.start; trend.to = p.end < gYest() ? p.end : gYest();
+  if(G.retrend){ const n = Math.round((p.e - p.s)/864e5) + 1; trend.scale = n <= 16 ? "day" : n <= 120 ? "week" : "month"; G.retrend = false; }
+  return base.apply(this, arguments); }; }
+if(state.era==="compare"){ state.era = "new"; try{ sessionStorage.setItem("l10-era", "new"); }catch(e){} }
 /* ---------- Sales process toggle buttons (applyEra lives in lb-core.js) ---------- */
 document.querySelectorAll("#eraSeg button").forEach(b=>b.onclick=()=>{
   state.era = b.dataset.era; try{ sessionStorage.setItem("l10-era", state.era); }catch(e){}
@@ -227,9 +318,9 @@ const BK_COLS_ALL = [
   {label:"1st-time show (excl. our cancels)", f:t=>t.first, pct:true, list:"fdue", sub:t=>t.fdue.length?t.f1.length+" of "+t.fdue.length:""},
   {label:"1st-time show, all", f:t=>t.firstAll, pct:true, list:"fall", sub:t=>t.fall.length?t.f1.length+" of "+t.fall.length:""},
   {label:"1st-time show (excl. their cancels)", f:t=>t.firstExT, pct:true, list:"fext", sub:t=>t.fdueT.length?t.f1.length+" of "+t.fdueT.length:""},
-  {label:"Showed, DQ'd",   f:t=>t.dqRate, pct:true, list:"dq", sub:t=>t.had.length?t.hdq.length+" of "+t.had.length:""},
-  {label:"No-shows",        f:t=>t.ns.length,    list:"ns"},
-  {label:"Cancelled ahead", f:t=>t.ca.length,    list:"ca"},
+  {label:"Showed, DQ'd",   f:t=>t.dqRate, pct:true, lower:true, list:"dq", sub:t=>t.had.length?t.hdq.length+" of "+t.had.length:""},
+  {label:"No-shows",        f:t=>t.ns.length,    lower:true, list:"ns"},
+  {label:"Cancelled ahead", f:t=>t.ca.length,    lower:true, list:"ca"},
   {label:"Recovery",        f:t=>t.recovery, pct:true, list:"rec", sub:t=>t.rec.length?t.recBack.length+" of "+t.rec.length:""},
   {label:"Designs",         f:t=>t.des.length,   list:"des", era:"old"},
   {label:"Design/Audit",    f:t=>t.des.length,   list:"des", era:"new"},
@@ -247,21 +338,24 @@ const L10 = {
 function bkRow(sec, key, name, pred, cls){ const pk = "l10:"+sec+":"+key; PRED.set(pk, pred); const r = {key, pk, name, cls}; L10[sec].rows[key] = r; return r; }
 const bkStats = (r, p) => statsFor(r.pk, "bdr", p);
 function bkTable(sec, rows, p){
+  const pp = gCmpOn() ? gPrev() : null;
   return `<table class="ib-tbl"><thead><tr><th></th>${BK_COLS.map(c=>`<th>${c.label}</th>`).join("")}</tr></thead><tbody>${rows.map(r=>{
-    const t = bkStats(r, p);
-    return `<tr class="${r.cls||""}"><td>${esc(r.name)}</td>${BK_COLS.map((c,i)=>`<td><span class="click" data-bk="${sec}|${esc(r.key)}" data-bkc="${i}">${bkShown(c, c.f(t))}</span>${c.sub&&c.sub(t)?`<small>${c.sub(t)}</small>`:""}</td>`).join("")}</tr>`;
+    const t = bkStats(r, p), tp = pp ? bkStats(r, pp) : null;
+    return `<tr class="${r.cls||""}"><td>${esc(r.name)}</td>${BK_COLS.map((c,i)=>`<td><span class="click" data-bk="${sec}|${esc(r.key)}" data-bkc="${i}">${bkShown(c, c.f(t))}</span>${c.sub&&c.sub(t)?`<small>${c.sub(t)}</small>`:""}${tp?dl(c.f(t), c.f(tp), {pct:c.pct, money:c.money, lower:c.lower}):""}</td>`).join("")}</tr>`;
   }).join("") || `<tr><td class="empty" colspan="${BK_COLS.length+1}">Nothing in this period.</td></tr>`}</tbody></table>`;
 }
 function bkTiles(sec, row, bench, benchName, p){
-  const a = bkStats(row, p), b = bkStats(bench, p);
-  const tile = (k,v,sub,ci) => `<div class="ib-tile"><div class="k">${k}</div><div class="v"><span class="click" data-bk="${sec}|${row.key}" data-bkc="${ci}">${v}</span></div><div class="s">${sub}</div></div>`;
-  return tile("Books (new)", fmt(a.books.length), benchName+" "+fmt(b.books.length), 0) +
-    tile("Runs had", fmt(a.had.length), "of "+a.dueN+" calls due", 2) +
-    tile("Overall show", pctS(a.show), benchName+" "+pctS(b.show), 3) +
-    tile("1st-time show (excl. our cancels)", pctS(a.first), "all "+pctS(a.firstAll)+" · excl. theirs "+pctS(a.firstExT)+" · "+benchName+" "+pctS(b.first), 4) +
-    tile("Showed, DQ'd", pctS(a.dqRate), benchName+" "+pctS(b.dqRate), 5) +
-    tile("Closes", fmt(a.won.length), benchName+" "+fmt(b.won.length), 10) +
-    tile("MRR", fmt(a.cwd,true), benchName+" "+fmt(b.cwd,true), 11);
+  const a = bkStats(row, p), b = bkStats(bench, p), pp = gCmpOn() ? gPrev() : null, q = pp ? bkStats(row, pp) : null;
+  const ci = lbl => BK_COLS.findIndex(c=>c.label===lbl);
+  const tile = (k,v,sub,lbl,d) => `<div class="ib-tile"><div class="k">${k}</div><div class="v"><span class="click" data-bk="${sec}|${row.key}" data-bkc="${ci(lbl)}">${v}</span></div>${d||""}<div class="s">${sub}</div></div>`;
+  const D = (f, o) => q ? dl(f(a), f(q), o) : "";
+  return tile("Books (new)", fmt(a.books.length), benchName+" "+fmt(b.books.length), "Books", D(t=>t.books.length)) +
+    tile("Runs had", fmt(a.had.length), "of "+a.dueN+" calls due", "Runs had", D(t=>t.had.length)) +
+    tile("Overall show", pctS(a.show), benchName+" "+pctS(b.show), "Overall show", D(t=>t.show, {pct:true})) +
+    tile("1st-time show (excl. our cancels)", pctS(a.first), "all "+pctS(a.firstAll)+" · excl. theirs "+pctS(a.firstExT)+" · "+benchName+" "+pctS(b.first), "1st-time show (excl. our cancels)", D(t=>t.first, {pct:true})) +
+    tile("Showed, DQ'd", pctS(a.dqRate), benchName+" "+pctS(b.dqRate), "Showed, DQ'd", D(t=>t.dqRate, {pct:true, lower:true})) +
+    tile("Closes", fmt(a.won.length), benchName+" "+fmt(b.won.length), "Closes", D(t=>t.won.length)) +
+    tile("MRR", fmt(a.cwd,true), benchName+" "+fmt(b.cwd,true), "MRR", D(t=>t.cwd, {money:true}));
 }
 // first-touch sources seen on records matching pred in the period, busiest first, "No UTM" last
 function bkSources(pred, p){
@@ -271,7 +365,7 @@ function bkSources(pred, p){
   return Object.keys(n).sort((a,b)=>((a===NO_UTM)-(b===NO_UTM)) || (n[b]-n[a]) || a.localeCompare(b));
 }
 function bkPeriodUI(sec){
-  const st = L10[sec], p = periodFor(st.kind, st.offset);
+  const st = L10[sec], p = gP();   // the time bar decides the period
   document.getElementById(sec+"Period").textContent = p.label;
   document.querySelectorAll("#"+sec+"Kind button").forEach(b=>b.setAttribute("aria-pressed", b.dataset.k===st.kind));
   document.getElementById(sec+"Prev").disabled = p.start <= DATA_FROM;
@@ -322,6 +416,7 @@ function renderInboundBreakdown(){
 }
 function renderL10(){
   if(!document.getElementById("bdSec")) return;
+  gUI();
   for(const k of [...PRED.keys()]) if(k.startsWith("l10:")) PRED.delete(k);
   renderScorecard(); renderBdrBreakdown(); renderInboundBreakdown(); renderAEs(); renderCloses();
 }
@@ -333,7 +428,7 @@ for(const sec of ["bd","ib"]){
   document.getElementById(sec+"Sec").addEventListener("click", e=>{
     const c = e.target.closest("[data-bk]"); if(!c) return;
     const [s2, key] = c.dataset.bk.split("|"); const r = L10[s2].rows[key], col = BK_COLS[+c.dataset.bkc]; if(!r || !col) return;
-    openList(r.pk, "bdr", col.list, r.name+": "+col.label, periodFor(L10[s2].kind, L10[s2].offset));
+    openList(r.pk, "bdr", col.list, r.name+": "+col.label, gP());
   });
 }
 document.querySelectorAll("#ibWho button").forEach(b=>b.onclick=()=>{ L10.ib.who=b.dataset.w; renderInboundBreakdown(); });
@@ -374,6 +469,7 @@ const CL_DIMS = [
 ];
 const dimOf = id => CL_DIMS.find(d=>d.id===id);
 function clPeriod(){
+  if(REPORTING) return gP();
   if(CL.kind==="all"){ const y = new Date(); y.setHours(0,0,0,0); y.setDate(y.getDate()-1); return {start:DATA_FROM, end:ymd(y), label:"Jan 1 to "+MON[y.getMonth()]+" "+y.getDate()+", "+y.getFullYear()}; }
   return periodFor(CL.kind, CL.offset);
 }
@@ -476,13 +572,15 @@ function renderCloses(){
   document.getElementById("clMoreN").textContent = moreOn ? " ("+moreOn+" on)" : "";
   const rows = clFilter(cohort), t = clStats(rows);
   CL.rows = {}; CL.rows["__all"] = {name:"All runs shown", list:rows};
-  const tile = (k, v, s, ci) => `<div class="ib-tile"><div class="k">${k}</div><div class="v"><span class="click" data-cl="__all" data-clc="${ci}">${v}</span></div><div class="s">${s}</div></div>`;
+  const pp = gCmpOn() ? gPrev() : null, tq = pp ? clStats(clFilter(clCohort(pp))) : null;
+  const D = (f, o) => tq ? dl(f(t), f(tq), o) : "";
+  const tile = (k, v, s, ci, d) => `<div class="ib-tile"><div class="k">${k}</div><div class="v"><span class="click" data-cl="__all" data-clc="${ci}">${v}</span></div>${d||""}<div class="s">${s}</div></div>`;
   document.getElementById("clTiles").innerHTML =
-    tile("Discos run", fmt(t.n), filtered ? "of "+cohort.length+" before filters" : "deals, one per deal", 0) +
-    tile("Designs", fmt(t.d.length), pctS(t.drate)+" of runs", 1) +
-    tile("Closes", fmt(t.w.length), "won, any date after", 3) +
-    tile("Close rate", pctS(t.rate), "closes ÷ runs", 4) +
-    tile("MRR", fmt(t.mrr,true), t.w.length ? "avg "+fmt(t.mrr/t.w.length,true)+" per close" : "USD/month", 5);
+    tile("Discos run", fmt(t.n), filtered ? "of "+cohort.length+" before filters" : "deals, one per deal", 0, D(x=>x.n)) +
+    tile("Designs", fmt(t.d.length), pctS(t.drate)+" of runs", 1, D(x=>x.d.length)) +
+    tile("Closes", fmt(t.w.length), "won, any date after", 3, D(x=>x.w.length)) +
+    tile("Close rate", pctS(t.rate), "closes ÷ runs", 4, D(x=>x.rate, {pct:true})) +
+    tile("MRR", fmt(t.mrr,true), t.w.length ? "avg "+fmt(t.mrr/t.w.length,true)+" per close" : "USD/month", 5, D(x=>x.mrr, {money:true}));
   const by = document.getElementById("clBy");
   by.innerHTML = CL_DIMS.map(d=>`<option value="${d.id}"${d.id===CL.by?" selected":""}>${esc(d.title)}</option>`).join("");
   const unseen = rows.filter(x=>!state.attrs || !state.attrs.has(String(x.run.deal_id))).length;
@@ -645,6 +743,15 @@ function scStats(view, p){
 }
 // one column = a period. The in-progress one is compared against the goal pro-rated to yesterday.
 const scYest = () => { const d = new Date(); d.setHours(0,0,0,0); d.setDate(d.getDate()-1); return ymd(d); };
+function scSyncG(){
+  if(!REPORTING) return;
+  if(G.kind==="w" || G.kind==="m"){
+    SC.range = ""; const end = gP().end < gYest() ? gP().end : gYest();
+    let off = 0; while(off > -400 && periodFor(SC.kind, off).start > end) off--; SC.shift = off;
+  } else if(G.kind==="q"){ const p = gP(); SC.range = "custom"; SC.from = p.start; SC.to = p.end; }
+  else if(G.kind==="ytd") SC.range = "ytd";
+  else { SC.range = "custom"; SC.from = G.from; SC.to = G.to; }
+}
 function scRange(){
   const y = scYest(), clamp = v => v < DATA_FROM ? DATA_FROM : v > y ? y : v;
   if(SC.range==="ytd") return {start:DATA_FROM, end:y};
@@ -702,6 +809,7 @@ function scCell(m, v, goal, pace, sub, clickAttr){
 }
 function renderScorecard(){
   const box = document.getElementById("scTable"); if(!box) return;
+  scSyncG();
   const views = scViews();
   if(!views.some(v=>v.id===SC.view)) SC.view = "team";
   const view = views.find(v=>v.id===SC.view);
@@ -882,7 +990,7 @@ function axWhoList(p){
 }
 function renderAEs(){
   const box = document.getElementById("axTable"); if(!box) return;
-  const p = periodFor(AX.kind, AX.offset);
+  const p = gP(), pp = gCmpOn() ? gPrev() : null;
   document.getElementById("axPeriod").textContent = p.label;
   document.querySelectorAll("#axKind button").forEach(b=>b.setAttribute("aria-pressed", b.dataset.k===AX.kind));
   document.getElementById("axPrev").disabled = p.start <= DATA_FROM;
@@ -893,7 +1001,8 @@ function renderAEs(){
       const v = axVal(c, r, p), sub = axSub(c, r, p);
       const txt = scFmt(c, v);
       const cell = c.list && v!=null ? `<span class="click" data-ax="${esc(r.who)}|${ci}">${txt}</span>` : txt;
-      return `<td>${cell}${sub?`<small>${sub}</small>`:""}</td>`;
+      const d = pp ? dl(v, axVal(c, r, pp), {pct:c.ratio, money:c.money, lower:["dq","ans","pns"].includes(c.id)}) : "";
+      return `<td>${cell}${sub?`<small>${sub}</small>`:""}${d}</td>`;
     }).join("")}</tr>`).join("")}</tbody></table>`;
   // trend controls
   const whoOpts = [["all","All AEs"], ...AES.map(a=>[a.key, a.name]), [FORMER, "Former AEs"]];
@@ -969,7 +1078,7 @@ document.getElementById("axSec").addEventListener("click", e=>{
     return;
   }
   const cell = e.target.closest("[data-ax]"); if(!cell) return;
-  const [who, ci] = cell.dataset.ax.split("|"), c = AX_COLS[+ci], v = axView(who), p = periodFor(AX.kind, AX.offset);
+  const [who, ci] = cell.dataset.ax.split("|"), c = AX_COLS[+ci], v = axView(who), p = gP();
   if(v.ae) openList(v.ae, "ae", c.list, v.name+": "+c.label, p);
   else if(v.aeFormer) openList(FORMER, "ae", c.list, "Former AEs: "+c.label, p);
   else openList(v.key, "bdr", c.list, "All AEs: "+c.label, p);
@@ -983,6 +1092,8 @@ function l10Tab(t){
   try{ localStorage.setItem("jf_l10_tab", t); }catch(e){}
   if(t==="tr") renderTrends();
   if(t==="ax") requestAnimationFrame(renderAEs);
+  if(t==="cmp" && typeof renderCompare==="function") renderCompare();
+  if(typeof gUI==="function") gUI();
 }
 document.querySelectorAll("#l10Tabs button").forEach(b=>b.onclick=()=>l10Tab(b.dataset.t));
-if(REPORTING){ let t0 = "sc"; try{ t0 = localStorage.getItem("jf_l10_tab") || "sc"; }catch(e){} l10Tab(["sc","bd","ib","ax","tr","cl"].includes(t0)?t0:"sc"); }
+if(REPORTING){ let t0 = "sc"; try{ t0 = localStorage.getItem("jf_l10_tab") || "sc"; }catch(e){} l10Tab(["sc","bd","ib","ax","tr","cl","cmp"].includes(t0)?t0:"sc"); }

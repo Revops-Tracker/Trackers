@@ -4,9 +4,8 @@
    - Conversion = a cohort per process: deals whose FIRST disco was in that process (eraOf), disco run in the window,
      followed for the same number of days, and only deals that have had that many days. Same age = fair comparison. */
 (() => {
-  document.getElementById("eraSeg").insertAdjacentHTML("beforeend", `<button type="button" data-era="compare" aria-pressed="false">Compare</button>`);
-  document.getElementById("l10Era").insertAdjacentHTML("afterend", `
-  <section id="cmpSec" class="l10-sec cmp-sec">
+  document.getElementById("clSec").insertAdjacentHTML("afterend", `
+  <section id="cmpSec" class="l10-sec cmp-sec" data-tab="cmp" hidden>
     <div class="sec-head">
       <h2 id="cmpTitle">Before vs after the 3-call close</h2>
       <div class="sc-ctl cmp-ctl">
@@ -18,6 +17,7 @@
           <option value="8w" selected>8 weeks before</option>
           <option value="ytd">since Jan 1</option></select></label>
         <label class="ib-pick cmp-dates">Quick pick <select id="cmpPreset">
+          <option value="bar" selected>the period in the time bar vs the one before</option>
           <option value="">custom dates</option>
           <option value="l30">last 30 days vs the 30 before</option>
           <option value="l8w">last 8 weeks vs the 8 before</option>
@@ -49,10 +49,7 @@
       <p>Click any underlined number to see the deals.</p>
     </div></details>
   </section>`);
-  document.querySelector('#eraSeg button[data-era="compare"]').onclick = () => {
-    state.era = "compare"; try{ sessionStorage.setItem("l10-era", "compare"); }catch(e){}
-    applyEra(); render();
-  };
+  if(document.querySelector('#l10Tabs [data-t="cmp"]').getAttribute("aria-selected")==="true") document.getElementById("cmpSec").hidden = false;   // tab restored before this section existed
   ["cmpOld","cmpAge","cmpSrc","cmpMode"].forEach(id=>document.getElementById(id).onchange = renderCompare);
   ["cmpA1","cmpA2","cmpB1","cmpB2"].forEach(id=>document.getElementById(id).onchange = ()=>{ document.getElementById("cmpPreset").value = ""; renderCompare(); });
   document.getElementById("cmpPreset").onchange = e=>{ cmpPreset(e.target.value); renderCompare(); };
@@ -82,8 +79,8 @@ function cmpPreset(v){
   else if(v==="q"){ const m = +y.slice(5,7), qs = y.slice(0,5)+String(Math.floor((m-1)/3)*3+1).padStart(2,"0")+"-01"; const x = new Date(qs+"T12:00:00"); x.setMonth(x.getMonth()-3); set(ymd(x), dayAdd(qs,-1), qs, y); }
 }
 function renderCompare(){
-  const on = REPORTING && state.era === "compare";
-  document.documentElement.classList.toggle("cmp-mode", on);
+  const sec = document.getElementById("cmpSec");
+  const on = REPORTING && sec && !sec.hidden;
   if(!on || !state.lastRun) return;
   const yest = cmpYest();
   const cut = state.cutover, newDays = dayDiff(cut, yest) + 1;
@@ -93,6 +90,10 @@ function renderCompare(){
   document.getElementById("cmpTitle").textContent = dates ? "Compare two time frames" : "Before vs after the 3-call close";
   let P;
   if(dates){
+    if(document.getElementById("cmpPreset").value==="bar"){ const b = gP(), a = gPrev(), y2 = gYest();
+      const set = (id, v) => document.getElementById(id).value = v;
+      if(a){ set("cmpA1", a.start); set("cmpA2", a.end); } else { document.getElementById("cmpPreset").value = "l30"; cmpPreset("l30"); }
+      if(a){ set("cmpB1", b.start); set("cmpB2", b.end < y2 ? b.end : y2); } }
     if(!document.getElementById("cmpB2").value){ document.getElementById("cmpPreset").value = "l30"; cmpPreset("l30"); }
     const clamp = v => v < DATA_FROM ? DATA_FROM : v > yest ? yest : v;
     const rng = (a, b) => { let x = clamp(document.getElementById(a).value || DATA_FROM), z = clamp(document.getElementById(b).value || yest); if(x > z) [x, z] = [z, x]; return mkP(x, z); };

@@ -93,9 +93,7 @@ details.how > div{margin-top:8px;line-height:1.5}
 html.view-reporting .click{text-underline-position:auto}
 
 /* Compare before vs after (lb-cmp.js) */
-.cmp-sec{display:none}
-html.cmp-mode .cmp-sec{display:block}
-html.cmp-mode .l10-tabs,html.cmp-mode section[data-tab]{display:none!important}
+/* Compare is a tab (11-11) */
 .cmp-ctl{flex-wrap:wrap;gap:10px 14px}
 .cmp-tbl{min-width:640px}
 .cmp-tbl td:first-child small{display:block;font-size:11px;color:var(--muted);font-weight:400}
@@ -129,3 +127,25 @@ html.cmp-mode .l10-tabs,html.cmp-mode section[data-tab]{display:none!important}
 .sc-dates[hidden],.sc-ctl .nav[hidden]{display:none}
 .sc-dates input{border:1px solid var(--line);background:var(--panel);color:var(--ink);border-radius:8px;padding:6px 8px;font:inherit;font-size:14px}
 .sc-wrap{overflow-x:auto}
+/* One time bar (11-11): per-tab period controls hidden on the Sales L10 */
+.l10-time{display:none}
+html.view-reporting .l10-time{display:flex;flex-wrap:wrap;align-items:center;gap:10px 14px;margin:0 0 14px;padding:10px 14px;border:1px solid var(--line);border-radius:12px;background:var(--panel)}
+.l10-time .lbl{font-weight:700;font-size:14px}
+.l10-time select,.g-dates input{border:1px solid var(--line);background:var(--panel);color:var(--ink);border-radius:8px;padding:7px 10px;font:inherit;font-size:14px}
+.l10-time .nav .period{min-width:230px;font-size:20px}
+.l10-time .nav.no-arrows button{display:none}
+.g-dates{display:inline-flex;align-items:center;gap:6px;font-size:14px;color:var(--muted)}
+.g-dates[hidden]{display:none}
+.g-cmp{display:inline-flex;align-items:center;gap:6px;font-size:14px;font-weight:600;cursor:pointer}
+.g-cmp span{font-weight:400;color:var(--muted);font-size:12.5px}
+.g-cmp input{width:16px;height:16px;accent-color:var(--fill)}
+.g-hint{flex:1 1 100%;font-size:12.5px;color:var(--muted)}
+.g-hint:empty{display:none}
+html.view-reporting #bdKind,html.view-reporting #ibKind,html.view-reporting #axKind,html.view-reporting #clKind,
+html.view-reporting #bdSec .sec-head .nav,html.view-reporting #ibSec .sec-head .nav,html.view-reporting #axSec .sec-head .nav,html.view-reporting #clSec .sec-head .nav,
+html.view-reporting #scSec .sc-ctl .nav,html.view-reporting #scDates,html.view-reporting #rpTrends .tr-range:has(#trRange),html.view-reporting #trCustom{display:none!important}
+small.dlt{display:block;font-size:11px;font-weight:600;margin-top:1px}
+small.dlt.up{color:var(--ahead)}
+small.dlt.dn{color:var(--behind)}
+small.dlt.eq{color:var(--muted);font-weight:500}
+.ib-tile small.dlt{font-size:12px;margin:2px 0}

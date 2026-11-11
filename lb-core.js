@@ -235,6 +235,9 @@ function effShowup(){
         if(SHOWS.has(o.cat) && !e.run_at){ const d=(e.due_ts||[]); e.run_at = d.length ? d[d.length-1] : e.first_slot; }
         if(!SHOWS.has(o.cat)) e.run_at = null;
         if(o.cat==="cst_show") e.cst = true;
+        // the correction says what happened to the first slot, so it overrides the engine's "moved before it happened" flag
+        // (e.g. corrected to Showed 1st time = the first slot was kept). Only a moved/cancelled-ahead label keeps it.
+        if(o.cat!=="moved_show" && o.cat!=="cancelled_ahead") e.pushed = false;
       }
       if(o.exclude || o.cat==="not_a_booking") e.dropped = true;
     }

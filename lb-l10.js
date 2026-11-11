@@ -242,7 +242,7 @@
 })();
 /* ---------- one time bar for every tab (11-11) ---------- */
 // G.kind: w / m / q (+ offset, arrows) | ytd | custom (from/to). G.cmp = show change vs the previous period.
-const G = (()=>{ const d = {kind:"m", off:0, from:"", to:"", cmp:"", cf:"", ct:""}; let g = d; try{ g = {...d, ...JSON.parse(sessionStorage.getItem("l10-time")||"{}")}; }catch(e){}
+const G = (()=>{ const d = {kind:"m", off:0, from:"", to:"", cmp:"prev", cf:"", ct:""}; let g = d; try{ g = {...d, ...JSON.parse(sessionStorage.getItem("l10-time")||"{}")}; }catch(e){}
   if(g.cmp===true) g.cmp = "prev"; if(g.cmp===false) g.cmp = ""; return g; })();   // cmp: "" | "prev" (whole period before) | "same" (same days so far) | "custom" (cf..ct)
 const gSave = () => { try{ sessionStorage.setItem("l10-time", JSON.stringify(G)); }catch(e){} };
 const gYest = () => { const d = new Date(); d.setHours(0,0,0,0); d.setDate(d.getDate()-1); return ymd(d); };
@@ -256,7 +256,7 @@ function gP(){
   if(G.kind==="custom"){ const c = v => v < DATA_FROM ? DATA_FROM : v > y ? y : v; let a = c(G.from || DATA_FROM), b = c(G.to || y); if(a > b) [a, b] = [b, a]; return gMk(a, b); }
   return periodFor(G_KIND[G.kind], G.off);
 }
-// the period before. "prev" = the whole period before (Q4 so far vs all of Q3); "same" (and the Compare tab when nothing is picked) =
+// the period before. "prev" = the whole period before (Q4 so far vs all of Q3); "same" =
 // a period still in progress is compared with the same number of days of the one before (Q4 Oct 1–Nov 10 vs Jul 1–Aug 10).
 function gPrev(){
   const p = gP(), y = gYest();
@@ -266,7 +266,7 @@ function gPrev(){
     if(ymd(e) < DATA_FROM) return null; return gMk(ymd(s) < DATA_FROM ? DATA_FROM : ymd(s), ymd(e)); }
   const q = periodFor(G_KIND[G.kind], G.off-1);
   if(q.end < DATA_FROM) return null;
-  if(p.end > y && G.cmp!=="prev"){ const n = Math.round((new Date(y+"T00:00:00") - p.s)/864e5); const e = new Date(q.s); e.setDate(e.getDate()+n); return gMk(q.start < DATA_FROM ? DATA_FROM : q.start, ymd(e) < q.end ? ymd(e) : q.end); }
+  if(p.end > y && G.cmp==="same"){ const n = Math.round((new Date(y+"T00:00:00") - p.s)/864e5); const e = new Date(q.s); e.setDate(e.getDate()+n); return gMk(q.start < DATA_FROM ? DATA_FROM : q.start, ymd(e) < q.end ? ymd(e) : q.end); }
   return q.start < DATA_FROM ? gMk(DATA_FROM, q.end) : q;
 }
 const gCmpOn = () => !!G.cmp && !!gPrev();

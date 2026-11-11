@@ -26,6 +26,13 @@
       <div class="sc-ctl">
         <button type="button" class="linkish" id="scAll">Show all rows</button>
         <label class="ib-pick">View <select id="scView"></select></label>
+        <label class="ib-pick">Range <select id="scRange">
+          <option value="">Latest</option>
+          <option value="q">This quarter</option>
+          <option value="lq">Last quarter</option>
+          <option value="ytd">Since Jan 1</option>
+          <option value="custom">Custom dates…</option></select></label>
+        <span class="sc-dates" id="scDates" hidden><input type="date" id="scFrom" aria-label="From"> to <input type="date" id="scTo" aria-label="To"></span>
         <div class="seg" id="scKind" role="group" aria-label="Columns">
           <button data-k="week" aria-pressed="true">Weekly</button>
           <button data-k="month" aria-pressed="false">Monthly</button>
@@ -505,7 +512,7 @@ document.getElementById("clMin").onchange = ()=>renderCloses();
 document.getElementById("clClear").onclick = ()=>{ CL.lead="all"; CL.utmVal=""; CL.utmTxt=""; document.getElementById("clUtmTxt").value=""; CL.flt={}; renderCloses(); };
 document.getElementById("clSec").addEventListener("click", e=>{ const c = e.target.closest("[data-cl]"); if(c) clOpen(c.dataset.cl, +c.dataset.clc); });
 /* ---------- Sales L10: scorecard (one row per L10 metric, one column per week / month) ---------- */
-const SC = {kind:"week", shift:0, view:"team", cols:[],
+const SC = {kind:"week", shift:0, view:"team", cols:[], range:"", from:"", to:"",
   open:(()=>{ try{ return new Set(JSON.parse(localStorage.getItem("l10-sc-open")||"[]")); }catch(e){ return new Set(); } })()};   // scorecard groups shown in full
 const scSaveOpen = () => { try{ localStorage.setItem("l10-sc-open", JSON.stringify([...SC.open])); }catch(e){} };
 const SC_N = {week:8, month:6};
@@ -637,7 +644,38 @@ function scStats(view, p){
   return t;
 }
 // one column = a period. The in-progress one is compared against the goal pro-rated to yesterday.
+const scYest = () => { const d = new Date(); d.setHours(0,0,0,0); d.setDate(d.getDate()-1); return ymd(d); };
+function scRange(){
+  const y = scYest(), clamp = v => v < DATA_FROM ? DATA_FROM : v > y ? y : v;
+  if(SC.range==="ytd") return {start:DATA_FROM, end:y};
+  if(SC.range==="q"){ const p = periodFor("quarter", 0); return {start:p.start, end:y}; }
+  if(SC.range==="lq"){ const p = periodFor("quarter", -1); return {start:clamp(p.start), end:p.end}; }
+  if(SC.range==="custom"){
+    let a = clamp(SC.from || DATA_FROM), b = clamp(SC.to || y); if(a > b) [a, b] = [b, a];
+    return {start:a, end:b};
+  }
+  return null;
+}
 function scColumns(){
+  const R = scRange();
+  if(R){
+    const out = [], day = s => new Date(s+"T00:00:00");
+    for(let off = 0; off > -400; off--){
+      const p = periodFor(SC.kind, off);
+      if(p.start > R.end) continue;
+      if(p.end < R.start) break;
+      const s = p.start < R.start ? day(R.start) : p.s, e = p.end > R.end ? day(R.end) : p.e;
+      const q = {s, e, start:ymd(s), end:ymd(e), now:p.now, label:p.label};
+      const clipped = q.start!==p.start || q.end!==p.end;
+      const full = bizDays(p.s, p.e) || 1, part = bizDays(s, e);
+      const pace = paceFraction(q) * (clipped ? part/full : 1);   // goal pro-rated to the days the column covers
+      const head = SC.kind==="week" ? MON[s.getMonth()]+" "+s.getDate() : MONTHS[s.getMonth()];
+      const sub = SC.kind==="week" ? "to "+(e.getMonth()===s.getMonth()?e.getDate():MON[e.getMonth()]+" "+e.getDate())
+        : clipped ? s.getDate()+"–"+e.getDate() : String(s.getFullYear());
+      out.unshift({p:q, off, pace, cur: paceFraction(q)<1, head, sub});
+    }
+    return out;
+  }
   const n = SC_N[SC.kind], out = [];
   for(let i=n-1;i>=0;i--){
     const off = -i + SC.shift, p = periodFor(SC.kind, off);
@@ -671,6 +709,12 @@ function renderScorecard(){
   sel.innerHTML = views.map(v=>`<option value="${esc(v.id)}"${v.id===SC.view?" selected":""}>${esc(v.name)}</option>`).join("");
   document.querySelectorAll("#scKind button").forEach(b=>b.setAttribute("aria-pressed", b.dataset.k===SC.kind));
   const cols = scColumns(); SC.cols = cols;
+  const ranged = !!SC.range;
+  document.getElementById("scRange").value = SC.range;
+  document.getElementById("scDates").hidden = SC.range!=="custom";
+  document.querySelector("#scSec .sc-ctl .nav").hidden = ranged;
+  if(SC.range==="custom"){ const fi = document.getElementById("scFrom"), ti = document.getElementById("scTo"), y = scYest();
+    [fi, ti].forEach(el=>{ el.min = DATA_FROM; el.max = y; }); const R = scRange(); fi.value = R.start; ti.value = R.end; }
   document.getElementById("scNext").disabled = SC.shift >= 0;
   document.getElementById("scPrev").disabled = !cols.length || cols[0].p.start <= DATA_FROM;
   const mult = SC.kind==="month" ? MULT.month : 1;
@@ -730,7 +774,7 @@ function renderScorecard(){
     // average of finished columns: counts / n, ratios pooled over the span
     let av = null, avSub = "";
     if(n){
-      if(src){ const aa = SRC[src].avg; if(aa){ const v = m.f(aa, avgT); av = v==null ? null : (m.ratio||m.dec) ? v : v/n; } }
+      if(src){ const aa = SRC[src].avg, nd = cols.filter((c,ci)=>!c.cur && SRC[src].cols[ci]).length; if(aa && nd){ const v = m.f(aa, avgT); av = v==null ? null : (m.ratio||m.dec) ? v : v/nd; } }
       else av = rowAvg(m, null);
     }
     const avTxt = scFmt(m, av);
@@ -761,6 +805,11 @@ function renderScorecard(){
 }
 document.getElementById("scView").onchange = e=>{ SC.view = e.target.value; renderScorecard(); };
 document.querySelectorAll("#scKind button").forEach(b=>b.onclick=()=>{ SC.kind=b.dataset.k; SC.shift=0; renderScorecard(); });
+document.getElementById("scRange").onchange = e=>{ SC.range = e.target.value; SC.shift = 0;
+  if(SC.range==="custom" && !SC.from){ const p = periodFor("month", -1); SC.from = p.start; SC.to = scYest(); }
+  if(SC.range==="ytd" || SC.range==="q" || SC.range==="lq") SC.kind = SC.range==="ytd" ? "month" : "week";
+  renderScorecard(); };
+["scFrom","scTo"].forEach(id=>document.getElementById(id).onchange = e=>{ SC[id==="scFrom"?"from":"to"] = e.target.value; renderScorecard(); });
 document.getElementById("scPrev").onclick = ()=>{ SC.shift -= Math.max(1, SC_N[SC.kind]-2); renderScorecard(); };
 document.getElementById("scNext").onclick = ()=>{ SC.shift = Math.min(0, SC.shift + Math.max(1, SC_N[SC.kind]-2)); renderScorecard(); };
 document.getElementById("scAll").onclick = ()=>{ const all = SC.groups.every(n=>SC.open.has(n)); SC.groups.forEach(n=>all ? SC.open.delete(n) : SC.open.add(n)); scSaveOpen(); renderScorecard(); };

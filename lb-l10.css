@@ -124,3 +124,8 @@ html.cmp-mode .l10-tabs,html.cmp-mode section[data-tab]{display:none!important}
 .l10-era .era-help summary::before{content:"ⓘ"}
 .l10-era .era-help summary::-webkit-details-marker{display:none}
 .l10-era .era-help .note{margin:6px 0 0;display:block}
+/* Scorecard custom range (11-11) */
+.sc-dates{display:inline-flex;align-items:center;gap:6px;font-size:14px;color:var(--muted)}
+.sc-dates[hidden],.sc-ctl .nav[hidden]{display:none}
+.sc-dates input{border:1px solid var(--line);background:var(--panel);color:var(--ink);border-radius:8px;padding:6px 8px;font:inherit;font-size:14px}
+.sc-wrap{overflow-x:auto}

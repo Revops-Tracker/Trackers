@@ -26,7 +26,11 @@
       <button type="button" id="gNext" aria-label="Later">›</button>
     </div>
     <span class="g-dates" id="gDates" hidden><input type="date" id="gFrom" aria-label="From"> to <input type="date" id="gTo" aria-label="To"></span>
-    <label class="g-cmp"><input type="checkbox" id="gCmp"> vs previous period <span id="gPrevLbl"></span></label>
+    <label class="g-cmp">Compare with <select id="gCmpMode">
+      <option value="">nothing</option>
+      <option value="prev">the period before</option>
+      <option value="custom">dates I pick…</option></select> <span id="gPrevLbl"></span></label>
+    <span class="g-dates" id="gCmpDates" hidden><input type="date" id="gCf" aria-label="Compare from"> to <input type="date" id="gCt" aria-label="Compare to"></span>
     <span class="g-warn" id="gWarn"></span>
     <span class="g-hint" id="gHint"></span>
   </div>
@@ -62,6 +66,7 @@
         <div class="seg" id="scKind" role="group" aria-label="Columns">
           <button data-k="week" aria-pressed="true">Weekly</button>
           <button data-k="month" aria-pressed="false">Monthly</button>
+          <button data-k="quarter" aria-pressed="false">Quarterly</button>
         </div>
         <div class="nav">
           <button type="button" id="scPrev" aria-label="Earlier">‹</button>
@@ -236,7 +241,8 @@
 })();
 /* ---------- one time bar for every tab (11-11) ---------- */
 // G.kind: w / m / q (+ offset, arrows) | ytd | custom (from/to). G.cmp = show change vs the previous period.
-const G = (()=>{ const d = {kind:"m", off:0, from:"", to:"", cmp:false}; try{ return {...d, ...JSON.parse(sessionStorage.getItem("l10-time")||"{}")}; }catch(e){ return d; } })();
+const G = (()=>{ const d = {kind:"m", off:0, from:"", to:"", cmp:"", cf:"", ct:""}; let g = d; try{ g = {...d, ...JSON.parse(sessionStorage.getItem("l10-time")||"{}")}; }catch(e){}
+  if(g.cmp===true) g.cmp = "prev"; if(g.cmp===false) g.cmp = ""; return g; })();   // cmp: "" | "prev" | "custom" (cf..ct)
 const gSave = () => { try{ sessionStorage.setItem("l10-time", JSON.stringify(G)); }catch(e){} };
 const gYest = () => { const d = new Date(); d.setHours(0,0,0,0); d.setDate(d.getDate()-1); return ymd(d); };
 const gMk = (start, end) => { const s = new Date(start+"T00:00:00"), e = new Date(end+"T00:00:00"), y = new Date(gYest()+"T00:00:00");
@@ -252,6 +258,7 @@ function gP(){
 // the period before, same length. A period still in progress is compared with the same number of days of the one before.
 function gPrev(){
   const p = gP(), y = gYest();
+  if(G.cmp==="custom"){ const c = v => v < DATA_FROM ? DATA_FROM : v > y ? y : v; let a = c(G.cf || DATA_FROM), b = c(G.ct || y); if(a > b) [a, b] = [b, a]; return gMk(a, b); }
   if(G.kind==="ytd") return null;
   if(G.kind==="custom"){ const n = Math.round((p.e - p.s)/864e5) + 1, e = new Date(p.s); e.setDate(e.getDate()-1); const s = new Date(e); s.setDate(s.getDate()-n+1);
     if(ymd(e) < DATA_FROM) return null; return gMk(ymd(s) < DATA_FROM ? DATA_FROM : ymd(s), ymd(e)); }
@@ -260,7 +267,7 @@ function gPrev(){
   if(p.end > y){ const n = Math.round((new Date(y+"T00:00:00") - p.s)/864e5); const e = new Date(q.s); e.setDate(e.getDate()+n); return gMk(q.start < DATA_FROM ? DATA_FROM : q.start, ymd(e) < q.end ? ymd(e) : q.end); }
   return q.start < DATA_FROM ? gMk(DATA_FROM, q.end) : q;
 }
-const gCmpOn = () => G.cmp && !!gPrev();
+const gCmpOn = () => !!G.cmp && !!gPrev();
 // change vs the previous period, as a small line under a number. o: {pct, money, lower}
 function dl(cur, prev, o){
   if(!gCmpOn() || cur==null || prev==null || (typeof cur==="number" && isNaN(cur))) return "";
@@ -270,7 +277,7 @@ function dl(cur, prev, o){
   const txt = pctT ? Math.round(Math.abs(d)*100)+" pts" : o && o.money ? fmt(Math.abs(d),true) : fmt(Math.abs(Math.round(d*10)/10));
   return `<small class="dlt ${good?"up":"dn"}" title="Previous period: ${pctT?pctS(prev):o&&o.money?fmt(prev,true):fmt(prev)}">${d>0?"▲":"▼"} ${txt}</small>`;
 }
-const G_HINT = {sc:"Scorecard: the columns lead up to the chosen period (Weekly / Monthly sets the columns). Tick “vs previous period” to add a Chosen period column with the change.", tr:"Trends: the chart covers the chosen period.",
+const G_HINT = {sc:"Scorecard: the columns lead up to the chosen period (Weekly / Monthly / Quarterly sets the columns). Pick “Compare with” to add a Chosen period column showing the change.", tr:"Trends: the chart covers the chosen period.",
   scCmp:"", cmp:"Compare: pick “the period in the time bar” to compare it with the one before, or choose any two ranges.", ax:"The AE trend chart below the table always shows since Jan 1."};
 function gUI(){
   const p = gP(), pv = gPrev(), y = gYest(), arrows = !!G_KIND[G.kind];
@@ -281,8 +288,10 @@ function gUI(){
   document.getElementById("gNav").classList.toggle("no-arrows", !arrows);
   const dt = document.getElementById("gDates"); dt.hidden = G.kind!=="custom";
   if(G.kind==="custom"){ const f = document.getElementById("gFrom"), t = document.getElementById("gTo"); [f,t].forEach(el=>{ el.min = DATA_FROM; el.max = y; }); f.value = p.start; t.value = p.end; }
-  const c = document.getElementById("gCmp"); c.checked = G.cmp; c.disabled = !pv;
-  document.getElementById("gPrevLbl").textContent = pv ? "("+pv.label+")" : "(nothing earlier: data starts Jan 1)";
+  document.getElementById("gCmpMode").value = G.cmp;
+  document.getElementById("gPrevLbl").textContent = !G.cmp ? "" : pv ? (G.cmp==="prev" ? "("+pv.label+")" : "") : "(nothing earlier: data starts Jan 1)";
+  document.getElementById("gCmpDates").hidden = G.cmp!=="custom";
+  if(G.cmp==="custom" && pv){ const f = document.getElementById("gCf"), t = document.getElementById("gCt"); [f,t].forEach(el=>{ el.min = DATA_FROM; el.max = y; }); f.value = pv.start; t.value = pv.end; }
   let tab = (document.querySelector("#l10Tabs [aria-selected=true]")||{}).dataset?.t; if(tab==="pp") tab = PP.sub;
   document.getElementById("gHint").textContent = G_HINT[tab] || "";
   const cut = state.cutover, cutD = new Date(cut+"T12:00:00"), cutT = MON[cutD.getMonth()]+" "+cutD.getDate();
@@ -293,7 +302,7 @@ function gUI(){
 function gChanged(retrend){
   gSave(); if(retrend) G.retrend = true;
   // long ranges read better as monthly scorecard columns
-  if(retrend && (G.kind==="ytd" || G.kind==="custom")){ const p = gP(); SC.kind = (p.e - p.s)/864e5 > 120 ? "month" : "week"; }
+  if(retrend && (G.kind==="ytd" || G.kind==="custom") && SC.kind!=="quarter"){ const p = gP(); SC.kind = (p.e - p.s)/864e5 > 120 ? "month" : "week"; }
   else if(retrend && (G.kind==="w")) SC.kind = "week";
   render();
   const tab = (document.querySelector("#l10Tabs [aria-selected=true]")||{}).dataset?.t;
@@ -306,7 +315,11 @@ document.getElementById("gPrev").onclick = ()=>{ G.off--; gChanged(true); };
 document.getElementById("gNext").onclick = ()=>{ if(G.off<0){ G.off++; gChanged(true); } };
 document.getElementById("gFrom").onchange = e=>{ if(e.target.value){ G.from = e.target.value; gChanged(true); } };
 document.getElementById("gTo").onchange = e=>{ if(e.target.value){ G.to = e.target.value; gChanged(true); } };
-document.getElementById("gCmp").onchange = e=>{ G.cmp = e.target.checked; gChanged(false); };
+document.getElementById("gCmpMode").onchange = e=>{ G.cmp = e.target.value;
+  if(G.cmp==="custom" && !G.cf){ const q = periodFor(G_KIND[G.kind]||"month", (G.off||0)-1); G.cf = q.start < DATA_FROM ? DATA_FROM : q.start; G.ct = q.end; }
+  gChanged(false); };
+document.getElementById("gCf").onchange = e=>{ if(e.target.value){ G.cf = e.target.value; gChanged(false); } };
+document.getElementById("gCt").onchange = e=>{ if(e.target.value){ G.ct = e.target.value; gChanged(false); } };
 // Trends (lb-core) follows the time bar on the Sales L10; its own range picker is hidden here
 if(REPORTING){ const base = renderTrends; renderTrends = function(){
   const p = gP(); trend.range = "custom"; trend.from = p.start; trend.to = p.end < gYest() ? p.end : gYest();
@@ -631,7 +644,10 @@ document.getElementById("clSec").addEventListener("click", e=>{ const c = e.targ
 const SC = {kind:"week", shift:0, view:"team", cols:[], range:"", from:"", to:"",
   open:(()=>{ try{ return new Set(JSON.parse(localStorage.getItem("l10-sc-open")||"[]")); }catch(e){ return new Set(); } })()};   // scorecard groups shown in full
 const scSaveOpen = () => { try{ localStorage.setItem("l10-sc-open", JSON.stringify([...SC.open])); }catch(e){} };
-const SC_N = {week:8, month:6};
+const SC_N = {week:8, month:6, quarter:4};
+const scHead = (s, e, clipped) => SC.kind==="week" ? [MON[s.getMonth()]+" "+s.getDate(), "to "+(e.getMonth()===s.getMonth()?e.getDate():MON[e.getMonth()]+" "+e.getDate())]
+  : SC.kind==="quarter" ? ["Q"+(Math.floor(s.getMonth()/3)+1), clipped ? MON[s.getMonth()]+" "+s.getDate()+"–"+MON[e.getMonth()]+" "+e.getDate() : String(s.getFullYear())]
+  : [MONTHS[s.getMonth()], clipped ? s.getDate()+"–"+e.getDate() : String(s.getFullYear())];
 const isOutb = r => isBdrBooked(r) && !isInbLead(r);
 const isLeadIn = r => isInbLead(r) && (NOT_A_BDR.has(r.booker) || isBdrBooked(r) || CUR_AE.has(r.booker) || !r.booker);
 // views: who the numbers are for. key = person key for statsFor/openList, nooks = which BDRs' activity counts
@@ -800,9 +816,7 @@ function scColumns(){
       const clipped = q.start!==p.start || q.end!==p.end;
       const full = bizDays(p.s, p.e) || 1, part = bizDays(s, e);
       const pace = paceFraction(q) * (clipped ? part/full : 1);   // goal pro-rated to the days the column covers
-      const head = SC.kind==="week" ? MON[s.getMonth()]+" "+s.getDate() : MONTHS[s.getMonth()];
-      const sub = SC.kind==="week" ? "to "+(e.getMonth()===s.getMonth()?e.getDate():MON[e.getMonth()]+" "+e.getDate())
-        : clipped ? s.getDate()+"–"+e.getDate() : String(s.getFullYear());
+      const [head, sub] = scHead(s, e, clipped);
       out.unshift({p:q, off, pace, cur: paceFraction(q)<1, head, sub});
     }
     return out;
@@ -813,8 +827,7 @@ function scColumns(){
     if(p.end < DATA_FROM) continue;
     const pace = paceFraction(p);
     const s = p.s, e = p.e;
-    const head = SC.kind==="week" ? MON[s.getMonth()]+" "+s.getDate() : MONTHS[s.getMonth()];
-    const sub = SC.kind==="week" ? "to "+(e.getMonth()===s.getMonth()?e.getDate():MON[e.getMonth()]+" "+e.getDate()) : String(s.getFullYear());
+    const [head, sub] = scHead(s, e, false);
     out.push({p, off, pace, cur: pace<1, head, sub});
   }
   return out;
@@ -849,7 +862,7 @@ function renderScorecard(){
     [fi, ti].forEach(el=>{ el.min = DATA_FROM; el.max = y; }); const R = scRange(); fi.value = R.start; ti.value = R.end; }
   document.getElementById("scNext").disabled = SC.shift >= 0;
   document.getElementById("scPrev").disabled = !cols.length || cols[0].p.start <= DATA_FROM;
-  const mult = SC.kind==="month" ? MULT.month : 1;
+  const mult = SC.kind==="month" ? MULT.month : SC.kind==="quarter" ? MULT.quarter : 1;
   const done = cols.filter(c=>!c.cur);
   const avgP = done.length ? {start:done[0].p.start, end:done[done.length-1].p.end, label:"Average of "+done.length+" "+(SC.kind==="week"?"weeks":"months")} : null;
   // stats per column (+ the average span)

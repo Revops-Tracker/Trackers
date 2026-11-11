@@ -159,3 +159,6 @@ small.dlt.eq{color:var(--muted);font-weight:500}
 .sc-tbl th.cmpc,.sc-tbl td.cmpc{border-left:2px solid var(--fill);background:color-mix(in srgb,var(--fill) 5%,var(--panel));position:sticky;right:0;z-index:1}
 .g-warn{flex:1 1 100%;font-size:13px;font-weight:600;color:var(--behind)}
 .g-warn:empty{display:none}
+.sc-tbl tr.grp td:first-child{position:static}
+.sc-tbl .grp-lbl{position:sticky;left:10px;display:inline-block}
+#scSec .ib-pick[hidden]{display:none}

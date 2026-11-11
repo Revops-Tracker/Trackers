@@ -860,7 +860,6 @@ function renderScorecard(){
   const n = done.length;
   const showAct = !!view.nooks;
   const CMP = REPORTING && gCmpOn() ? {p:gP(), q:gPrev()} : null;
-  if(CMP && CMP.p.end > scYest()) CMP.p = {...CMP.p, end:scYest()};
   let html = `<table class="sc-tbl"><thead><tr><th>${esc(view.name)}</th><th class="goal">Goal<small>per ${SC.kind}</small></th>${cols.map(c=>`<th class="${c.cur?"cur":""}">${c.p.end>=DOUBLE_BOOK_FROM?'<span class="db" title="Double booking on">● </span>':""}${c.head}<small>${c.cur?"so far":c.sub}</small></th>`).join("")}<th class="avg">Avg</th>${CMP?`<th class="cmpc">Chosen period<small>${esc(CMP.p.label)}</small><small>vs ${esc(CMP.q.label)}</small></th>`:""}</tr></thead><tbody>`;
   const cut = state.cutover, cutTxt = (d=>MON[d.getMonth()]+" "+d.getDate())(new Date(cut+"T12:00:00"));
   // a column the chosen process can't fill: New + before the cutover, Old + after it; 3-call-close rows before the cutover
@@ -891,7 +890,7 @@ function renderScorecard(){
   document.getElementById("scAll").textContent = SC.groups.every(n=>SC.open.has(n)) ? "Headline rows only" : "Show all rows";
   shown.forEach(gr=>{
   const open = SC.open.has(gr.name), more = gr.rows.filter(r=>!r.m.core).length;
-  html += `<tr class="grp${more?" tog":""}"${more?` data-grp="${esc(gr.name)}" title="${open?"Show headline rows only":"Show all "+gr.name+" rows"}"`:""}><td colspan="${cols.length+3+(CMP?1:0)}">${gr.name}${more?`<span class="grp-more">${open?"fewer ▴":more+" more ▾"}</span>`:""}</td></tr>`;
+  html += `<tr class="grp${more?" tog":""}"${more?` data-grp="${esc(gr.name)}" title="${open?"Show headline rows only":"Show all "+gr.name+" rows"}"`:""}><td colspan="${cols.length+3+(CMP?1:0)}"><span class="grp-lbl">${gr.name}${more?`<span class="grp-more">${open?"fewer ▴":more+" more ▾"}</span>`:""}</span></td></tr>`;
   gr.rows.forEach(({m, mi})=>{
     if(!open && !m.core) return;
     const src = m.act ? "act" : m.slot ? "slot" : null;

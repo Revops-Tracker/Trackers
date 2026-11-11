@@ -80,7 +80,6 @@ document.currentScript.insertAdjacentHTML("beforebegin", `
         </label>
         <label class="tr-range">Range
           <select id="trRange">
-            <option value="q3">Since Jul 1</option>
             <option value="ytd">Since Jan 1</option>
             <option value="thisq">This quarter</option>
             <option value="lastq">Last quarter</option>
@@ -862,7 +861,7 @@ function utmSeries(from, to){
   return out;
 }
 const ALWAYS = new Set(["Brandon Cameron","Issa Hattar","Inbound"]);   // shown in legend/table even at zero
-const trend = {metric:"books", scale:"week", group:"all", pick:"", range:"q3", from:null, to:null, table:false};
+const trend = {metric:"books", scale:"week", group:"all", pick:"", range:"ytd", from:null, to:null, table:false};
 const trVal = (v,m) => m.money ? fmt(v,true) : fmt(v);
 const dOf = s => new Date(s+"T00:00:00");
 function trYesterday(){ const y=new Date(); y.setHours(0,0,0,0); y.setDate(y.getDate()-1); return y; }
@@ -876,8 +875,7 @@ function trendRange(){
   else if(trend.range==="l8w"){ f = new Date(y); f.setDate(f.getDate()-((f.getDay()+6)%7)-49); }
   else if(trend.range==="l3m") f = new Date(y.getFullYear(), y.getMonth()-2, 1);
   else if(trend.range==="custom"){ f = trend.from ? dOf(trend.from) : dOf(DATA_FROM); t = trend.to ? dOf(trend.to) : y; }
-  else if(trend.range==="ytd") f = dOf(DATA_FROM);
-  else f = dOf("2026-07-01");
+  else f = dOf(DATA_FROM);   // "ytd" = since Jan 1 (any old saved "q3" lands here too)
   if(f < dOf(DATA_FROM)) f = dOf(DATA_FROM);
   if(t > y) t = y;
   if(t < f) t = new Date(f);
@@ -1013,7 +1011,7 @@ function trendOpen(srcKey, i){
 }
 document.getElementById("trMetric").onclick = e=>{ const b=e.target.closest("button[data-tm]"); if(b){ trend.metric=b.dataset.tm; renderTrends(); } };
 document.getElementById("trScale").onclick = e=>{ const b=e.target.closest("button[data-s]"); if(!b) return;
-  if(b.dataset.s==="day" && trend.scale!=="day" && ["q3","thisq","lastq","l3m"].includes(trend.range)) trend.range="l30d";
+  if(b.dataset.s==="day" && trend.scale!=="day" && ["ytd","q3","thisq","lastq","l3m"].includes(trend.range)) trend.range="l30d";
   trend.scale=b.dataset.s; renderTrends(); };
 document.getElementById("trGroup").onclick = e=>{ const b=e.target.closest("button[data-g]"); if(b && b.dataset.g!==trend.group){ trend.group=b.dataset.g; trend.pick=""; renderTrends(); } };
 document.getElementById("trPick").onchange = e=>{ trend.pick=e.target.value; renderTrends(); };

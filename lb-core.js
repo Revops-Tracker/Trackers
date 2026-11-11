@@ -265,11 +265,13 @@ const AE_NAME = {Dipen:"Dipen Mistry", Armin:"Armin"};
 function buildEra(r){
   state.cutover = r.cutover || "2026-10-27";
   const c = new Map(), put = (id, iso) => { const d = torDay(iso); if(!id || !d) return; const k = String(id); if(!c.has(k) || d < c.get(k)) c.set(k, d); };
-  state.showup.forEach(x=>put(x.deal_id, x.run_at || x.first_slot));
+  // built from the corrected records (11-11): corrected-out bookings do not set a deal's process, corrected show dates do
+  const SU = effShowup().filter(x=>!x.dropped), EV = effEvents().filter(x=>!x.dropped);
+  SU.forEach(x=>put(x.deal_id, x.run_at || x.first_slot));
   state.cohort = c;
   // new-process call + stage records from the AE tracker v2 job, with the AE's own corrections applied
   const ov = new Map((r.v2ov||[]).map(o=>[o.key, o]));
-  const su = new Map(); state.showup.forEach(x=>{ const k=String(x.deal_id); if(!su.has(k) || (x.seg||0) > (su.get(k).seg||0)) su.set(k, x); });
+  const su = new Map(); SU.forEach(x=>{ const k=String(x.deal_id); if(!su.has(k) || (x.seg||0) > (su.get(k).seg||0)) su.set(k, x); });
   const KIND = {audit_booked:{"":"abook"}, prop_booked:{"":"pbook"}, audit_call:{held:"arun", noshow:"ans", pending:"apend"}, prop_call:{held:"prun", noshow:"pns", pending:"ppend"}};
   state.v2ev = !REPORTING ? [] : (r.v2||[]).map(x=>{
     const o = ov.get(x.key); if(o && o.exclude) return null;
@@ -281,7 +283,7 @@ function buildEra(r){
   }).filter(Boolean);
   const idx = new Map(), add = (id, k, iso) => { const d = torDay(iso); if(!id || !d) return; const key = String(id); if(!idx.has(key)) idx.set(key, []); idx.get(key).push({k, d}); };
   state.v2ev.forEach(e=>add(e.deal_id, e.kind, e.at));
-  state.events.forEach(e=>{ if(e.kind==="design") add(e.deal_id, "abook", e.at); if(e.kind==="won") add(e.deal_id, "won", e.at); });
+  EV.forEach(e=>{ if(e.kind==="design") add(e.deal_id, "abook", e.at); if(e.kind==="won") add(e.deal_id, "won", e.at); });
   state.dealIdx = idx;
 }
 // did this deal reach any of these steps on/after the given time? (past tense conversion)

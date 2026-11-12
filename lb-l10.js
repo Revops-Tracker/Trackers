@@ -472,7 +472,8 @@ document.getElementById("bdRep").onchange = e=>{ L10.bd.rep = e.target.value; re
 // Attributes come from lb_auto_deal_attr (n8n GFmBhA4xG16yAgWS, daily 8:30am): lead type, UTMs, show-up confirmation, VSL click, audit video %, ARR band.
 const CL = {kind:"quarter", offset:0, lead:"all", utmMode:"first", utmVal:"", utmTxt:"", band:"self", by:"conf", flt:{}, rows:{}};
 const UNK = "(no value)";
-const BANDS = ["<$250k","$250k-$500K","$500k-$750K","$750k-$1.2M","$1.2M-$3M","$3M-$5M","$5M-$10M","$3M-$10M","$10M+"];
+// 2026-11-12 ARR buckets; old ranges kept at the end for deals that still hold them
+const BANDS = ["<$250k","$250k-$500K","$500k-$750K","$750k-$1M","$1M-$3M","$3M-$5M","$5M-$7M","$7M-$10M","$10M+","$750k-$1.2M","$1.2M-$3M","$3M-$10M","$5M-$10M"];
 const WATCH = ["75%+","50–74%","25–49%","Under 25%","Not watched"];
 const pctBand = v => { const n = Number(v)||0; return n>=75 ? "75%+" : n>=50 ? "50–74%" : n>=25 ? "25–49%" : n>0 ? "Under 25%" : "Not watched"; };
 // JF Verified ARR Band: picked by the AE, else stamped daily from the call transcript

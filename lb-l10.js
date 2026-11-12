@@ -733,13 +733,13 @@ const SC_ROWS_ALL = [
   {grp:"Revenue"},
   {id:"won", core:true,      label:"Closed won", core:true, tip:"Deals closed won, by close date",            f:t=>t.won.length, list:"won"},
   {id:"cwd", core:true,      label:"MRR closed", core:true, tip:"Closed-won MRR (USD/month), by close date",            money:true, f:t=>t.cwd, list:"won"},
+  {id:"crate", core:true,    label:"Close rate", core:true, tip:"Deals closed won in the period ÷ discovery calls run in the same period (the Closed won and Runs had rows of the same column)", ratio:true, f:t=>t.had.length?t.won.length/t.had.length:null, list:"won", sub:t=>t.had.length?t.won.length+" closes ÷ "+t.had.length+" discos run":""},
   {id:"d2w",      label:"Design → close", tip:"Closes ÷ designs",        ratio:true, f:t=>t.des.length?t.won.length/t.des.length:null, list:"won", era:"old"},
   {id:"c2w",      label:"Contract → close", tip:"Closes ÷ contracts",      ratio:true, f:t=>t.con.length?t.won.length/t.con.length:null, list:"won", era:"old"},
   {grp:"Conversion (from calls that ran)", era:"new"},
   {id:"cvd", label:"Disco → Design/Audit", tip:"Of discos run in the period, how many have since moved to Design/Audit", ratio:true, f:t=>t.cvD.length?t.cvDn.length/t.cvD.length:null, list:"cvd", sub:t=>t.cvD.length?t.cvDn.length+" of "+t.cvD.length+" discos run":"", era:"new"},
   {id:"cva", label:"Design/Audit → Prop Review/Contract", tip:"Of audits run, how many have since moved to Prop Review/Contract", ratio:true, f:t=>t.cvA.length?t.cvAn.length/t.cvA.length:null, list:"cva", sub:t=>t.cvA.length?t.cvAn.length+" of "+t.cvA.length+" audits run":"", era:"new"},
   {id:"cvp", label:"Prop Review/Contract → Closed won", tip:"Of prop reviews run, how many have since closed won", ratio:true, f:t=>t.cvP.length?t.cvPn.length/t.cvP.length:null, list:"cvp", sub:t=>t.cvP.length?t.cvPn.length+" of "+t.cvP.length+" prop reviews run":"", era:"new"},
-  {id:"cvw", label:"Disco → Closed won", core:true, tip:"Of discos run in the period, how many have since closed won", ratio:true, f:t=>t.cvD.length?t.cvDw.length/t.cvD.length:null, list:"cvw", sub:t=>t.cvD.length?t.cvDw.length+" of "+t.cvD.length+" discos run":"", era:"new"},
 ];
 let SC_ROWS = eraPick(SC_ROWS_ALL);
 const SC_SPLIT = [
@@ -1028,11 +1028,11 @@ const AX_COLS_ALL = [
   {id:"prun", core:true,  label:"Prop reviews run", f:t=>t.prun.length, list:"prun", era:"new"},
   {id:"pns",   label:"Prop review no-shows", f:t=>t.pns.length, list:"pns", era:"new"},
   {id:"won", core:true,   label:"Closes",          f:t=>t.won.length, list:"won"},
+  {id:"crate", core:true, label:"Close rate", ratio:true, f:t=>t.had.length?t.won.length/t.had.length:null, list:"won", sub:t=>t.had.length?t.won.length+" ÷ "+t.had.length+" runs":""},
   {id:"d2w",   label:"Design → close",  ratio:true, f:t=>t.des.length?t.won.length/t.des.length:null, list:"won", era:"old"},
   {id:"cvd", label:"Disco → Design/Audit", ratio:true, f:t=>t.cvD.length?t.cvDn.length/t.cvD.length:null, list:"cvd", sub:t=>t.cvD.length?t.cvDn.length+" of "+t.cvD.length:"", era:"new"},
   {id:"cva", label:"Design/Audit → Prop Review", ratio:true, f:t=>t.cvA.length?t.cvAn.length/t.cvA.length:null, list:"cva", sub:t=>t.cvA.length?t.cvAn.length+" of "+t.cvA.length:"", era:"new"},
   {id:"cvp", label:"Prop Review → Closed won", ratio:true, f:t=>t.cvP.length?t.cvPn.length/t.cvP.length:null, list:"cvp", sub:t=>t.cvP.length?t.cvPn.length+" of "+t.cvP.length:"", era:"new"},
-  {id:"cvw", label:"Disco → Closed won", ratio:true, f:t=>t.cvD.length?t.cvDw.length/t.cvD.length:null, list:"cvw", sub:t=>t.cvD.length?t.cvDw.length+" of "+t.cvD.length:"", era:"new"},
   {id:"cwd", core:true,   label:"MRR",             money:true, f:t=>t.cwd, list:"won"},
 ];
 let AX_COLS = eraPick(AX_COLS_ALL);

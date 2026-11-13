@@ -173,5 +173,9 @@ html.view-reporting #scTable.sc-wrap{overflow-x:auto;border-radius:12px}
 .sc-tbl thead th.cur{background:color-mix(in srgb,var(--fill) 6%,var(--panel))}
 .sc-tbl thead th:first-child{left:0;z-index:5}
 .sc-tbl thead th.cmpc{right:0;z-index:5;background:color-mix(in srgb,var(--fill) 5%,var(--panel))}
+/* sideways scrollbar above the Scorecard too (11-13) */
+.sc-topscroll{position:sticky;top:0;z-index:26;overflow-x:auto;overflow-y:hidden;height:16px;margin-bottom:4px;background:var(--panel);border-radius:8px}
+.sc-topscroll>div{height:1px}
+.sc-topscroll[hidden]{display:none}
 html.view-reporting .l10-time.stuck #gHint{display:none}
 html.view-reporting .l10-time.stuck{padding-top:6px;padding-bottom:6px;border-radius:0 0 12px 12px}

@@ -75,6 +75,7 @@
         </div>
       </div>
     </div>
+    <div class="sc-topscroll" id="scTop" hidden aria-hidden="true"><div></div></div>
     <div class="sc-wrap" id="scTable"></div>
     <p class="sc-note" id="scNote"></p>
     <details class="how"><summary>How this is counted</summary><div>
@@ -1195,8 +1196,17 @@ if(REPORTING){ let t0 = "sc"; try{ t0 = localStorage.getItem("jf_l10_tab") || "s
   const wrap = document.getElementById("scTable"), bar = document.getElementById("l10Time");
   if(!wrap) return;
   const fl = document.createElement("div"); fl.id = "scFloat"; fl.hidden = true; document.body.appendChild(fl);
+  // second sideways scrollbar above the table (sticks under the time bar), kept in step with the table's own (11-13)
+  const ts = document.getElementById("scTop"), tsIn = ts && ts.firstElementChild;
+  const sizeTop = () => { if(!ts) return; const over = wrap.scrollWidth > wrap.clientWidth + 1;
+    ts.hidden = !over; if(over){ tsIn.style.width = wrap.scrollWidth+"px"; ts.scrollLeft = wrap.scrollLeft; } };
+  if(ts){
+    ts.addEventListener("scroll", () => { if(Math.abs(wrap.scrollLeft - ts.scrollLeft) > 1) wrap.scrollLeft = ts.scrollLeft; }, {passive:true});
+    wrap.addEventListener("scroll", () => { if(Math.abs(ts.scrollLeft - wrap.scrollLeft) > 1) ts.scrollLeft = wrap.scrollLeft; }, {passive:true});
+  }
   let real = [], copy = [], nat = [], built = false;
   function build(){
+    sizeTop();
     const tb = wrap.querySelector("table"), th = tb && tb.querySelector("thead");
     fl.innerHTML = ""; built = false; if(!th) return;
     const t = document.createElement("table"); t.className = tb.className; t.style.tableLayout = "fixed";
@@ -1210,7 +1220,8 @@ if(REPORTING){ let t0 = "sc"; try{ t0 = localStorage.getItem("jf_l10_tab") || "s
   function place(){
     if(!built || !wrap.offsetParent){ fl.hidden = true; return; }
     const th = real[0] && real[0].closest("thead"); if(!th){ fl.hidden = true; return; }
-    const top = bar && getComputedStyle(bar).position==="sticky" ? Math.max(0, bar.getBoundingClientRect().bottom) : 0;
+    let top = bar && getComputedStyle(bar).position==="sticky" ? Math.max(0, bar.getBoundingClientRect().bottom) : 0;
+    if(ts && !ts.hidden){ const sb = ts.getBoundingClientRect(); if(sb.top <= top + 1) top = Math.max(top, sb.bottom); }
     const hr = th.getBoundingClientRect(), wr = wrap.getBoundingClientRect();
     const show = hr.top < top && wr.bottom - hr.height > top + 8;
     fl.hidden = !show; if(!show) return;
@@ -1230,6 +1241,8 @@ if(REPORTING){ let t0 = "sc"; try{ t0 = localStorage.getItem("jf_l10_tab") || "s
 (function(){ const b = document.getElementById("l10Time"); if(!b || !REPORTING) return;
   // sit under the site menu bar (nav.jfnav, sticky) when there is one
   const off = () => { const n = document.querySelector("nav.jfnav"); const p = n && getComputedStyle(n).position; return n && (p==="sticky"||p==="fixed") ? n.offsetHeight : 0; };
-  const f = () => { const t = off(); b.style.top = t+"px"; b.classList.toggle("stuck", b.getBoundingClientRect().top <= t + 0.5 && scrollY > 40); };
+  const ts = document.getElementById("scTop");
+  const f = () => { const t = off(); b.style.top = t+"px"; b.classList.toggle("stuck", b.getBoundingClientRect().top <= t + 0.5 && scrollY > 40);
+    if(ts) ts.style.top = (t + b.offsetHeight)+"px"; };
   addEventListener("resize", f);
   addEventListener("scroll", f, {passive:true}); f(); })();

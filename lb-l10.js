@@ -538,16 +538,25 @@ function clFilter(rows, skip){
 const clStats = rows => { const d = rows.filter(x=>x.des), w = rows.filter(x=>x.won); const mrr = w.reduce((s,x)=>s+(Number(x.won.amount)||0),0);
   return {rows, n:rows.length, d, w, mrr, rate: rows.length ? w.length/rows.length : null, drate: rows.length ? d.length/rows.length : null}; };
 const CL_COLS_ALL = [
-  {label:"Runs", f:t=>fmt(t.n), list:"runs"},
-  {label:"Designs", core:true, f:t=>fmt(t.d.length), list:"des", era:"old"},
-  {label:"Run → design", f:t=>pctS(t.drate), list:"des", era:"old"},
-  {label:"Design/Audit", core:true, f:t=>fmt(t.d.length), list:"des", era:"new"},
-  {label:"Run → Design/Audit", f:t=>pctS(t.drate), list:"des", era:"new"},
-  {label:"Closes", core:true, f:t=>fmt(t.w.length), list:"won"},
-  {label:"Close rate", f:t=>pctS(t.rate), list:"won", sub:t=>t.n ? t.w.length+" of "+t.n : ""},
-  {label:"MRR", f:t=>fmt(t.mrr,true), list:"won"},
+  {label:"Runs", f:t=>fmt(t.n), v:t=>t.n, list:"runs"},
+  {label:"Designs", core:true, f:t=>fmt(t.d.length), v:t=>t.d.length, list:"des", era:"old"},
+  {label:"Run → design", f:t=>pctS(t.drate), v:t=>t.drate, list:"des", era:"old"},
+  {label:"Design/Audit", core:true, f:t=>fmt(t.d.length), v:t=>t.d.length, list:"des", era:"new"},
+  {label:"Run → Design/Audit", f:t=>pctS(t.drate), v:t=>t.drate, list:"des", era:"new"},
+  {label:"Closes", core:true, f:t=>fmt(t.w.length), v:t=>t.w.length, list:"won"},
+  {label:"Close rate", f:t=>pctS(t.rate), v:t=>t.rate, list:"won", sub:t=>t.n ? t.w.length+" of "+t.n : ""},
+  {label:"MRR", f:t=>fmt(t.mrr,true), v:t=>t.mrr, list:"won"},
 ];
 let CL_COLS = eraPick(CL_COLS_ALL);
+// table sorting (11-13, Vianney: "order the tables by a metric"): click a column header.
+// col "" = the breakdown's own order (revenue band low→high, etc.); dir 1 = that order / highest first, -1 = reversed
+CL.sort = {col:"", dir:1}; CL.rsort = {col:"rate", dir:1};
+const sortArrow = (on, dir) => `<span class="sort-ar" aria-hidden="true">${on ? (dir>0 ? "▼" : "▲") : "↕"}</span>`;
+const sortTh = (attr, col, label, cur) => { const on = cur.col===col;
+  return `<th class="sortable${on?" on":""}" ${attr}="${esc(col)}" aria-sort="${on?(cur.dir>0?"descending":"ascending"):"none"}" title="Sort by ${esc(label)}"><button type="button">${esc(label)}${sortArrow(on, cur.dir)}</button></th>`; };
+// metric sort: highest first (dir 1); blanks (no rate) and "No value" always at the bottom
+const byMetric = (val, dir) => (a, b) => { const x = val(a), y = val(b);
+  if(x==null && y==null) return 0; if(x==null) return 1; if(y==null) return -1; return dir*(y-x); };
 // display name for a breakdown value: blank → "No value"; an old wide form range is labelled so it isn't read as a new bucket
 const OLD_BANDS = new Set(["$750k-$1.2M","$1.2M-$3M","$3M-$10M","$5M-$10M"]);
 const clName = v => v===UNK ? "No value" : OLD_BANDS.has(v) ? v+" (old form range)" : v;
@@ -555,26 +564,31 @@ const clKeys = (dim, g) => { const keys = dim.order ? dim.order.filter(k=>g.has(
   [...g.keys()].forEach(k=>{ if(!keys.includes(k)) keys.push(k); }); return keys; };   // any value not in the fixed order still shows
 const groupBy = (dim, rows) => { const g = new Map(); rows.forEach(x=>{ const k = dim.f(x.a); if(!g.has(k)) g.set(k, []); g.get(k).push(x); }); return g; };
 function clTable(dim, rows){
-  const g = groupBy(dim, rows), keys = clKeys(dim, g);
+  const g = groupBy(dim, rows); let keys = clKeys(dim, g);
+  const sc = CL_COLS.find(c=>c.label===CL.sort.col);
+  if(sc){ const real = keys.filter(k=>k!==UNK), st = new Map(real.map(k=>[k, sc.v(clStats(g.get(k)))]));
+    keys = real.sort(byMetric(k=>st.get(k), CL.sort.dir)).concat(keys.includes(UNK) ? [UNK] : []); }
+  else if(!CL.sort.col && CL.sort.dir<0){ const real = keys.filter(k=>k!==UNK).reverse(); keys = real.concat(keys.includes(UNK) ? [UNK] : []); }
   const maxRate = Math.max(0.0001, ...keys.map(k=>{ const s = clStats(g.get(k)); return s.n>=3 ? s.rate||0 : 0; }));
   const tr = (key, name, list, cls) => { const t = clStats(list); CL.rows[key] = {name, list};
     return `<tr class="${cls||""}"><td>${esc(clName(name))}</td>${CL_COLS.map((c,i)=>`<td><span class="click" data-cl="${esc(key)}" data-clc="${i}">${c.f(t)}</span>${c.sub&&c.sub(t)?`<small>${c.sub(t)}</small>`:""}</td>`).join("")}<td class="cl-bc">${cls!=="tot"&&t.n?`<div class="cl-bar" style="width:${Math.round(100*(t.rate||0)/maxRate)}%;opacity:${t.n<3?.35:1}" title="Close rate ${pctS(t.rate)}${t.n<3?" (fewer than 3 runs)":""}"></div>`:""}</td></tr>`; };
   const body = keys.map(k=>tr(dim.id+"|"+k, k, g.get(k))).join("") + tr(dim.id+"|__tot", "Total", rows, "tot");
-  return `<div class="table-wrap"><table class="ib-tbl cl-tbl"><thead><tr><th>${esc(dim.title)}</th>${CL_COLS.map(c=>`<th>${c.label}</th>`).join("")}<th aria-label="Close rate bar"></th></tr></thead><tbody>${rows.length?body:`<tr><td class="empty" colspan="${CL_COLS.length+2}">No runs match these filters.</td></tr>`}</tbody></table></div>`;
+  return `<div class="table-wrap"><table class="ib-tbl cl-tbl"><thead><tr>${sortTh("data-sort", "", dim.title, CL.sort)}${CL_COLS.map(c=>sortTh("data-sort", c.label, c.label, CL.sort)).join("")}<th aria-label="Close rate bar"></th></tr></thead><tbody>${rows.length?body:`<tr><td class="empty" colspan="${CL_COLS.length+2}">No runs match these filters.</td></tr>`}</tbody></table></div>`;
 }
 // every segment of every breakdown (minus the ones a filter already pins down), ranked by close rate
 function clRank(rows){
   const min = +document.getElementById("clMin").value || 10, all = [];
   CL_DIMS.filter(d=>!CL.flt[d.id] && !(d.id==="lead" && CL.lead!=="all") && !(d.id==="utm1" && CL.utmMode==="first" && CL.utmVal) && !(d.id==="utml" && CL.utmMode==="last" && CL.utmVal))
     .forEach(d=>groupBy(d, rows).forEach((list, k)=>{ const t = clStats(list); if(t.n >= min) all.push({d, k, t, list}); }));
-  all.sort((a,b)=>(b.t.rate-a.t.rate) || (b.t.n-a.t.n));
+  const RV = {runs:t=>t.n, closes:t=>t.w.length, rate:t=>t.rate, mrr:t=>t.mrr}, rv = RV[CL.rsort.col] || RV.rate;
+  all.sort((a,b)=>byMetric(x=>rv(x.t), CL.rsort.dir)(a,b) || (b.t.rate-a.t.rate) || (b.t.n-a.t.n));
   if(!all.length) return `<p class="sc-note">No segment has ${min}+ runs with these filters. Lower the minimum or widen the period.</p>`;
   const top = Math.max(0.0001, all[0].t.rate || 0), base = clStats(rows).rate;
   const body = all.map((x,i)=>{ const key = "rank|"+x.d.id+"|"+x.k; CL.rows[key] = {name:x.d.title+": "+clName(x.k), list:x.list};
     const cells = [fmt(x.t.n), fmt(x.t.w.length), pctS(x.t.rate), fmt(x.t.mrr,true)], ci = [0,3,4,5];
     const vs = base==null || x.t.rate==null ? "" : x.t.rate > base ? "above" : x.t.rate < base ? "below" : "";
     return `<tr><td class="cl-rk">${i+1}</td><td class="cl-seg"><span class="cl-dim">${esc(x.d.title)}</span>${esc(clName(x.k))}</td>${cells.map((v,j)=>`<td><span class="click" data-cl="${esc(key)}" data-clc="${ci[j]}">${v}</span>${j===2&&x.t.n?`<small>${x.t.w.length} of ${x.t.n}</small>`:""}</td>`).join("")}<td class="cl-bc"><div class="cl-bar${vs==="below"?" lo":""}" style="width:${Math.round(100*(x.t.rate||0)/top)}%" title="${vs?vs+" the "+pctS(base)+" average":""}"></div></td></tr>`; }).join("");
-  return `<div class="table-wrap"><table class="ib-tbl cl-tbl"><thead><tr><th>#</th><th class="cl-seg">Segment</th><th>Runs</th><th>Closes</th><th>Close rate</th><th>MRR</th><th aria-label="Close rate bar"></th></tr></thead><tbody>${body}</tbody></table></div>
+  return `<div class="table-wrap"><table class="ib-tbl cl-tbl"><thead><tr><th>#</th><th class="cl-seg">Segment</th>${[["runs","Runs"],["closes","Closes"],["rate","Close rate"],["mrr","MRR"]].map(([k,l])=>sortTh("data-rsort", k, l, CL.rsort)).join("")}<th aria-label="Close rate bar"></th></tr></thead><tbody>${body}</tbody></table></div>
     <p class="sc-note">Average for these runs: ${pctS(base)}. Bars in grey are below it. A deal appears once per breakdown, so segments overlap.</p>`;
 }
 function clOptions(sel, values, cnt, cur, anyLabel){
@@ -648,7 +662,12 @@ document.querySelectorAll("#clSec select[data-flt]").forEach(sel=>sel.onchange=(
 document.getElementById("clBy").onchange = e=>{ CL.by=e.target.value; renderCloses(); };
 document.getElementById("clMin").onchange = ()=>renderCloses();
 document.getElementById("clClear").onclick = ()=>{ CL.lead="all"; CL.utmVal=""; CL.utmTxt=""; document.getElementById("clUtmTxt").value=""; CL.flt={}; renderCloses(); };
-document.getElementById("clSec").addEventListener("click", e=>{ const c = e.target.closest("[data-cl]"); if(c) clOpen(c.dataset.cl, +c.dataset.clc); });
+document.getElementById("clSec").addEventListener("click", e=>{
+  // header click = sort: same column flips the direction, a new column starts highest first (or the breakdown's own order)
+  const s = e.target.closest("th[data-sort],th[data-rsort]");
+  if(s){ const st = s.hasAttribute("data-sort") ? CL.sort : CL.rsort, col = s.getAttribute(s.hasAttribute("data-sort") ? "data-sort" : "data-rsort");
+    if(st.col===col) st.dir = -st.dir; else { st.col = col; st.dir = 1; } renderCloses(); return; }
+  const c = e.target.closest("[data-cl]"); if(c) clOpen(c.dataset.cl, +c.dataset.clc); });
 /* ---------- Sales L10: scorecard (one row per L10 metric, one column per week / month) ---------- */
 const SC = {kind:"week", shift:0, view:"team", cols:[], range:"", from:"", to:"",
   open:(()=>{ try{ return new Set(JSON.parse(localStorage.getItem("l10-sc-open")||"[]")); }catch(e){ return new Set(); } })()};   // scorecard groups shown in full

@@ -37,6 +37,14 @@ section[hidden]{display:none}
 .cl-tbl{min-width:0;width:100%}
 .cl-tbl td.cl-bc{width:18%;min-width:48px;overflow:hidden}
 .cl-bar{height:8px;border-radius:4px;background:var(--fill);min-width:2px;max-width:100%}
+/* sortable headers (Deals breakdown + ranking): click to sort, again to flip */
+.cl-tbl th.sortable{padding:0}
+.cl-tbl th.sortable button{all:unset;box-sizing:border-box;display:flex;align-items:center;justify-content:inherit;gap:4px;width:100%;padding:8px 7px;cursor:pointer;font:inherit;color:inherit;white-space:nowrap}
+.cl-tbl th.sortable:not(:first-child) button{justify-content:flex-end}
+.cl-tbl th.sortable button:hover{color:var(--ink);background:var(--line)}
+.cl-tbl th.sortable button:focus-visible{outline:2px solid var(--ink);outline-offset:-2px}
+.cl-tbl th.sortable .sort-ar{font-size:10px;color:var(--muted);opacity:.55}
+.cl-tbl th.sortable.on .sort-ar{opacity:1;color:var(--ink)}
 /* Sales L10 layout: tabs + scorecard */
 .l10-tabs{display:none}
 html.view-reporting .l10-tabs{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 22px;border-bottom:1px solid var(--line)}

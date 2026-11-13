@@ -129,11 +129,11 @@
   var API = 'https://ottvswkgqohurzilfafu.supabase.co/functions/v1/ae-v2';
   var TZ = 'America/Toronto', PORTAL = '1905790';
   var RETIRED = ['Armin'];
-  var S = null, rep = null, period = 'month', list = 'audit';
+  var S = null, rep = null, period = 'month', list = 'audit', proc = 'new';
   var CUT = '2026-10-27';   // official switch to the 3-call close; replaced by lb_auto_config.process_cutover on load
   var MONS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
   function cutLabel() { return MONS[+CUT.slice(5, 7) - 1] + ' ' + (+CUT.slice(8, 10)); }
-  try { period = sessionStorage.getItem('aev2-period') || 'month'; list = sessionStorage.getItem('aev2-list') || 'audit'; } catch (e) {}
+  try { period = sessionStorage.getItem('aev2-period') || 'month'; list = sessionStorage.getItem('aev2-list') || 'audit'; proc = sessionStorage.getItem('aev2-proc') || 'new'; } catch (e) {}
 
   var $ = function (id) { return document.getElementById(id); };
   function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
@@ -151,6 +151,7 @@
   function range(p) {
     var t = today(), y = +t.slice(0, 4), m = +t.slice(5, 7);
     if (p === 'since') return { a: CUT, b: t, label: 'Since ' + cutLabel() };
+    if (p === 'quarter') { var q0 = Math.floor((m - 1) / 3) * 3 + 1, qa = y + '-' + String(q0).padStart(2, '0') + '-01', qe = q0 + 3 > 12 ? (y + 1) + '-01-01' : y + '-' + String(q0 + 3).padStart(2, '0') + '-01'; return { a: qa, b: addDays(qe, -1), label: 'This quarter (Q' + ((q0 + 2) / 3) + ')' }; }
     if (p === 'week') { var dow = (new Date(t + 'T12:00:00Z').getUTCDay() + 6) % 7; return { a: addDays(t, -dow), b: addDays(t, 6 - dow), label: 'This week' }; }
     if (p === 'last') { var lm = m === 1 ? 12 : m - 1, ly = m === 1 ? y - 1 : y; var a = ly + '-' + String(lm).padStart(2, '0') + '-01'; return { a: a, b: addDays(t.slice(0, 8) + '01', -1), label: 'Last month' }; }
     return { a: t.slice(0, 8) + '01', b: addDays(addDays(t.slice(0, 8) + '28', 4).slice(0, 8) + '01', -1), label: 'This month' };
@@ -159,9 +160,11 @@
   function workdays(a, b) { var n = 0; for (var d = a; d <= b; d = addDays(d, 1)) { var w = new Date(d + 'T12:00:00Z').getUTCDay(); if (w && w < 6) n++; } return n; }
 
   // ---- rows with the AE's corrections applied ----
-  function rows() {
+  // old vs new process (11-13): a deal belongs to the process of its FIRST discovery call (before the cutover = old)
+  function isOld(x) { var f = x.deal_id && S.firstDisco && S.firstDisco[x.deal_id]; return !!f && dayOf(f) < CUT; }
+  function rows(all0) {
     var ov = {}; (S.overrides || []).forEach(function (o) { ov[o.key] = o; });
-    var all = S.items.concat(S.discos).filter(function (x) { return x.rep === rep; });
+    var all = S.items.concat(S.discos).filter(function (x) { return x.rep === rep && (all0 || proc === 'all' || !isOld(x)); });
     return all.map(function (x) {
       var o = ov[x.key], y = Object.assign({}, x, { auto: x.status, ov: o || null });
       if (o && o.status) y.status = o.status;
@@ -222,11 +225,13 @@
     var run = S.lastRun ? new Date(S.lastRun.ran_at) : null;
     $('bar').innerHTML =
       (reps.length > 1 ? '<div class="seg" id="reps">' + reps.map(function (r) { return '<button data-r="' + esc(r) + '"' + (r === rep ? ' class="on"' : '') + '>' + esc(r) + '</button>'; }).join('') + '</div>' : '') +
-      '<div class="seg" id="per">' + [['week', 'This week'], ['month', 'This month'], ['last', 'Last month'], ['since', 'Since ' + cutLabel()]].map(function (p) { return '<button data-p="' + p[0] + '"' + (p[0] === period ? ' class="on"' : '') + '>' + p[1] + '</button>'; }).join('') + '</div>' +
+      '<div class="seg" id="per">' + [['week', 'This week'], ['month', 'This month'], ['last', 'Last month'], ['quarter', 'This quarter'], ['since', 'Since ' + cutLabel()]].map(function (p) { return '<button data-p="' + p[0] + '"' + (p[0] === period ? ' class="on"' : '') + '>' + p[1] + '</button>'; }).join('') + '</div>' +
+      '<div class="seg" id="proc" title="A deal belongs to the process of its first discovery call. Deals whose first disco was before ' + cutLabel() + ' are the old process.">' + [['new', 'New process'], ['all', 'All deals']].map(function (p) { return '<button data-q="' + p[0] + '"' + (p[0] === proc ? ' class="on"' : '') + '>' + p[1] + '</button>'; }).join('') + '</div>' +
       '<span class="grow"></span><span class="updated">' + (run ? 'HubSpot synced ' + fmtShow.format(run) : 'Not synced yet') + ' &middot; discos sync daily 8am</span>' +
       '<button class="ghost" id="refresh">Refresh now</button>';
     Array.prototype.forEach.call(document.querySelectorAll('#reps button'), function (b) { b.onclick = function () { rep = b.getAttribute('data-r'); render(); }; });
     Array.prototype.forEach.call(document.querySelectorAll('#per button'), function (b) { b.onclick = function () { period = b.getAttribute('data-p'); try { sessionStorage.setItem('aev2-period', period); } catch (e) {} render(); }; });
+    Array.prototype.forEach.call(document.querySelectorAll('#proc button'), function (b) { b.onclick = function () { proc = b.getAttribute('data-q'); try { sessionStorage.setItem('aev2-proc', proc); } catch (e) {} render(); }; });
     $('refresh').onclick = refresh;
   }
 
@@ -360,7 +365,8 @@
     return '<div class="card"><h2>How it counts</h2><ul class="defs">' +
       '<li><strong>Discos run / no-shows</strong> &mdash; from the leaderboard&rsquo;s show-up engine, credited to the AE on the deal. Show rate here = held &divide; (held + no-show), so calls cancelled before the slot are left out. The Sales L10 shows 1st-time show three ways (excl. our cancels / all / excl. their cancels).</li>' +
       '<li><strong>Moved to Design/Audit</strong> and <strong>Moved to Prop Review</strong> &mdash; the day the deal entered that HubSpot stage.</li>' +
-      '<li><strong>Audits / prop reviews run</strong> &mdash; MSP Audit and Proposal Review meetings (GHL calendars, synced to HubSpot). Held = Fathom recording or Completed outcome, or the deal moved past that stage after the call.</li>' +
+      '<li><strong>Audits / prop reviews run</strong> &mdash; MSP Audit and Proposal Review meetings (GHL calendars, synced to HubSpot). Checked in this order: the deal went to the no-show stage &rarr; no-show; the deal was already Closed Lost / DQ&rsquo;d before the call &rarr; needs your answer; Fathom recording or Completed outcome &rarr; held; the deal moved past that stage after the call &rarr; held. (The calendar sync marks calls Completed even when nobody showed, so a no-show stage move always wins.) Proposal Review, Proposal Decision and Program Discussion titles all count as prop reviews.</li>' +
+      '<li><strong>New process / All deals</strong> &mdash; New process (the default) leaves out deals whose first discovery call was before ' + cutLabel() + ', so the rates only show the 3-call close. All deals puts the old-process deals back. This month&rsquo;s pace always counts every close.</li>' +
       '<li><strong>No-shows</strong> &mdash; the deal went to the no-show stage, or you marked it. Rebooked calls aren&rsquo;t counted twice.</li>' +
       '<li><strong>Closed won</strong> &mdash; by close date, MRR in USD. HT/LT from the deal&rsquo;s Offer field.</li>' +
       '<li><strong>Conversion</strong> (and the arrows between the boxes) is past tense only. Disco &rarr; Design/Audit = of the discos run in the period, how many have since moved to Design/Audit. Design/Audit &rarr; Prop Review = of the audits run, how many have since moved to Prop Review. Prop Review &rarr; Closed won = of the prop reviews run, how many have since closed. Disco &rarr; Closed won = of the discos run, how many have since closed.</li>' +
@@ -371,7 +377,7 @@
   function render() {
     renderBar();
     var rs = rows(), rg = range(period), c = count(rs, rg), st = steps(rs, rg);
-    $('view').innerHTML = funnel(c, st) + convCard(st, rg) + '<div class="cols"><div>' + needsCard(rs) + listCard(rs, rg) + '</div><div>' + paceCard(rs) + defsCard() + '</div></div>';
+    $('view').innerHTML = funnel(c, st) + convCard(st, rg) + '<div class="cols"><div>' + needsCard(rows(true)) + listCard(rs, rg) + '</div><div>' + paceCard(rows(true)) + defsCard() + '</div></div>';
     bind();
   }
 

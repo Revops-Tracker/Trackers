@@ -548,6 +548,9 @@ const CL_COLS_ALL = [
   {label:"MRR", f:t=>fmt(t.mrr,true), list:"won"},
 ];
 let CL_COLS = eraPick(CL_COLS_ALL);
+// display name for a breakdown value: blank → "No value"; an old wide form range is labelled so it isn't read as a new bucket
+const OLD_BANDS = new Set(["$750k-$1.2M","$1.2M-$3M","$3M-$10M","$5M-$10M"]);
+const clName = v => v===UNK ? "No value" : OLD_BANDS.has(v) ? v+" (old form range)" : v;
 const clKeys = (dim, g) => { const keys = dim.order ? dim.order.filter(k=>g.has(k)) : [...g.keys()].sort((a,b)=>((a===UNK)-(b===UNK)) || g.get(b).length-g.get(a).length || a.localeCompare(b));
   [...g.keys()].forEach(k=>{ if(!keys.includes(k)) keys.push(k); }); return keys; };   // any value not in the fixed order still shows
 const groupBy = (dim, rows) => { const g = new Map(); rows.forEach(x=>{ const k = dim.f(x.a); if(!g.has(k)) g.set(k, []); g.get(k).push(x); }); return g; };
@@ -555,7 +558,7 @@ function clTable(dim, rows){
   const g = groupBy(dim, rows), keys = clKeys(dim, g);
   const maxRate = Math.max(0.0001, ...keys.map(k=>{ const s = clStats(g.get(k)); return s.n>=3 ? s.rate||0 : 0; }));
   const tr = (key, name, list, cls) => { const t = clStats(list); CL.rows[key] = {name, list};
-    return `<tr class="${cls||""}"><td>${esc(name===UNK?"No value":name)}</td>${CL_COLS.map((c,i)=>`<td><span class="click" data-cl="${esc(key)}" data-clc="${i}">${c.f(t)}</span>${c.sub&&c.sub(t)?`<small>${c.sub(t)}</small>`:""}</td>`).join("")}<td class="cl-bc">${cls!=="tot"&&t.n?`<div class="cl-bar" style="width:${Math.round(100*(t.rate||0)/maxRate)}%;opacity:${t.n<3?.35:1}" title="Close rate ${pctS(t.rate)}${t.n<3?" (fewer than 3 runs)":""}"></div>`:""}</td></tr>`; };
+    return `<tr class="${cls||""}"><td>${esc(clName(name))}</td>${CL_COLS.map((c,i)=>`<td><span class="click" data-cl="${esc(key)}" data-clc="${i}">${c.f(t)}</span>${c.sub&&c.sub(t)?`<small>${c.sub(t)}</small>`:""}</td>`).join("")}<td class="cl-bc">${cls!=="tot"&&t.n?`<div class="cl-bar" style="width:${Math.round(100*(t.rate||0)/maxRate)}%;opacity:${t.n<3?.35:1}" title="Close rate ${pctS(t.rate)}${t.n<3?" (fewer than 3 runs)":""}"></div>`:""}</td></tr>`; };
   const body = keys.map(k=>tr(dim.id+"|"+k, k, g.get(k))).join("") + tr(dim.id+"|__tot", "Total", rows, "tot");
   return `<div class="table-wrap"><table class="ib-tbl cl-tbl"><thead><tr><th>${esc(dim.title)}</th>${CL_COLS.map(c=>`<th>${c.label}</th>`).join("")}<th aria-label="Close rate bar"></th></tr></thead><tbody>${rows.length?body:`<tr><td class="empty" colspan="${CL_COLS.length+2}">No runs match these filters.</td></tr>`}</tbody></table></div>`;
 }
@@ -567,15 +570,15 @@ function clRank(rows){
   all.sort((a,b)=>(b.t.rate-a.t.rate) || (b.t.n-a.t.n));
   if(!all.length) return `<p class="sc-note">No segment has ${min}+ runs with these filters. Lower the minimum or widen the period.</p>`;
   const top = Math.max(0.0001, all[0].t.rate || 0), base = clStats(rows).rate;
-  const body = all.map((x,i)=>{ const key = "rank|"+x.d.id+"|"+x.k; CL.rows[key] = {name:x.d.title+": "+(x.k===UNK?"No value":x.k), list:x.list};
+  const body = all.map((x,i)=>{ const key = "rank|"+x.d.id+"|"+x.k; CL.rows[key] = {name:x.d.title+": "+clName(x.k), list:x.list};
     const cells = [fmt(x.t.n), fmt(x.t.w.length), pctS(x.t.rate), fmt(x.t.mrr,true)], ci = [0,3,4,5];
     const vs = base==null || x.t.rate==null ? "" : x.t.rate > base ? "above" : x.t.rate < base ? "below" : "";
-    return `<tr><td class="cl-rk">${i+1}</td><td class="cl-seg"><span class="cl-dim">${esc(x.d.title)}</span>${esc(x.k===UNK?"No value":x.k)}</td>${cells.map((v,j)=>`<td><span class="click" data-cl="${esc(key)}" data-clc="${ci[j]}">${v}</span>${j===2&&x.t.n?`<small>${x.t.w.length} of ${x.t.n}</small>`:""}</td>`).join("")}<td class="cl-bc"><div class="cl-bar${vs==="below"?" lo":""}" style="width:${Math.round(100*(x.t.rate||0)/top)}%" title="${vs?vs+" the "+pctS(base)+" average":""}"></div></td></tr>`; }).join("");
+    return `<tr><td class="cl-rk">${i+1}</td><td class="cl-seg"><span class="cl-dim">${esc(x.d.title)}</span>${esc(clName(x.k))}</td>${cells.map((v,j)=>`<td><span class="click" data-cl="${esc(key)}" data-clc="${ci[j]}">${v}</span>${j===2&&x.t.n?`<small>${x.t.w.length} of ${x.t.n}</small>`:""}</td>`).join("")}<td class="cl-bc"><div class="cl-bar${vs==="below"?" lo":""}" style="width:${Math.round(100*(x.t.rate||0)/top)}%" title="${vs?vs+" the "+pctS(base)+" average":""}"></div></td></tr>`; }).join("");
   return `<div class="table-wrap"><table class="ib-tbl cl-tbl"><thead><tr><th>#</th><th class="cl-seg">Segment</th><th>Runs</th><th>Closes</th><th>Close rate</th><th>MRR</th><th aria-label="Close rate bar"></th></tr></thead><tbody>${body}</tbody></table></div>
     <p class="sc-note">Average for these runs: ${pctS(base)}. Bars in grey are below it. A deal appears once per breakdown, so segments overlap.</p>`;
 }
 function clOptions(sel, values, cnt, cur, anyLabel){
-  sel.innerHTML = `<option value="">${anyLabel||"Any"}</option>` + values.map(v=>`<option value="${esc(v)}"${v===cur?" selected":""}>${esc(v===UNK?"No value":v)} (${cnt[v]||0})</option>`).join("");
+  sel.innerHTML = `<option value="">${anyLabel||"Any"}</option>` + values.map(v=>`<option value="${esc(v)}"${v===cur?" selected":""}>${esc(clName(v))} (${cnt[v]||0})</option>`).join("");
 }
 function renderCloses(){
   if(!document.getElementById("clSec")) return;

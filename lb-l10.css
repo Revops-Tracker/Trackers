@@ -187,3 +187,7 @@ html.view-reporting #scTable.sc-wrap{overflow-x:auto;border-radius:12px}
 .sc-topscroll[hidden]{display:none}
 html.view-reporting .l10-time.stuck #gHint{display:none}
 html.view-reporting .l10-time.stuck{padding-top:6px;padding-bottom:6px;border-radius:0 0 12px 12px}
+
+/* revenue band panel (2026-11-16) */
+.bn-grid{display:grid;grid-template-columns:1fr;gap:18px}
+.bn-t{font-weight:600;margin:0 0 6px}

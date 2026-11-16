@@ -227,7 +227,10 @@
       </div></details>
     </div>
     <div class="ib-tiles" id="clTiles"></div>
-    <div class="cl-by"><label class="cl-f cl-f-in"><span>Break down by</span><select id="clBy"></select></label></div>
+    <div class="ib-h" style="margin:22px 0 4px">By revenue band</div>
+    <p class="sc-note" style="margin:0 0 8px" id="bnNote"></p>
+    <div class="bn-grid" id="bnTables"></div>
+    <div class="cl-by" style="margin-top:22px"><label class="cl-f cl-f-in"><span>Break down by</span><select id="clBy"></select></label></div>
     <div id="clTables"></div>
     <div class="cl-by" style="margin-top:26px"><div class="ib-h" style="margin:0">Highest to lowest closing segments</div>
       <label class="cl-f cl-f-in"><span>Min. runs</span><select id="clMin"><option value="5">5</option><option value="10" selected>10</option><option value="20">20</option></select></label></div>
@@ -599,6 +602,65 @@ function clRank(rows){
 function clOptions(sel, values, cnt, cur, anyLabel){
   sel.innerHTML = `<option value="">${anyLabel||"Any"}</option>` + values.map(v=>`<option value="${esc(v)}"${v===cur?" selected":""}>${esc(clName(v))} (${cnt[v]||0})</option>`).join("");
 }
+/* ---------- revenue band panel (2026-11-16, Vianney: closes + close rate by band, always visible) ---------- */
+// Closes = closed won with a close date in the period (like the Scorecard). Close rate (simple) = those closes / discos run
+// in the same period; Close rate (by call) = of the discos run in the period, how many have closed since. Band = the picker above.
+const BN = {rows:{}, s1:{col:"", dir:1}, s2:{col:"", dir:1}};
+function clClosesIn(p){
+  const runRow = new Map();
+  effShowup().filter(r=>!r.dropped && r.run_at).forEach(r=>{ const k = String(r.deal_id); if(!runRow.has(k) || Date.parse(r.run_at) < Date.parse(runRow.get(k).run_at)) runRow.set(k, r); });
+  return onePerDeal(effEvents().filter(e=>!e.dropped && e.kind==="won" && inP(e.at, p) && eraOk(e)), e=>e.at)
+    .map(e=>{ const r = runRow.get(String(e.deal_id)); return {won:e, a:{...attrOf(e.deal_id), _rtb: r ? rtbOf(r).cat : RTB_CATS[3]}}; });
+}
+const BN_T1 = [
+  {k:"w", label:"Closes", f:t=>fmt(t.w), v:t=>t.w, open:"c"},
+  {k:"cpct", label:"% of closes", f:t=>pctS(t.cpct), v:t=>t.cpct, open:"c"},
+  {k:"m", label:"MRR", f:t=>fmt(t.m,true), v:t=>t.m, open:"c"},
+  {k:"mpct", label:"% of MRR", f:t=>pctS(t.mpct), v:t=>t.mpct, open:"c"},
+  {k:"avg", label:"Avg MRR per close", f:t=>t.avg==null ? "–" : fmt(t.avg,true), v:t=>t.avg, open:"c"},
+];
+const BN_T2 = [
+  {k:"n", label:"Discos run", f:t=>fmt(t.n), v:t=>t.n, open:"r"},
+  {k:"w", label:"Closes", f:t=>fmt(t.w), v:t=>t.w, open:"c"},
+  {k:"rate", label:"Close rate (simple)", f:t=>pctS(t.rate), v:t=>t.rate, open:"c", sub:t=>t.n ? t.w+" ÷ "+t.n : ""},
+  {k:"cvw", label:"Close rate (by call)", f:t=>pctS(t.cvw), v:t=>t.cvw, open:"rw", sub:t=>t.n ? t.rw.length+" of "+t.n : ""},
+  {k:"mpr", label:"MRR per disco run", f:t=>t.mpr==null ? "–" : fmt(t.mpr,true), v:t=>t.mpr, open:"c"},
+];
+function bandPanel(runs, closes){
+  const dim = dimOf("band"), grp = list => { const m = new Map(); list.forEach(x=>{ const k = dim.f(x.a); if(!m.has(k)) m.set(k, []); m.get(k).push(x); }); return m; };
+  const gR = grp(runs), gC = grp(closes), mrrOf = l => l.reduce((s,x)=>s+(Number(x.won.amount)||0),0);
+  const totC = closes.length, totM = mrrOf(closes);
+  const st = k => { const r = k==null ? runs : (gR.get(k)||[]), c = k==null ? closes : (gC.get(k)||[]), m = mrrOf(c), rw = r.filter(x=>x.won);
+    return {r, c, rw, n:r.length, w:c.length, m, cpct: totC ? c.length/totC : null, mpct: totM ? m/totM : null, avg: c.length ? m/c.length : null,
+      rate: r.length ? c.length/r.length : null, cvw: r.length ? rw.length/r.length : null, mpr: r.length ? m/r.length : null}; };
+  const union = new Map(); [...gR.keys(), ...gC.keys()].forEach(k=>union.set(k, []));
+  const base = clKeys(dim, union);
+  BN.rows = {};
+  const table = (id, cols, sort, keys, title) => {
+    let ks = keys.slice(); const sc = cols.find(c=>c.k===sort.col);
+    const real = ks.filter(k=>k!==UNK), tail = ks.includes(UNK) ? [UNK] : [];
+    if(sc){ const v = new Map(real.map(k=>[k, sc.v(st(k))])); ks = real.sort(byMetric(k=>v.get(k), sort.dir)).concat(tail); }
+    else if(sort.dir<0) ks = real.reverse().concat(tail);
+    const tr = (k, cls) => { const t = st(k), key = id+"|"+(k==null ? "__tot" : k); BN.rows[key] = {name: k==null ? "All bands" : clName(k), t};
+      return `<tr class="${cls||""}"><td>${esc(k==null ? "Total" : clName(k))}</td>${cols.map(c=>`<td><span class="click" data-bn="${esc(key)}" data-bno="${c.open}">${c.f(t)}</span>${c.sub && c.sub(t) ? `<small>${c.sub(t)}</small>` : ""}</td>`).join("")}</tr>`; };
+    const attr = id==="t1" ? "data-bs1" : "data-bs2";
+    return `<div><div class="bn-t">${title}</div><div class="table-wrap"><table class="ib-tbl cl-tbl"><thead><tr>${sortTh(attr, "", "Revenue band", sort)}${cols.map(c=>sortTh(attr, c.k, c.label, sort)).join("")}</tr></thead><tbody>${
+      ks.length ? ks.map(k=>tr(k)).join("") + tr(null, "tot") : `<tr><td class="empty" colspan="${cols.length+1}">Nothing in this period.</td></tr>`}</tbody></table></div></div>`;
+  };
+  const verified = runs.filter(x=>jfBand(x.a)).length, verC = closes.filter(x=>jfBand(x.a)).length;
+  document.getElementById("bnNote").innerHTML = `Band = <b>${esc({best:"Best known", jf:"JF verified", self:"Self-claimed"}[CL.band]||"Best known")}</b> (picker above). `
+    + `JF verified on ${fmt(verified)} of ${fmt(runs.length)} discos run and ${fmt(verC)} of ${fmt(closes.length)} closes; the rest fall back to self-claimed. `
+    + `Closes = closed won with a close date in the period. <b>Close rate (simple)</b> = those closes ÷ discos run in the same period (same as the Scorecard). <b>Close rate (by call)</b> = of the discos run in the period, how many have closed since. Click any number to see the deals.`;
+  return table("t1", BN_T1, BN.s1, base.filter(k=>gC.has(k)), "Closes by revenue band")
+    + table("t2", BN_T2, BN.s2, base, "Close rate by revenue band");
+}
+function bnOpen(key, what){
+  const r = BN.rows[key]; if(!r) return; const t = r.t, p = clPeriod();
+  const groups = what==="r" ? [["Discos run", t.r.map(x=>x.run)]]
+    : what==="rw" ? [["Ran and closed (any date)", t.rw.map(x=>x.won)], ["Ran, not closed (yet)", t.r.filter(x=>!x.won).map(x=>x.run)]]
+    : [["Closed won", t.c.map(x=>x.won)]];
+  showDialog(r.name, "Revenue band, "+p.label+". Click a deal name to open it in HubSpot.", groups);
+}
 function renderCloses(){
   if(!document.getElementById("clSec")) return;
   const p = clPeriod();
@@ -640,6 +702,7 @@ function renderCloses(){
     tile("Closes", fmt(t.w.length), "won, any date after", 3, D(x=>x.w.length)) +
     tile("Close rate", pctS(t.rate), "closes ÷ runs", 4, D(x=>x.rate, {pct:true})) +
     tile("MRR", fmt(t.mrr,true), t.w.length ? "avg "+fmt(t.mrr/t.w.length,true)+" per close" : "USD/month", 5, D(x=>x.mrr, {money:true}));
+  document.getElementById("bnTables").innerHTML = bandPanel(rows, clFilter(clClosesIn(p)));
   const by = document.getElementById("clBy");
   by.innerHTML = CL_DIMS.map(d=>`<option value="${d.id}"${d.id===CL.by?" selected":""}>${esc(d.title)}</option>`).join("");
   const unseen = rows.filter(x=>!state.attrs || !state.attrs.has(String(x.run.deal_id))).length;
@@ -669,6 +732,10 @@ document.getElementById("clMin").onchange = ()=>renderCloses();
 document.getElementById("clClear").onclick = ()=>{ CL.lead="all"; CL.utmVal=""; CL.utmTxt=""; document.getElementById("clUtmTxt").value=""; CL.flt={}; renderCloses(); };
 document.getElementById("clSec").addEventListener("click", e=>{
   // header click = sort: same column flips the direction, a new column starts highest first (or the breakdown's own order)
+  const b = e.target.closest("th[data-bs1],th[data-bs2]");
+  if(b){ const one = b.hasAttribute("data-bs1"), st = one ? BN.s1 : BN.s2, col = b.getAttribute(one ? "data-bs1" : "data-bs2");
+    if(st.col===col) st.dir = -st.dir; else { st.col = col; st.dir = 1; } renderCloses(); return; }
+  const bn = e.target.closest("[data-bn]"); if(bn){ bnOpen(bn.dataset.bn, bn.dataset.bno); return; }
   const s = e.target.closest("th[data-sort],th[data-rsort]");
   if(s){ const st = s.hasAttribute("data-sort") ? CL.sort : CL.rsort, col = s.getAttribute(s.hasAttribute("data-sort") ? "data-sort" : "data-rsort");
     if(st.col===col) st.dir = -st.dir; else { st.col = col; st.dir = 1; } renderCloses(); return; }

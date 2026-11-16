@@ -230,6 +230,11 @@
     <div class="ib-h" style="margin:22px 0 4px">By revenue band</div>
     <p class="sc-note" style="margin:0 0 8px" id="bnNote"></p>
     <div class="bn-grid" id="bnTables"></div>
+    <div class="cl-by" style="margin-top:26px"><div class="ib-h" style="margin:0">Time and calls to close</div>
+      <label class="cl-f cl-f-in"><span>Show</span><select id="tcSeg"></select></label></div>
+    <p class="sc-note" style="margin:0 0 8px" id="tcNote"></p>
+    <div class="ib-tiles" id="tcTiles"></div>
+    <div class="bn-grid" id="tcTables"></div>
     <div class="cl-by" style="margin-top:22px"><label class="cl-f cl-f-in"><span>Break down by</span><select id="clBy"></select></label></div>
     <div id="clTables"></div>
     <div class="cl-by" style="margin-top:26px"><div class="ib-h" style="margin:0">Highest to lowest closing segments</div>
@@ -661,6 +666,98 @@ function bnOpen(key, what){
     : [["Closed won", t.c.map(x=>x.won)]];
   showDialog(r.name, "Revenue band, "+p.label+". Click a deal name to open it in HubSpot.", groups);
 }
+/* ---------- time and calls to close (2026-11-16, Zamir: "do most deals close in the first X calls / days?") ---------- */
+// Cohort = the discos run in the period (same rows as the tiles, filters apply). Held call = a day with a held meeting on the
+// deal on/after its disco: disco runs, held design/audit meetings, recorded calls matched to the deal (fathom_calls -> p.call_days).
+// Calls to close = held-call days up to and including the close day. Days to close = disco day -> closed won date.
+const TC = {seg:"all", rows:{}};
+const TC_SIZE = a => { const b = bestBand(a); return !b ? "No band" : ["<$250k","$250k-$500K","$500k-$750K","$750k-$1M"].includes(String(b).split(";")[0]) ? "Under $1M ARR" : "$1M+ ARR"; };
+const TC_SEGS = [
+  {id:"all", label:"All deals", f:()=>true},
+  {id:"lt1", label:"Under $1M ARR (best known)", f:a=>TC_SIZE(a)==="Under $1M ARR"},
+  {id:"ge1", label:"$1M+ ARR (best known)", f:a=>TC_SIZE(a)==="$1M+ ARR"},
+  {id:"in", label:"Inbound", f:a=>a.lead_type__outbound_inbound_==="Inbound"},
+  {id:"out", label:"Outbound", f:a=>a.lead_type__outbound_inbound_==="Outbound"},
+  {id:"lt", label:"Low ticket (Offer = LT)", f:a=>a.offer==="lt"},
+  {id:"ht", label:"High ticket (Offer = HT)", f:a=>a.offer==="ht"},
+];
+const tcDay = (() => { const f = new Intl.DateTimeFormat("en-CA", {timeZone:"America/Toronto", year:"numeric", month:"2-digit", day:"2-digit"}); return t => t ? f.format(new Date(t)) : ""; })();
+const tcDiff = (a, b) => Math.round((Date.parse(b) - Date.parse(a)) / 864e5);
+function tcDeals(rows){
+  const held = new Map(), add = (id, d) => { if(!d) return; const k = String(id); if(!held.has(k)) held.set(k, new Set()); held.get(k).add(d); };
+  effShowup().filter(r=>!r.dropped && r.run_at).forEach(r=>add(r.deal_id, tcDay(r.run_at)));
+  effEvents().filter(e=>!e.dropped && e.kind==="dheld").forEach(e=>add(e.deal_id, tcDay(e.at)));
+  const today = tcDay(Date.now());
+  return rows.map(x=>{
+    const id = String(x.run.deal_id), d0 = tcDay(x.run.run_at), dw = x.won ? tcDay(x.won.at) : null;
+    String(x.a.call_days||"").split(",").forEach(d=>add(id, d.trim()));
+    const days = [...(held.get(id)||[])].filter(d=>d>=d0).sort();
+    const ca = Math.max(1, days.length), c = dw ? Math.max(1, days.filter(d=>d<=dw).length) : null;
+    return {...x, ca, c, dd: dw ? Math.max(0, tcDiff(d0, dw)) : null, age: tcDiff(d0, today)};
+  });
+}
+function tcPanel(rows){
+  const sel = document.getElementById("tcSeg");
+  sel.innerHTML = TC_SEGS.map(g=>`<option value="${g.id}"${g.id===TC.seg?" selected":""}>${esc(g.label)} (${rows.filter(x=>g.f(x.a)).length})</option>`).join("");
+  const seg = TC_SEGS.find(g=>g.id===TC.seg) || TC_SEGS[0];
+  const D = tcDeals(rows.filter(x=>seg.f(x.a))), W = D.filter(x=>x.won), nW = W.length;
+  TC.rows = {};
+  const cell = (key, list, name, v, sub) => { TC.rows[key] = {name, list}; return `<td><span class="click" data-tc="${esc(key)}">${v}</span>${sub ? `<small>${sub}</small>` : ""}</td>`; };
+  // ----- by calls held
+  const K = [1,2,3,4,5];
+  const callRows = K.map(k=>{
+    const last = k===5, atK = x => last ? x.c>=5 : x.c===k;
+    const reached = D.filter(x=>x.won ? x.c>=k : x.ca>=k), closedAt = W.filter(atK), cum = W.filter(x=>x.c<=k || last);
+    const openAfter = last ? [] : reached.filter(x=>!x.won || x.c>k), later = openAfter.filter(x=>x.won);
+    return `<tr><td>${last ? "5+" : k}</td>`
+      + cell("cr"+k, reached, `Reached held call ${last?"5+":k}`, fmt(reached.length))
+      + cell("ca"+k, closedAt, `Closed on held call ${last?"5+":k}`, fmt(closedAt.length))
+      + cell("cc"+k, cum, `Closed by held call ${last?"5+":k}`, pctS(nW ? cum.length/nW : null), `${cum.length} of ${nW}`)
+      + (last ? `<td>–</td>` : cell("cl"+k, openAfter, `Still open after held call ${k}`, pctS(openAfter.length ? later.length/openAfter.length : null), `${later.length} of ${openAfter.length}`))
+      + `</tr>`;
+  }).join("");
+  // ----- by days since the disco (only deals old enough to have had X days)
+  const X = [7,14,21,30,45,60,90];
+  const dayRows = X.map(dx=>{
+    const old = D.filter(x=>x.age>=dx), by = old.filter(x=>x.won && x.dd<=dx), open = old.filter(x=>!x.won || x.dd>dx), later = open.filter(x=>x.won);
+    const cum = W.filter(x=>x.dd<=dx);
+    return `<tr><td>${dx} days</td>`
+      + cell("do"+dx, old, `Discos at least ${dx} days old`, fmt(old.length))
+      + cell("db"+dx, by, `Closed within ${dx} days`, pctS(old.length ? by.length/old.length : null), `${by.length} of ${old.length}`)
+      + cell("dc"+dx, cum, `Closed within ${dx} days`, pctS(nW ? cum.length/nW : null), `${cum.length} of ${nW}`)
+      + cell("dl"+dx, open, `Still open on day ${dx}`, pctS(open.length ? later.length/open.length : null), `${later.length} of ${open.length}`)
+      + `</tr>`;
+  }).join("");
+  // ----- tiles
+  const med = a => { if(!a.length) return null; const v = a.slice().sort((p,q)=>p-q), m = v.length>>1; return v.length%2 ? v[m] : (v[m-1]+v[m])/2; };
+  const by3 = W.filter(x=>x.c<=3).length, by30 = W.filter(x=>x.dd<=30).length;
+  const lost = D.filter(x=>!x.won), extra = (list, k) => list.reduce((s,x)=>s+Math.max(0, x.ca-k), 0);
+  // deals that got to held call 3 without closing; how many closed later
+  const op3 = D.filter(x=>(x.won ? x.c>=3 : x.ca>=3) && (!x.won || x.c>3)), l3 = op3.filter(x=>x.won);
+  TC.rows.tW = {name:"Closed won", list:W}; TC.rows.tL3 = {name:"Never closed, held calls past call 3", list:lost.filter(x=>x.ca>3)};
+  TC.rows.tO3 = {name:"Still open after held call 3", list:op3};
+  const tile = (k, v, s, key) => `<div class="ib-tile"><div class="k">${k}</div><div class="v"><span class="click" data-tc="${key}">${v}</span></div><div class="s">${s}</div></div>`;
+  document.getElementById("tcTiles").innerHTML =
+    tile("Median to close", nW ? fmt(med(W.map(x=>x.dd)))+" days" : "–", nW ? (m=>"and "+fmt(m)+" held call"+(m===1?"":"s"))(med(W.map(x=>x.c))) : "no closes", "tW") +
+    tile("Closed by call 3", pctS(nW ? by3/nW : null), `${by3} of ${nW} closes`, "cc3") +
+    tile("Closed within 30 days", pctS(nW ? by30/nW : null), `${by30} of ${nW} closes`, "dc30") +
+    tile("Close after call 3", pctS(op3.length ? l3.length/op3.length : null), `${l3.length} of ${op3.length} still open after call 3`, "tO3") +
+    tile("Calls past call 3, no close", fmt(extra(lost, 3)), `on ${lost.filter(x=>x.ca>3).length} deals that never closed`, "tL3");
+  const recent = D.filter(x=>x.age<30).length, noRec = D.filter(x=>!String(x.a.call_days||"")).length;
+  document.getElementById("tcNote").innerHTML = `Of the discos run in the period (filters above apply), how many closed and how fast. <b>Held call</b> = a day with a held meeting on the deal from the disco on: the disco, a held design/audit meeting, or a recorded call matched to the deal. <b>Calls to close</b> counts held calls up to the close day. `
+    + `<b>Still open after call N / on day N</b> = of the deals that got that far without closing, the share that closed later. That is the payoff from keeping on following up. `
+    + `${recent ? `${fmt(recent)} discos are under 30 days old, so they can't show up in the 30+ day rows yet. ` : ""}${noRec ? `${fmt(noRec)} deals have no recorded call matched, so their count may be low. ` : ""}Click any number to see the deals.`;
+  const head = cols => `<thead><tr>${cols.map(c=>`<th>${c}</th>`).join("")}</tr></thead>`;
+  document.getElementById("tcTables").innerHTML =
+    `<div><div class="bn-t">By held calls</div><div class="table-wrap"><table class="ib-tbl cl-tbl">${head(["Held call","Deals that got there","Closed on this call","Closes done by this call","Still open after it → closed later"])}<tbody>${callRows}</tbody></table></div></div>`
+    + `<div><div class="bn-t">By days since the disco</div><div class="table-wrap"><table class="ib-tbl cl-tbl">${head(["Day","Discos old enough","Closed by then (close rate)","Closes done by then","Still open that day → closed later"])}<tbody>${dayRows}</tbody></table></div></div>`;
+}
+function tcOpen(key){
+  const r = TC.rows[key]; if(!r) return; const p = clPeriod();
+  const won = r.list.filter(x=>x.won), open = r.list.filter(x=>!x.won);
+  showDialog(r.name, `Discos run ${p.label}. Click a deal name to open it in HubSpot.`,
+    [["Closed won", won.map(x=>x.won)], ...(open.length ? [["Not closed (yet)", open.map(x=>x.run)]] : [])]);
+}
 function renderCloses(){
   if(!document.getElementById("clSec")) return;
   const p = clPeriod();
@@ -703,6 +800,7 @@ function renderCloses(){
     tile("Close rate", pctS(t.rate), "closes ÷ runs", 4, D(x=>x.rate, {pct:true})) +
     tile("MRR", fmt(t.mrr,true), t.w.length ? "avg "+fmt(t.mrr/t.w.length,true)+" per close" : "USD/month", 5, D(x=>x.mrr, {money:true}));
   document.getElementById("bnTables").innerHTML = bandPanel(rows, clFilter(clClosesIn(p)));
+  tcPanel(rows);
   const by = document.getElementById("clBy");
   by.innerHTML = CL_DIMS.map(d=>`<option value="${d.id}"${d.id===CL.by?" selected":""}>${esc(d.title)}</option>`).join("");
   const unseen = rows.filter(x=>!state.attrs || !state.attrs.has(String(x.run.deal_id))).length;
@@ -729,6 +827,7 @@ document.getElementById("clBand").onchange = e=>{ CL.band=e.target.value; CL.flt
 document.querySelectorAll("#clSec select[data-flt]").forEach(sel=>sel.onchange=()=>{ CL.flt[sel.dataset.flt]=sel.value; renderCloses(); });
 document.getElementById("clBy").onchange = e=>{ CL.by=e.target.value; renderCloses(); };
 document.getElementById("clMin").onchange = ()=>renderCloses();
+document.getElementById("tcSeg").onchange = e=>{ TC.seg=e.target.value; renderCloses(); };
 document.getElementById("clClear").onclick = ()=>{ CL.lead="all"; CL.utmVal=""; CL.utmTxt=""; document.getElementById("clUtmTxt").value=""; CL.flt={}; renderCloses(); };
 document.getElementById("clSec").addEventListener("click", e=>{
   // header click = sort: same column flips the direction, a new column starts highest first (or the breakdown's own order)
@@ -736,6 +835,7 @@ document.getElementById("clSec").addEventListener("click", e=>{
   if(b){ const one = b.hasAttribute("data-bs1"), st = one ? BN.s1 : BN.s2, col = b.getAttribute(one ? "data-bs1" : "data-bs2");
     if(st.col===col) st.dir = -st.dir; else { st.col = col; st.dir = 1; } renderCloses(); return; }
   const bn = e.target.closest("[data-bn]"); if(bn){ bnOpen(bn.dataset.bn, bn.dataset.bno); return; }
+  const tc = e.target.closest("[data-tc]"); if(tc){ tcOpen(tc.dataset.tc); return; }
   const s = e.target.closest("th[data-sort],th[data-rsort]");
   if(s){ const st = s.hasAttribute("data-sort") ? CL.sort : CL.rsort, col = s.getAttribute(s.hasAttribute("data-sort") ? "data-sort" : "data-rsort");
     if(st.col===col) st.dir = -st.dir; else { st.col = col; st.dir = 1; } renderCloses(); return; }

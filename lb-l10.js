@@ -208,8 +208,9 @@
           <option value="hist">History contains</option>
         </select><select id="clUtmVal" aria-label="UTM value"></select><input id="clUtmTxt" type="search" placeholder="e.g. Meta, RTB" aria-label="UTM history contains" hidden></span></label>
         <label class="cl-f"><span>Revenue band</span><span class="cl-pair"><select id="clBand" aria-label="Which revenue figure">
-          <option value="self">Self-claimed</option>
+          <option value="best">Best known</option>
           <option value="jf">JF verified</option>
+          <option value="self">Self-claimed</option>
         </select><select data-flt="band" aria-label="Revenue band"></select></span></label>
         <label class="cl-f"><span>RTB hit</span><select data-flt="rtb" aria-label="RTB hit before booking"></select></label>
         <button type="button" class="linkish" id="clClear" hidden>Clear filters</button>
@@ -234,7 +235,7 @@
     <div id="clRank"></div>
     <details class="how"><summary>How this is counted</summary><div>
       <b>Runs</b> = deals whose disco was held in the period (one per deal). Each deal is followed forward: <b>Designs</b> = it reached Design / Prop Review, <b>Closes</b> = it closed won, whenever that happened. <b>Close rate</b> = closes ÷ runs (per disco run, never won ÷ lost), so recent periods keep rising as their deals close. <b>MRR</b> = closed-won amount (USD/month).<br>
-      Everything else comes from the HubSpot deal, refreshed every morning. <b>Show-up confirmed</b> = replied YES to the reminder text, or clicked "I'll be there" on the thank-you or pre-call VSL page (one per deal, strongest first). <b>Pre-call VSL</b> = clicked the pre-call VSL link. <b>Audit videos</b> = the tracked pre-audit video page (6 Killers + Scaling &amp; Authority, live from Oct 27): Opened = entered their email, Started = watched part of a video, Watched = both videos 75%+. <b>Audit videos watched</b> = the most of either video. <b>AE flag</b> = what the AE recorded after asking on the call (HubSpot "Audit videos: AE flag"), kept separate from the tracking. <b>Revenue band</b> = self-claimed ARR, or JF verified ARR (the JF Verified ARR Band, else banded from the AE-entered JF Verified ARR amount; only filled on deals up to late Aug so far). <b>Offer</b> = HT / LT, set by the AE after the disco. Deals with no value get their own row, so the table always adds up to the total. Click any number to see the deals.
+      Everything else comes from the HubSpot deal, refreshed every morning. <b>Show-up confirmed</b> = replied YES to the reminder text, or clicked "I'll be there" on the thank-you or pre-call VSL page (one per deal, strongest first). <b>Pre-call VSL</b> = clicked the pre-call VSL link. <b>Audit videos</b> = the tracked pre-audit video page (6 Killers + Scaling &amp; Authority, live from Oct 27): Opened = entered their email, Started = watched part of a video, Watched = both videos 75%+. <b>Audit videos watched</b> = the most of either video. <b>AE flag</b> = what the AE recorded after asking on the call (HubSpot "Audit videos: AE flag"), kept separate from the tracking. <b>Revenue band</b> = <b>Best known</b> by default: the JF Verified ARR Band (picked by the AE after the disco, else read from the call transcript), and the self-claimed ARR when there is no verified band. Switch to <b>JF verified</b> or <b>Self-claimed</b> to see just one source. <b>Offer</b> = HT / LT, set by the AE after the disco. Deals with no value get their own row, so the table always adds up to the total. Click any number to see the deals.
     </div></details>
   </section>
 `);
@@ -471,7 +472,7 @@ document.getElementById("bdRep").onchange = e=>{ L10.bd.rep = e.target.value; re
 /* ---------- Sales L10: Deals tab (close rate per disco run, filtered + broken down by deal attributes) ---------- */
 // Cohort = deals whose disco was held in the period (one per deal); each is followed forward to design / close, whenever that happened.
 // Attributes come from lb_auto_deal_attr (n8n GFmBhA4xG16yAgWS, daily 8:30am): lead type, UTMs, show-up confirmation, VSL click, audit video %, ARR band.
-const CL = {kind:"quarter", offset:0, lead:"all", utmMode:"first", utmVal:"", utmTxt:"", band:"self", by:"conf", flt:{}, rows:{}};
+const CL = {kind:"quarter", offset:0, lead:"all", utmMode:"first", utmVal:"", utmTxt:"", band:"best", by:"conf", flt:{}, rows:{}};
 const UNK = "(no value)";
 // 2026-11-12 ARR buckets; old ranges kept at the end for deals that still hold them
 const BANDS = ["<$250k","$250k-$500K","$500k-$750K","$750k-$1M","$1M-$3M","$3M-$5M","$5M-$7M","$7M-$10M","$10M+","$750k-$1.2M","$1.2M-$3M","$3M-$10M","$5M-$10M"];
@@ -479,6 +480,10 @@ const WATCH = ["75%+","50–74%","25–49%","Under 25%","Not watched"];
 const pctBand = v => { const n = Number(v)||0; return n>=75 ? "75%+" : n>=50 ? "50–74%" : n>=25 ? "25–49%" : n>0 ? "Under 25%" : "Not watched"; };
 // JF Verified ARR Band: picked by the AE, else stamped daily from the call transcript
 const jfBand = a => a.jf_verified_arr_band;
+// Best known (reporting default, 2026-11-16): JF verified first, self-claimed as the fallback.
+// Same rule as the HubSpot field "ARR Band (Best Known)" (arr_band_best), synced daily by n8n 1BuYcXmOkHVOv6tD.
+const bestBand = a => String(jfBand(a) || "").split(";")[0] || a.self_claimed_msp_arr;
+const BAND_OF = {best: bestBand, jf: jfBand, self: a => a.self_claimed_msp_arr};
 // every dimension can be a breakdown; the ones with filter:true also get a dropdown in the filter bar
 const CL_DIMS = [
   {id:"conf", title:"Show-up confirmed", filter:true, order:["Replied YES to the reminder text","Clicked \"I'll be there\" (thank-you page)","Clicked \"I'll be there\" (pre-call VSL page)","Tapped Confirm via Text, no YES","No confirmation"],
@@ -493,7 +498,7 @@ const CL_DIMS = [
     f:a => ({watched_both:"Watched both", watched_6_killers:"Watched 6 Killers only", watched_scaling:"Watched Scaling & Authority only", partial:"Started, did not finish", not_watched:"Did not watch"})[a.audit_videos_ae_flag] || "Not flagged"},
   {id:"k6", title:"6 Killers watched", order:WATCH, f:a => pctBand(a.video_6_killers_watch_pct)},
   {id:"sa", title:"Scaling & Authority watched", order:WATCH, f:a => pctBand(a.video_scaling_authority_watch_pct)},
-  {id:"band", title:"Revenue band", filter:true, order:[...BANDS, UNK], f:a => String((CL.band==="jf" ? jfBand(a) : a.self_claimed_msp_arr) || UNK).split(";")[0]},
+  {id:"band", title:"Revenue band", filter:true, order:[...BANDS, UNK], f:a => String((BAND_OF[CL.band] || bestBand)(a) || UNK).split(";")[0]},
   {id:"offer", title:"Offer", filter:true, order:["High ticket (HT)","Low ticket (LT)","Not set"], f:a => ({ht:"High ticket (HT)", lt:"Low ticket (LT)"})[a.offer] || "Not set"},
   // Meta PPC deals labelled from the booking note by n8n 5vpYcV7EhNRUzi6X (HubSpot deal property meta_lead_channel), hourly
   {id:"mc", title:"Meta channel", filter:true, order:["Meta Lead Form","Meta VSL","Meta, unclear","Meta, not labelled yet","Not Meta PPC"],

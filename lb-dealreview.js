@@ -150,7 +150,7 @@
     return `<div class="dr-card" data-ckey="${esc(c.key)}"><div class="dr-top"><b>${esc((c.company||"Deal "+c.deal_id).replace(/ Deal 20\d\d$/i,""))}</b><span class="m">Who cancelled? · call ${esc(slot)}${c.booker?" · booked by "+esc(c.booker):""}</span><a href="${link}" target="_blank" rel="noopener">Open in HubSpot</a></div>
       <div class="dr-f" style="grid-template-columns:130px 1fr"><div class="lab">Who cancelled${conf}</div><div class="val">
         <div class="cur">The check says: ${c.verdict==="unknown"?"could not tell":esc(c.verdict==="ours"?"we cancelled or moved it":"they cancelled or moved it")}</div>
-        <div class="dr-row2"><label><input type="radio" name="w-${esc(c.key)}" value="ours" ${pre==="ours"?"checked":""}> We did (we pulled or moved the call)</label><label><input type="radio" name="w-${esc(c.key)}" value="theirs" ${pre==="theirs"?"checked":""}> They did (prospect cancelled or rescheduled)</label></div>
+        <div class="dr-row2"><label><input type="radio" name="w-${esc(c.key)}" value="ours" ${pre==="ours"?"checked":""}> We did (we pulled or moved the call)</label><label><input type="radio" name="w-${esc(c.key)}" value="theirs" ${pre==="theirs"?"checked":""}> They did (prospect cancelled or rescheduled)</label><label><input type="radio" name="w-${esc(c.key)}" value="noshow"> Prospect no-show (never said anything, or just declined the invite)</label></div>
         ${c.reason?`<div class="ev">${esc(c.reason)}</div>`:""}${evHTML(c.evidence, c.verdict==="unknown")}</div></div>
       <div class="dr-act"><span class="err"></span><button class="btn ghost" data-skip>Skip</button><button class="btn" data-acceptc>Save</button></div></div>`;
   }

@@ -224,12 +224,16 @@
         <label class="cl-f"><span>Audit videos watched</span><select data-flt="hwmax"></select></label>
         <label class="cl-f"><span>AE flag (asked on call)</span><select data-flt="aeflag"></select></label>
         <label class="cl-f"><span>Offer</span><select data-flt="offer"></select></label>
+        <label class="cl-f"><span>Outcome / reason</span><select data-flt="oc"></select></label>
       </div></details>
     </div>
     <div class="ib-tiles" id="clTiles"></div>
     <div class="ib-h" style="margin:22px 0 4px">By revenue band</div>
     <p class="sc-note" style="margin:0 0 8px" id="bnNote"></p>
     <div class="bn-grid" id="bnTables"></div>
+    <div class="ib-h" style="margin:26px 0 4px">Why deals were DQ'd or lost</div>
+    <p class="sc-note" style="margin:0 0 8px" id="dqNote"></p>
+    <div class="bn-grid" id="dqTables"></div>
     <div class="cl-by" style="margin-top:26px"><div class="ib-h" style="margin:0">Time and calls to close</div>
       <label class="cl-f cl-f-in"><span>Show</span><select id="tcSeg"></select></label></div>
     <p class="sc-note" style="margin:0 0 8px" id="tcNote"></p>
@@ -492,6 +496,23 @@ const jfBand = a => a.jf_verified_arr_band;
 // Same rule as the HubSpot field "ARR Band (Best Known)" (arr_band_best), synced daily by n8n 1BuYcXmOkHVOv6tD.
 const bestBand = a => String(jfBand(a) || "").split(";")[0] || a.self_claimed_msp_arr;
 const BAND_OF = {best: bestBand, jf: jfBand, self: a => a.self_claimed_msp_arr};
+// DQ stage = bad fit / should not have been booked (HubSpot "DQ Category", dq_category). Everything else that ends a deal = Closed lost ("Close Lost Reason").
+// Both are filled when the AE moves the deal, and backfilled to Jul 1 2026 (11-17). Stage ids: DQ (AE pipeline) / Disqualified (BDR pipeline).
+const DQ_STAGES = new Set(["1244474161","1448429622"]);
+const DQ_LABEL = {cms:"CMS", revenue_too_low:"Revenue too low", msp_section_too_small:"MSP section too small", msp_out_of_scope:"MSP out of scope (government / enterprise)",
+  not_an_msp:"Not an MSP", niche_vertical_only:"Niche / vertical-only MSP", geography:"Geography (outside N. America, or Quebec / French)", other:"Other bad fit"};
+const DQ_ORDER = ["not_an_msp","revenue_too_low","geography","cms","msp_section_too_small","msp_out_of_scope","niche_vertical_only","other"];   // the ranking: first match wins
+const LOST_LABEL = {"Cost":"Pricing objection","Bad timing":"Bad timing","No Response":"No response","No Interest":"No interest","Unqualified - No pain":"No pain",
+  "Competitor":"Went with competitor","Negative Reviews":"Negative reviews","Business Closed/Out Of Business":"Business closed","Contract Disagreement":"Contract disagreement (complexity)",
+  "Doesnt see value":"Doesn't see value","Duplicate Deal":"Duplicate deal","Unqualified":"Unqualified - ICP fit (retired)","Went with competitor":"Went with competitor (old)",
+  "0-500K Revenue":"0-500K revenue (retired)","500-1M Revenue":"500-1M revenue (retired)","1M-1.15M Revenue":"1M-1.5M revenue (retired)"};
+const NO_REASON = "No reason recorded";
+const isDq = a => DQ_STAGES.has(String(a.dealstage)) || (!!a.dq_category && a.hs_is_closed_won!=="true");
+const isLost = a => !isDq(a) && (a.hs_is_closed_lost==="true" || a.dealstage==="closedlost");
+const dqName = a => DQ_LABEL[a.dq_category] || (a.dq_category ? a.dq_category : NO_REASON);
+const lostName = a => LOST_LABEL[a.close_lost_reason] || (a.close_lost_reason ? a.close_lost_reason : NO_REASON);
+const ocOf = a => isDq(a) ? "DQ'd: "+dqName(a) : isLost(a) ? "Lost: "+lostName(a) : a.hs_is_closed_won==="true" ? "Won" : "Still open";
+const OC_ORDER = ["Won", ...DQ_ORDER.map(k=>"DQ'd: "+DQ_LABEL[k]), "DQ'd: "+NO_REASON, ...Object.values(LOST_LABEL).map(l=>"Lost: "+l), "Lost: "+NO_REASON, "Still open"];
 // every dimension can be a breakdown; the ones with filter:true also get a dropdown in the filter bar
 const CL_DIMS = [
   {id:"conf", title:"Show-up confirmed", filter:true, order:["Replied YES to the reminder text","Clicked \"I'll be there\" (thank-you page)","Clicked \"I'll be there\" (pre-call VSL page)","Tapped Confirm via Text, no YES","No confirmation"],
@@ -507,6 +528,7 @@ const CL_DIMS = [
   {id:"k6", title:"6 Killers watched", order:WATCH, f:a => pctBand(a.video_6_killers_watch_pct)},
   {id:"sa", title:"Scaling & Authority watched", order:WATCH, f:a => pctBand(a.video_scaling_authority_watch_pct)},
   {id:"band", title:"Revenue band", filter:true, order:[...BANDS, UNK], f:a => String((BAND_OF[CL.band] || bestBand)(a) || UNK).split(";")[0]},
+  {id:"oc", title:"Outcome / reason (DQ'd or lost)", filter:true, order:OC_ORDER, f:ocOf},
   {id:"offer", title:"Offer", filter:true, order:["High ticket (HT)","Low ticket (LT)","Not set"], f:a => ({ht:"High ticket (HT)", lt:"Low ticket (LT)"})[a.offer] || "Not set"},
   // Meta PPC deals labelled from the booking note by n8n 5vpYcV7EhNRUzi6X (HubSpot deal property meta_lead_channel), hourly
   {id:"mc", title:"Meta channel", filter:true, order:["Meta Lead Form","Meta VSL","Meta, unclear","Meta, not labelled yet","Not Meta PPC"],
@@ -666,6 +688,59 @@ function bnOpen(key, what){
     : [["Closed won", t.c.map(x=>x.won)]];
   showDialog(r.name, "Revenue band, "+p.label+". Click a deal name to open it in HubSpot.", groups);
 }
+/* ---------- DQ'd and lost reasons panel (2026-11-17, Vianney: "add DQ categories into the Sales L10 so we can track via that") ---------- */
+// Deals that left the pipeline with a close date in the period (HubSpot closedate), split into DQ'd (bad fit) by dq_category and
+// Closed lost by close_lost_reason. Filters above apply (lead type, UTM, band...). "No reason recorded" gets its own row so the table adds up.
+const DQP = {s1:{col:"", dir:1}, s2:{col:"", dir:1}, rows:{}};
+function dqDeals(p){
+  const runRow = new Map();
+  effShowup().filter(r=>!r.dropped && r.run_at).forEach(r=>{ const k = String(r.deal_id); if(!runRow.has(k) || Date.parse(r.run_at) < Date.parse(runRow.get(k).run_at)) runRow.set(k, r); });
+  const rec = new Map();
+  effShowup().filter(r=>!r.dropped).forEach(r=>{ const k = String(r.deal_id), t = Date.parse(r.booked_at||r.first_slot||0)||0; if(!rec.has(k) || t > rec.get(k).t) rec.set(k, {t, r}); });
+  const recOf = new Map([...rec].map(([k,v])=>[k, v.r]));
+  effEvents().filter(e=>!e.dropped).forEach(e=>{ if(!recOf.has(String(e.deal_id))) recOf.set(String(e.deal_id), e); });
+  const out = []; let noDate = 0;
+  if(state.attrs) state.attrs.forEach((a, id)=>{
+    const dq = isDq(a), lost = isLost(a); if(!dq && !lost) return;
+    const r = recOf.get(id); if(!r) return;
+    if(!a.closedate){ noDate++; return; }
+    if(!inP(a.closedate, p) || !eraOk(r)) return;
+    const run = runRow.get(id);
+    out.push({kind: dq ? "dq" : "lost", rec: r, ran: !!run, a: {...a, _rtb: run ? rtbOf(run).cat : RTB_CATS[3]}});
+  });
+  return {rows: out, noDate};
+}
+function dqPanel(p){
+  const d = dqDeals(p), rows = clFilter(d.rows);
+  const dq = rows.filter(x=>x.kind==="dq"), lost = rows.filter(x=>x.kind==="lost");
+  DQP.rows = {};
+  const table = (id, list, nameOf, order, title, sort) => {
+    const g = new Map(); list.forEach(x=>{ const k = nameOf(x.a); if(!g.has(k)) g.set(k, []); g.get(k).push(x); });
+    let keys = order.filter(k=>g.has(k)); [...g.keys()].forEach(k=>{ if(!keys.includes(k)) keys.push(k); });
+    const real = keys.filter(k=>k!==NO_REASON), tail = keys.includes(NO_REASON) ? [NO_REASON] : [];
+    if(sort.col==="n") keys = real.sort(byMetric(k=>g.get(k).length, sort.dir)).concat(tail);
+    else if(sort.dir<0) keys = real.reverse().concat(tail);
+    else keys = real.concat(tail);
+    const tot = list.length;
+    const tr = (k, l, cls) => { const key = id+"|"+(k==null ? "__tot" : k); DQP.rows[key] = {name: k==null ? title : k, list: l};
+      const n = l.length, never = l.filter(x=>!x.ran).length;
+      return `<tr class="${cls||""}"><td>${esc(k==null ? "Total" : k)}</td><td><span class="click" data-dqo="${esc(key)}">${fmt(n)}</span></td><td>${pctS(tot ? n/tot : null)}</td><td>${fmt(n-never)}<small>${never ? never+" never met" : ""}</small></td></tr>`; };
+    return `<div><div class="bn-t">${title}</div><div class="table-wrap"><table class="ib-tbl cl-tbl"><thead><tr>${sortTh("data-dqs"+id, "", "Reason", sort)}${sortTh("data-dqs"+id, "n", "Deals", sort)}<th>% of total</th><th>Discos held</th></tr></thead><tbody>${
+      tot ? keys.map(k=>tr(k, g.get(k))).join("") + tr(null, list, "tot") : `<tr><td class="empty" colspan="4">Nothing in this period.</td></tr>`}</tbody></table></div></div>`;
+  };
+  const blankDq = dq.filter(x=>!x.a.dq_category).length, blankLost = lost.filter(x=>!x.a.close_lost_reason).length;
+  document.getElementById("dqNote").innerHTML = `Deals with a close date ${esc(p.label)} that ended <b>DQ'd</b> (bad fit / should not have been booked: DQ category) or <b>Closed lost</b> (everything else: Close Lost Reason). `
+    + `Filters above apply. <b>${fmt(dq.length)}</b> DQ'd, <b>${fmt(lost.length)}</b> lost; ${fmt(blankDq)} DQ'd and ${fmt(blankLost)} lost have no reason yet (own row). `
+    + `DQ categories are ranked, first match wins: Not an MSP, Revenue too low, Geography, CMS, MSP section too small, MSP out of scope, Niche, then Other. Click any number to see the deals.`
+    + (d.noDate ? ` ${fmt(d.noDate)} deal${d.noDate>1?"s":""} with no close date are left out.` : "");
+  return table("dq", dq, dqName, DQ_ORDER.map(k=>DQ_LABEL[k]), "DQ'd deals by reason (bad fit)", DQP.s1)
+    + table("lost", lost, lostName, Object.values(LOST_LABEL), "Closed lost deals by reason", DQP.s2);
+}
+function dqOpen(key){
+  const r = DQP.rows[key]; if(!r) return; const p = clPeriod();
+  const ran = r.list.filter(x=>x.ran).map(x=>x.rec), never = r.list.filter(x=>!x.ran).map(x=>x.rec);
+  showDialog(r.name, "Close date "+p.label+". Click a deal name to open it in HubSpot.", [["Disco held", ran], ["Never met (no disco held)", never]]);
+}
 /* ---------- time and calls to close (2026-11-16, Zamir: "do most deals close in the first X calls / days?") ---------- */
 // Cohort = the discos run in the period (same rows as the tiles, filters apply). Held call = a day with a held meeting on the
 // deal on/after its disco: disco runs, held design/audit meetings, recorded calls matched to the deal (fathom_calls -> p.call_days).
@@ -800,6 +875,7 @@ function renderCloses(){
     tile("Close rate", pctS(t.rate), "closes ÷ runs", 4, D(x=>x.rate, {pct:true})) +
     tile("MRR", fmt(t.mrr,true), t.w.length ? "avg "+fmt(t.mrr/t.w.length,true)+" per close" : "USD/month", 5, D(x=>x.mrr, {money:true}));
   document.getElementById("bnTables").innerHTML = bandPanel(rows, clFilter(clClosesIn(p)));
+  document.getElementById("dqTables").innerHTML = dqPanel(p);
   tcPanel(rows);
   const by = document.getElementById("clBy");
   by.innerHTML = CL_DIMS.map(d=>`<option value="${d.id}"${d.id===CL.by?" selected":""}>${esc(d.title)}</option>`).join("");
@@ -836,6 +912,10 @@ document.getElementById("clSec").addEventListener("click", e=>{
     if(st.col===col) st.dir = -st.dir; else { st.col = col; st.dir = 1; } renderCloses(); return; }
   const bn = e.target.closest("[data-bn]"); if(bn){ bnOpen(bn.dataset.bn, bn.dataset.bno); return; }
   const tc = e.target.closest("[data-tc]"); if(tc){ tcOpen(tc.dataset.tc); return; }
+  const dqo = e.target.closest("[data-dqo]"); if(dqo){ dqOpen(dqo.dataset.dqo); return; }
+  const dqs = e.target.closest("th[data-dqsdq],th[data-dqslost]");
+  if(dqs){ const one = dqs.hasAttribute("data-dqsdq"), st = one ? DQP.s1 : DQP.s2, col = dqs.getAttribute(one ? "data-dqsdq" : "data-dqslost");
+    if(st.col===col) st.dir = -st.dir; else { st.col = col; st.dir = 1; } renderCloses(); return; }
   const s = e.target.closest("th[data-sort],th[data-rsort]");
   if(s){ const st = s.hasAttribute("data-sort") ? CL.sort : CL.rsort, col = s.getAttribute(s.hasAttribute("data-sort") ? "data-sort" : "data-rsort");
     if(st.col===col) st.dir = -st.dir; else { st.col = col; st.dir = 1; } renderCloses(); return; }

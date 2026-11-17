@@ -496,13 +496,13 @@ const jfBand = a => a.jf_verified_arr_band;
 // Same rule as the HubSpot field "ARR Band (Best Known)" (arr_band_best), synced daily by n8n 1BuYcXmOkHVOv6tD.
 const bestBand = a => String(jfBand(a) || "").split(";")[0] || a.self_claimed_msp_arr;
 const BAND_OF = {best: bestBand, jf: jfBand, self: a => a.self_claimed_msp_arr};
-// DQ stage = bad fit / should not have been booked (HubSpot "DQ Category", dq_category). Everything else that ends a deal = Closed lost ("Close Lost Reason").
+// DQ stage = a company we CANNOT serve at all (HubSpot "DQ Category", dq_category). Everything else that ends a deal = Closed lost ("Close Lost Reason"), incl. "Revenue too low" (moved from DQ 11-17: too small for the high-ticket offer, revisit with the low-ticket offer).
 // Both are filled when the AE moves the deal, and backfilled to Jul 1 2026 (11-17). Stage ids: DQ (AE pipeline) / Disqualified (BDR pipeline).
 const DQ_STAGES = new Set(["1244474161","1448429622"]);
-const DQ_LABEL = {cms:"CMS", revenue_too_low:"Revenue too low", msp_section_too_small:"MSP section too small", msp_out_of_scope:"MSP out of scope (government / enterprise)",
+const DQ_LABEL = {cms:"CMS", revenue_too_low:"Revenue too low (old DQ value, now Closed lost)", msp_section_too_small:"MSP section too small", msp_out_of_scope:"MSP out of scope (government / enterprise)",
   not_an_msp:"Not an MSP", niche_vertical_only:"Niche / vertical-only MSP", geography:"Geography (outside N. America, or Quebec / French)", other:"Other bad fit"};
-const DQ_ORDER = ["not_an_msp","revenue_too_low","geography","cms","msp_section_too_small","msp_out_of_scope","niche_vertical_only","other"];   // the ranking: first match wins
-const LOST_LABEL = {"Cost":"Pricing objection","Bad timing":"Bad timing","No Response":"No response","No Interest":"No interest","Unqualified - No pain":"No pain",
+const DQ_ORDER = ["not_an_msp","geography","cms","msp_section_too_small","msp_out_of_scope","niche_vertical_only","other"];   // the ranking: first match wins
+const LOST_LABEL = {"Revenue too low":"Revenue too low (revisit with low-ticket offer)","Cost":"Pricing objection","Bad timing":"Bad timing","No Response":"No response","No Interest":"No interest","Unqualified - No pain":"No pain",
   "Competitor":"Went with competitor","Negative Reviews":"Negative reviews","Business Closed/Out Of Business":"Business closed","Contract Disagreement":"Contract disagreement (complexity)",
   "Doesnt see value":"Doesn't see value","Duplicate Deal":"Duplicate deal","Unqualified":"Unqualified - ICP fit (retired)","Went with competitor":"Went with competitor (old)",
   "0-500K Revenue":"0-500K revenue (retired)","500-1M Revenue":"500-1M revenue (retired)","1M-1.15M Revenue":"1M-1.5M revenue (retired)"};
@@ -729,9 +729,9 @@ function dqPanel(p){
       tot ? keys.map(k=>tr(k, g.get(k))).join("") + tr(null, list, "tot") : `<tr><td class="empty" colspan="4">Nothing in this period.</td></tr>`}</tbody></table></div></div>`;
   };
   const blankDq = dq.filter(x=>!x.a.dq_category).length, blankLost = lost.filter(x=>!x.a.close_lost_reason).length;
-  document.getElementById("dqNote").innerHTML = `Deals with a close date ${esc(p.label)} that ended <b>DQ'd</b> (bad fit / should not have been booked: DQ category) or <b>Closed lost</b> (everything else: Close Lost Reason). `
+  document.getElementById("dqNote").innerHTML = `Deals with a close date ${esc(p.label)} that ended <b>DQ'd</b> (a company we cannot serve: DQ category) or <b>Closed lost</b> (everything else, incl. too small for the high-ticket offer: Close Lost Reason). `
     + `Filters above apply. <b>${fmt(dq.length)}</b> DQ'd, <b>${fmt(lost.length)}</b> lost; ${fmt(blankDq)} DQ'd and ${fmt(blankLost)} lost have no reason yet (own row). `
-    + `DQ categories are ranked, first match wins: Not an MSP, Revenue too low, Geography, CMS, MSP section too small, MSP out of scope, Niche, then Other. Click any number to see the deals.`
+    + `DQ categories are ranked, first match wins: Not an MSP, Geography, CMS, MSP section too small, MSP out of scope, Niche, then Other. Click any number to see the deals.`
     + (d.noDate ? ` ${fmt(d.noDate)} deal${d.noDate>1?"s":""} with no close date are left out.` : "");
   return table("dq", dq, dqName, DQ_ORDER.map(k=>DQ_LABEL[k]), "DQ'd deals by reason (bad fit)", DQP.s1)
     + table("lost", lost, lostName, Object.values(LOST_LABEL), "Closed lost deals by reason", DQP.s2);

@@ -6,7 +6,7 @@
   const API = "https://ottvswkgqohurzilfafu.supabase.co/functions/v1/deal-review";
   const PORTAL = "1905790";
   const DEMO = /[?&]demo=1/.test(location.search) && /^(localhost|127\.0\.0\.1)$/.test(location.hostname);
-  const S = {loaded:false, reviewer:false, pending:[], done:[], opts:{bands:[],dq:[],lost:[]}, hidden:new Set(), filter:"all", busy:false};
+  const S = {loaded:false, reviewer:false, pending:[], cancels:[], done:[], opts:{bands:[],dq:[],lost:[]}, hidden:new Set(), filter:"all", busy:false};
   const esc = s => String(s==null?"":s).replace(/[&<>"']/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
   const token = () => { try { return localStorage.getItem("jf_token"); } catch(e){ return null; } };
   const FIELD = {claimed:"Claimed ARR", verified:"JF verified band", best:"Best known", outcome:"Outcome"};
@@ -67,6 +67,9 @@
   const toast = m => { const t=document.getElementById("toast"); if(!t) return; t.textContent=m; t.classList.add("show"); setTimeout(()=>t.classList.remove("show"),2600); };
 
   const visible = () => S.pending.filter(d=>!S.hidden.has(d.deal_id));
+  const visCancels = () => S.cancels.filter(c=>!S.hidden.has(c.key));
+  const cancelHigh = c => c.verdict!=="unknown" && c.confidence==="high";
+  const total = () => visible().length + visCancels().length;
   const minConf = d => { let r=3; for(const k of Object.keys(d.proposals||{})){ const c=(d.proposals[k]||{}).confidence; if(k==="best"||c==null||c==="") continue; r=Math.min(r, CONF_RANK[c]||1); } return r; };
   const isHigh = d => minConf(d)===3 && !(d.proposals.outcome && d.proposals.outcome.flag);
 
@@ -78,9 +81,9 @@
       el = document.createElement("div"); el.id = "drBar"; anchor.parentNode.insertBefore(el, anchor.nextSibling);
     }
     if(!S.reviewer){ el.innerHTML = ""; return; }
-    const n = visible().length, d = S.done.length;
+    const n = total(), d = S.done.length;
     el.innerHTML = n
-      ? `<div class="rv todo"><b>${n} deal${n>1?"s":""} to review</b><span class="prog">${d} reviewed in the last 3 days</span><button class="btn" id="drOpen">Review now</button></div>`
+      ? `<div class="rv todo"><b>${n} item${n>1?"s":""} to review</b><span class="prog">${d} reviewed in the last 3 days</span><button class="btn" id="drOpen">Review now</button></div>`
       : `<div class="rv"><span>All deals reviewed.</span><span class="prog">${d} reviewed in the last 3 days</span></div>`;
     const b = document.getElementById("drOpen"); if(b) b.onclick = openDlg;
   }
@@ -107,7 +110,7 @@
         <div class="val"><div class="cur">now: ${esc(p.current_stage)} / ${esc(p.current||"no reason")}${resched?" &middot; AI says reschedule needed, handle by hand":""}</div>
         <div class="dr-row2"><select data-stage style="width:auto"><option ${stage==="DQ"?"selected":""}>DQ</option><option ${stage==="Closed lost"?"selected":""}>Closed lost</option></select>
         <select data-cat style="flex:1;min-width:160px">${catOpts(stage)}</select></div>
-        <textarea data-note>${esc(p.note||"")}</textarea>${ev}${p.flag?`<div class="ev">Check: ${esc(p.flag)}</div>`:""}</div></div>`;
+        <textarea data-note>${esc(p.note||"")}</textarea>${ev}${p.flag?`<div class="ev">Flag: ${esc(p.flag)}</div>`:""}</div></div>`;
     }
     return "";
   }
@@ -121,16 +124,41 @@
       <div class="dr-act"><span class="err"></span><button class="btn ghost" data-skip>Skip</button><button class="btn" data-accept>Accept &amp; write</button></div></div>`;
   }
 
+  function cancelCard(c){
+    const slot = c.first_slot ? String(c.first_slot).slice(0,10) : "";
+    const link = `https://app.hubspot.com/contacts/${PORTAL}/record/0-3/${esc(c.deal_id)}`;
+    const conf = `<span class="dr-badge ${esc(c.confidence)}">${esc(c.confidence)}</span>`;
+    const pre = c.verdict==="unknown" ? "" : c.verdict;
+    return `<div class="dr-card" data-ckey="${esc(c.key)}"><div class="dr-top"><b>${esc((c.company||"Deal "+c.deal_id).replace(/ Deal 20\d\d$/i,""))}</b><span class="m">Who cancelled? · call ${esc(slot)}${c.booker?" · booked by "+esc(c.booker):""}</span><a href="${link}" target="_blank" rel="noopener">Open in HubSpot</a></div>
+      <div class="dr-f" style="grid-template-columns:130px 1fr"><div class="lab">Who cancelled${conf}</div><div class="val">
+        <div class="cur">The check says: ${c.verdict==="unknown"?"could not tell":esc(c.verdict==="ours"?"we cancelled or moved it":"they cancelled or moved it")}</div>
+        <div class="dr-row2"><label><input type="radio" name="w-${esc(c.key)}" value="ours" ${pre==="ours"?"checked":""}> We did (we pulled or moved the call)</label><label><input type="radio" name="w-${esc(c.key)}" value="theirs" ${pre==="theirs"?"checked":""}> They did (prospect cancelled or rescheduled)</label></div>
+        ${c.reason?`<div class="ev">${esc(c.reason)}</div>`:""}${c.evidence&&c.evidence!=='""'?`<details class="ev"><summary>Evidence</summary>${esc(c.evidence)}</details>`:""}</div></div>
+      <div class="dr-act"><span class="err"></span><button class="btn ghost" data-skip>Skip</button><button class="btn" data-acceptc>Save</button></div></div>`;
+  }
+  async function acceptCancel(key, cardEl, quiet, forced){
+    const c = S.cancels.find(x=>x.key===key); if(!c) return false;
+    const err = cardEl && cardEl.querySelector(".err");
+    const sel = forced || (cardEl && (cardEl.querySelector("input[type=radio]:checked")||{}).value);
+    if(!sel){ if(err) err.textContent = "Pick who cancelled."; return false; }
+    if(cardEl) cardEl.querySelectorAll("button").forEach(b=>b.disabled=true);
+    const r = await call("/decide-cancel", {key, who:sel});
+    if(r.ok){ S.cancels = S.cancels.filter(x=>x.key!==key); S.done.unshift({deal_id:c.deal_id, company:c.company, status:"accepted"}); if(!quiet){ toast("Saved"); renderBar(); renderList(); } return true; }
+    if(err) err.textContent = r.error || "Could not save";
+    if(cardEl) cardEl.querySelectorAll("button").forEach(b=>b.disabled=false);
+    return false;
+  }
+
   function renderList(){
     const list = document.getElementById("drList"); if(!list) return;
-    let items = visible();
-    if(S.filter==="look") items = items.filter(d=>!isHigh(d));
-    if(S.filter==="high") items = items.filter(isHigh);
-    const nHigh = visible().filter(isHigh).length;
+    let items = visible(), cits = visCancels();
+    if(S.filter==="look"){ items = items.filter(d=>!isHigh(d)); cits = cits.filter(c=>!cancelHigh(c)); }
+    if(S.filter==="high"){ items = items.filter(isHigh); cits = cits.filter(cancelHigh); }
+    const nHigh = visible().filter(isHigh).length + visCancels().filter(cancelHigh).length;
     document.getElementById("drHigh").textContent = `Accept all high confidence (${nHigh})`;
     document.getElementById("drHigh").disabled = !nHigh || S.busy;
     document.querySelectorAll("#drDlg .chip").forEach(c=>c.classList.toggle("on", c.dataset.f===S.filter));
-    list.innerHTML = items.length ? items.map(card).join("") : `<div class="dr-empty">${visible().length?"Nothing in this filter.":"All deals reviewed. Nice."}</div>`;
+    list.innerHTML = (items.length||cits.length) ? items.map(card).join("")+cits.map(cancelCard).join("") : `<div class="dr-empty">${total()?"Nothing in this filter.":"All reviewed. Nice."}</div>`;
   }
 
   function collect(cardEl, d){
@@ -166,8 +194,8 @@
     let dlg = document.getElementById("drDlg");
     if(!dlg){
       dlg = document.createElement("dialog"); dlg.id = "drDlg";
-      dlg.innerHTML = `<div class="dr-head"><button class="dr-x" type="button" aria-label="Close">&times;</button><h3>Deals to review</h3>
-        <p class="dr-sub">The 7:30 check read each deal's calls, emails and notes and proposes what to write. Change a value if it is wrong, untick a field to leave it out, then Accept. Accept writes to HubSpot straight away.</p>
+      dlg.innerHTML = `<div class="dr-head"><button class="dr-x" type="button" aria-label="Close">&times;</button><h3>To review</h3>
+        <p class="dr-sub">The 7:30 check read each deal's calls, emails and notes and proposes what to write. Change a value if it is wrong, untick a field to leave it out, then Accept. Accept writes to HubSpot straight away. \"Who cancelled\" cards fix the leaderboard numbers only (nothing goes to HubSpot).</p>
         <div class="dr-tools"><button class="chip on" data-f="all">All</button><button class="chip" data-f="look">Needs a look</button><button class="chip" data-f="high">High confidence</button><span style="flex:1"></span><button class="btn" id="drHigh">Accept all high confidence</button></div></div>
         <div id="drList"></div>`;
       document.body.appendChild(dlg);
@@ -175,14 +203,16 @@
       dlg.addEventListener("click", async e=>{
         const f = e.target.closest(".chip"); if(f){ S.filter = f.dataset.f; renderList(); return; }
         const cardEl = e.target.closest(".dr-card");
-        if(e.target.closest("[data-skip]") && cardEl){ S.hidden.add(cardEl.dataset.id); renderBar(); renderList(); return; }
+        if(e.target.closest("[data-skip]") && cardEl){ S.hidden.add(cardEl.dataset.id||cardEl.dataset.ckey); renderBar(); renderList(); return; }
+        if(e.target.closest("[data-acceptc]") && cardEl){ await acceptCancel(cardEl.dataset.ckey, cardEl); return; }
         if(e.target.closest("[data-accept]") && cardEl){ await accept(cardEl.dataset.id, cardEl); return; }
         if(e.target.id==="drHigh"){
-          const ids = visible().filter(isHigh).map(d=>d.deal_id);
-          if(!ids.length) return;
+          const ids = visible().filter(isHigh).map(d=>d.deal_id), cks = visCancels().filter(cancelHigh).map(c=>c);
+          if(!ids.length && !cks.length) return;
           S.busy = true; let ok = 0;
           for(const id of ids){ const c = dlg.querySelector(`.dr-card[data-id="${id}"]`); if(!c) continue; if(await accept(id, c, true)) ok++; }
-          S.busy = false; toast(ok+" of "+ids.length+" written to HubSpot"); renderBar(); renderList(); return;
+          for(const c of cks){ if(await acceptCancel(c.key, null, true, c.verdict)) ok++; }
+          S.busy = false; toast(ok+" of "+(ids.length+cks.length)+" saved"); renderBar(); renderList(); return;
         }
       });
       dlg.addEventListener("change", e=>{
@@ -198,7 +228,7 @@
     if(!DEMO && !token()) return;
     const r = await call("/list");
     if(!r.ok || !r.reviewer){ S.reviewer = false; renderBar(); return; }
-    S.loaded = true; S.reviewer = true; S.pending = r.pending||[]; S.done = r.done||[]; S.opts = r.options||S.opts;
+    S.loaded = true; S.reviewer = true; S.pending = r.pending||[]; S.cancels = r.cancels||[]; S.done = r.done||[]; S.opts = r.options||S.opts;
     renderBar();
   }
   // lb-core builds the page and signs the user in; wait for its review bar to exist, then load once

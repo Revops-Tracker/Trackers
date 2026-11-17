@@ -47,6 +47,15 @@
   .dr-badge.low{background:color-mix(in srgb,var(--behind) 18%,var(--panel));color:var(--behind)}
   .dr-act{display:flex;gap:8px;justify-content:flex-end;align-items:center;margin-top:8px}
   .dr-act .err{color:var(--behind);font-size:13px;margin-right:auto}
+  .dr-evl summary{cursor:pointer;font-weight:600;color:var(--ink)}
+  .dr-evl ul{list-style:none;margin:6px 0 0;padding:0;display:grid;gap:6px}
+  .dr-evl li{border-left:3px solid var(--line);padding:2px 0 2px 10px}
+  .dr-evl li.used{border-left-color:var(--gold);background:color-mix(in srgb,var(--gold) 8%,transparent)}
+  .dr-evl .who{font-weight:700;color:var(--ink)}
+  .dr-evl .who.prospect{color:var(--fill)}
+  .dr-evl .meta{font-size:12px;color:var(--muted)}
+  .dr-evl .key{font-size:11px;font-weight:700;color:var(--gold);text-transform:uppercase;letter-spacing:.04em}
+  .dr-evl .t{color:var(--ink);font-size:13px;margin-top:1px;overflow-wrap:anywhere}
   .dr-empty{padding:28px 0;text-align:center;color:var(--muted)}
   @media (max-width:560px){.dr-f{grid-template-columns:20px 1fr}.dr-f .lab{grid-column:2}.dr-f .val{grid-column:1 / -1}}
   `;
@@ -124,6 +133,15 @@
       <div class="dr-act"><span class="err"></span><button class="btn ghost" data-skip>Skip</button><button class="btn" data-accept>Accept &amp; write</button></div></div>`;
   }
 
+  const SRC = {ghl_sms:"Text message", ghl_email:"Email", ghl_activity_appointment:"Calendar booking", gcal:"Google Calendar", slack_slotguard:"Slot guard alert", hubspot_note:"HubSpot note", hubspot_meeting:"HubSpot meeting"};
+  const srcLabel = s => SRC[s] || String(s||"").replace(/^(ghl|slack|hubspot)_/,"").replace(/_/g," ").replace(/^./,c=>c.toUpperCase());
+  const when = iso => { try{ return new Date(iso).toLocaleString("en-CA",{timeZone:"America/Toronto",month:"short",day:"numeric",hour:"numeric",minute:"2-digit"}); }catch(e){ return String(iso||"").slice(0,16); } };
+  function evHTML(ev, open){
+    if(!Array.isArray(ev) || !ev.length) return "";
+    const li = e => `<li class="${e.used?"used":""}"><span class="who ${esc(e.side)}">${e.side==="us"?"We":(e.side==="prospect"?"Prospect":esc(e.side||""))}</span> <span class="meta">${esc(srcLabel(e.src))} · ${esc(when(e.at))}</span>${e.used?` <span class="key">decided on this</span>`:""}<div class="t">${esc(e.text)}</div></li>`;
+    return `<details class="ev dr-evl" ${open?"open":""}><summary>Evidence (${ev.length})</summary><ul>${ev.map(li).join("")}</ul></details>`;
+  }
+
   function cancelCard(c){
     const slot = c.first_slot ? String(c.first_slot).slice(0,10) : "";
     const link = `https://app.hubspot.com/contacts/${PORTAL}/record/0-3/${esc(c.deal_id)}`;
@@ -133,7 +151,7 @@
       <div class="dr-f" style="grid-template-columns:130px 1fr"><div class="lab">Who cancelled${conf}</div><div class="val">
         <div class="cur">The check says: ${c.verdict==="unknown"?"could not tell":esc(c.verdict==="ours"?"we cancelled or moved it":"they cancelled or moved it")}</div>
         <div class="dr-row2"><label><input type="radio" name="w-${esc(c.key)}" value="ours" ${pre==="ours"?"checked":""}> We did (we pulled or moved the call)</label><label><input type="radio" name="w-${esc(c.key)}" value="theirs" ${pre==="theirs"?"checked":""}> They did (prospect cancelled or rescheduled)</label></div>
-        ${c.reason?`<div class="ev">${esc(c.reason)}</div>`:""}${c.evidence&&c.evidence!=='""'?`<details class="ev"><summary>Evidence</summary>${esc(c.evidence)}</details>`:""}</div></div>
+        ${c.reason?`<div class="ev">${esc(c.reason)}</div>`:""}${evHTML(c.evidence, c.verdict==="unknown")}</div></div>
       <div class="dr-act"><span class="err"></span><button class="btn ghost" data-skip>Skip</button><button class="btn" data-acceptc>Save</button></div></div>`;
   }
   async function acceptCancel(key, cardEl, quiet, forced){

@@ -699,16 +699,18 @@ function dqDeals(p){
   effShowup().filter(r=>!r.dropped).forEach(r=>{ const k = String(r.deal_id), t = Date.parse(r.booked_at||r.first_slot||0)||0; if(!rec.has(k) || t > rec.get(k).t) rec.set(k, {t, r}); });
   const recOf = new Map([...rec].map(([k,v])=>[k, v.r]));
   effEvents().filter(e=>!e.dropped).forEach(e=>{ if(!recOf.has(String(e.deal_id))) recOf.set(String(e.deal_id), e); });
-  const out = []; let noDate = 0;
+  const out = []; let noDate = 0, dupN = 0;
   if(state.attrs) state.attrs.forEach((a, id)=>{
     const dq = isDq(a), lost = isLost(a); if(!dq && !lost) return;
     const r = recOf.get(id); if(!r) return;
     if(!a.closedate){ noDate++; return; }
+    // 11-17: "Duplicate Deal" = a record closed because a newer booking replaced it (REPLACED - name). Not a real loss, so it stays out of the reasons tables and is counted in the note.
+    if(lost && a.close_lost_reason==="Duplicate Deal"){ if(inP(a.closedate, p) && eraOk(r)) dupN++; return; }
     if(!inP(a.closedate, p) || !eraOk(r)) return;
     const run = runRow.get(id);
     out.push({kind: dq ? "dq" : "lost", rec: r, ran: !!run, a: {...a, _rtb: run ? rtbOf(run).cat : RTB_CATS[3]}});
   });
-  return {rows: out, noDate};
+  return {rows: out, noDate, dupN};
 }
 function dqPanel(p){
   const d = dqDeals(p), rows = clFilter(d.rows);
@@ -732,6 +734,7 @@ function dqPanel(p){
   document.getElementById("dqNote").innerHTML = `Deals with a close date ${esc(p.label)} that ended <b>DQ'd</b> (a company we cannot serve: DQ category) or <b>Closed lost</b> (everything else, incl. too small for the high-ticket offer: Close Lost Reason). `
     + `Filters above apply. <b>${fmt(dq.length)}</b> DQ'd, <b>${fmt(lost.length)}</b> lost; ${fmt(blankDq)} DQ'd and ${fmt(blankLost)} lost have no reason yet (own row). `
     + `DQ categories are ranked, first match wins: Not an MSP, Geography, CMS, MSP section too small, MSP out of scope, Niche, then Other. Click any number to see the deals.`
+    + (d.dupN ? ` ${fmt(d.dupN)} replaced duplicate deal${d.dupN>1?"s":""} (closed because a newer booking took over) are not counted here.` : "")
     + (d.noDate ? ` ${fmt(d.noDate)} deal${d.noDate>1?"s":""} with no close date are left out.` : "");
   return table("dq", dq, dqName, DQ_ORDER.map(k=>DQ_LABEL[k]), "DQ'd deals by reason (bad fit)", DQP.s1)
     + table("lost", lost, lostName, Object.values(LOST_LABEL), "Closed lost deals by reason", DQP.s2);

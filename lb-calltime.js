@@ -19,7 +19,10 @@
   #ctPanel th,#ctPanel td{text-align:right;padding:6px 10px;border-bottom:1px solid var(--line);white-space:nowrap}
   #ctPanel th:first-child,#ctPanel td:first-child{text-align:left}
   #ctPanel th{font-size:12px;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.04em}
-  #ctPanel td small{color:var(--muted)}
+  #ctPanel td small,#ctPanel th small{color:var(--muted);font-weight:400;text-transform:none;letter-spacing:0}
+  #ctPanel tr.tot td{border-top:2px solid var(--line)}
+  #ctPanel .grp th{text-align:center;border-bottom:0;padding-bottom:0}
+  #ctPanel .grp th:first-child{text-align:left;vertical-align:bottom}
   #ctPanel h4{margin:10px 0 2px;font-size:14px}
   `;
   document.head.appendChild(css);
@@ -31,15 +34,20 @@
       const anchor = document.getElementById("drBar") || document.getElementById("reviewBar"); if(!anchor) return;
       el = document.createElement("div"); el.id = "ctPanel"; anchor.parentNode.insertBefore(el, anchor.nextSibling);
     }
-    const rows = d.bands.map((b,i)=>`<tr><td>${esc(b)}</td><td>${cell(d.cold.bands[i],true)}</td><td>${cell(d.cold.bands[i],false)}</td><td>${cell(d.inbound.bands[i],true)}</td><td>${cell(d.inbound.bands[i],false)}</td></tr>`).join("")
-      + `<tr><td><b>All</b></td><td><b>${cell(d.cold.all,true)}</b></td><td><b>${cell(d.cold.all,false)}</b></td><td><b>${cell(d.inbound.all,true)}</b></td><td><b>${cell(d.inbound.all,false)}</b></td></tr>`;
-    const bdr = d.bdrs.map(b=>`<tr><td>${esc(b.name)}</td><td>${b.all.n}</td><td>${b.median_min}</td><td>${cell(b.all,true)}</td><td>${cell(b.short,true)}</td><td>${cell(b.long,true)}</td></tr>`).join("");
+    const row = (label, i, strong) => { const c = i==null ? d.cold.all : d.cold.bands[i], n = i==null ? d.inbound.all : d.inbound.bands[i]; const w = x => strong ? `<b>${x}</b>` : x;
+      return `<tr${strong?' class="tot"':""}><td>${w(esc(label))}</td><td>${w(cell(c,true))}</td><td>${w(cell(c,false))}</td><td>${w(cell(n,true))}</td><td>${w(cell(n,false))}</td></tr>`; };
+    const rows = d.bands.map((b,i)=>row(b,i,false)).join("") + row("All lengths", null, true);
+    const bdr = d.bdrs.map(b=>`<tr><td>${esc(b.name)}</td><td>${b.median_min} min</td><td>${cell(b.all,true)}</td><td>${cell(b.short,true)}</td><td>${cell(b.long,true)}</td></tr>`).join("");
     el.innerHTML = `<details><summary>Booking call length vs show-up<span class="prog">does a longer booking call mean a better show rate?</span></summary>
-      <div class="ct-note">The call that booked the meeting, matched from the Nooks call log in HubSpot. Pure cold = first touch was a cold call (${d.cold.matched} of ${d.cold.total} bookings matched to a call). Inbound = first touch was inbound but a rep booked it on the phone (${d.inbound.matched} of ${d.inbound.total}; most inbound leads book themselves). Each cell is the show rate with the number of bookings in brackets. First-time = showed on the first slot, moved calls left out. Overall = showed at all, including after a move; cancels ahead of the call and pending calls left out.${d.updated_at?` Updated ${esc(new Date(d.updated_at).toLocaleDateString())}.`:""}</div>
-      <div class="ct-wrap"><table><thead><tr><th>Call length</th><th>Cold: first-time</th><th>Cold: overall</th><th>Inbound: first-time</th><th>Inbound: overall</th></tr></thead><tbody>${rows}</tbody></table></div>
-      <h4>By BDR (pure cold, first-time show)</h4>
-      <div class="ct-note">If call length really drives showing, each BDR's long calls should beat their own short calls. Short = under 5 minutes.</div>
-      <div class="ct-wrap"><table><thead><tr><th>BDR</th><th>Bookings</th><th>Median call (min)</th><th>All calls</th><th>Under 5 min</th><th>5 min+</th></tr></thead><tbody>${bdr||`<tr><td colspan="6">Not enough bookings yet.</td></tr>`}</tbody></table></div>
+      <div class="ct-note">Length of the call that booked the meeting (Nooks calls logged in HubSpot). Each cell is the show rate, with the number of bookings in brackets. <b>Showed on first slot</b> leaves out calls that were moved. <b>Showed at all</b> also counts people who showed after a move. Cancelled-ahead and pending bookings are left out of both.</div>
+      <div class="ct-wrap"><table><thead>
+        <tr class="grp"><th rowspan="2">Booking call length</th><th colspan="2">Cold calls <small>(first touch was a cold call)</small></th><th colspan="2">Inbound leads <small>(a rep booked them by phone)</small></th></tr>
+        <tr><th>Showed on first slot</th><th>Showed at all</th><th>Showed on first slot</th><th>Showed at all</th></tr>
+      </thead><tbody>${rows}</tbody></table></div>
+      <div class="ct-note"><small>Matched to a booking call: ${d.cold.matched} of ${d.cold.total} cold-call bookings, ${d.inbound.matched} of ${d.inbound.total} inbound bookings (most inbound leads book themselves, so they have no call).</small></div>
+      <h4>By BDR: cold-call bookings, showed on first slot</h4>
+      <div class="ct-note">If call length really drives showing, each BDR's longer calls should beat their own shorter ones.</div>
+      <div class="ct-wrap"><table><thead><tr><th>BDR</th><th>Typical booking call</th><th>All calls</th><th>Calls under 5 min</th><th>Calls 5 min or more</th></tr></thead><tbody>${bdr||`<tr><td colspan="5">Not enough bookings yet.</td></tr>`}</tbody></table></div>
     </details>`;
   }
   async function load(){

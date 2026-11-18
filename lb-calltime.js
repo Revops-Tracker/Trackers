@@ -32,6 +32,17 @@
     if(!b) return "<small>none</small>";
     const t = `<small>${a} of ${b} showed</small>`;
     return `<b>${Math.round(100*a/b)}%</b><br>${t}`; };
+  const ccell = x => { if(!x || !x.discos) return "<small>none</small>";
+    const m = x.mature ? `<br><small>45+ days old: ${x.mature_won} of ${x.mature}</small>` : "";
+    return `<b>${(100*x.won/x.discos).toFixed(1).replace(/\.0$/,"")}%</b><br><small>${x.won} of ${x.discos} closed</small>${m}`; };
+  function closeBlock(d){
+    if(!d.close) return "";
+    const rows = d.bands.map((b,i)=>`<tr><td>${esc(b)}</td><td>${ccell(d.close.cold.bands[i])}</td><td>${ccell(d.close.inbound.bands[i])}</td></tr>`).join("")
+      + `<tr class="tot"><td><b>All lengths</b></td><td>${ccell(d.close.cold.all)}</td><td>${ccell(d.close.inbound.all)}</td></tr>`;
+    const nc = d.close.cold.all.won;
+    return `<h4>Booking call length vs closing</h4>
+      <div class="ct-note"><b>How to read it.</b> Same booking-call lengths as above, but the question is: of the meetings that actually <b>happened</b> (a discovery call was held), how many became a won deal? Each deal counts once, at its first held call. The percentage is closed-won deals divided by held discovery calls, so no-shows and cancelled meetings are not in it. The "45+ days old" line is the same count using only calls held at least 45 days ago, because nearly all closes happen within 45 days and newer calls may still close. <b>Only ${nc} cold-call deals have closed so far, so treat each row as a hint, not proof.</b></div>
+      <div class="ct-wrap"><table><thead><tr><th>Booking call length</th><th>Cold calls <small>(closed won of discos held)</small></th><th>Inbound leads <small>(closed won of discos held)</small></th></tr></thead><tbody>${rows}</tbody></table></div>`; }
   function render(d){
     let el = document.getElementById("ctPanel");
     if(!el){
@@ -42,7 +53,7 @@
     const row = (label, i, strong) => { const c = i==null ? d.cold.all : d.cold.bands[i], n = i==null ? d.inbound.all : d.inbound.bands[i];
       return `<tr${strong?' class="tot"':""}><td>${strong?`<b>${esc(label)}</b>`:esc(label)}</td><td>${cell(c,true)}</td><td>${cell(c,false)}</td><td>${cell(n,true)}</td><td>${cell(n,false)}</td></tr>`; };
     const rows = d.bands.map((b,i)=>row(b,i,false)).join("") + row("All lengths", null, true);
-    const bdr = d.bdrs.map(b=>{ const cnt = b.all.first_show + b.all.first_noshow; return `<tr><td>${esc(b.name)}</td><td>${b.total}</td><td>${cnt}</td><td>${b.median_min} min</td><td>${cell(b.all,true)}</td><td>${cell(b.short,true)}</td><td>${cell(b.long,true)}</td></tr>`; }).join("");
+    const bdr = d.bdrs.map(b=>{ const cnt = b.all.first_show + b.all.first_noshow; return `<tr><td>${esc(b.name)}</td><td>${b.total}</td><td>${cnt}</td><td>${b.median_min} min</td><td>${cell(b.all,true)}</td><td>${cell(b.short,true)}</td><td>${cell(b.long,true)}</td><td>${ccell(b.close)}</td></tr>`; }).join("");
     el.innerHTML = `<details open><summary>Booking call length vs show-up<span class="prog">does a longer booking call mean a better show rate?</span></summary>
       <div class="ct-note"><b>How to read it.</b> We find the call that booked each meeting (Nooks calls logged in HubSpot) and group the meetings by how long that call lasted. Each cell shows the % who showed up, and underneath, how many showed out of how many were counted (people who showed plus people who no-showed). <b>Showed on first slot</b> leaves out calls that were moved. <b>Showed at all</b> also counts people who showed after a move. Cancelled-ahead, pending and no-call-found bookings are not counted.</div>
       <div class="ct-wrap"><table><thead>
@@ -50,9 +61,10 @@
         <tr><th>Showed on first slot</th><th>Showed at all</th><th>Showed on first slot</th><th>Showed at all</th></tr>
       </thead><tbody>${rows}</tbody></table></div>
       <div class="ct-note"><small>A booking call was found for ${d.cold.matched} of ${d.cold.total} cold-call bookings and ${d.inbound.matched} of ${d.inbound.total} inbound bookings (most inbound leads book themselves, so there is no call).</small></div>
+      ${closeBlock(d)}
       <h4>By BDR (cold-call bookings, showed on first slot)</h4>
       <div class="ct-note">If call length really drives showing, a BDR's longer calls should beat their own shorter ones. "Counted" is how many of their bookings made it into the percentages; the rest had no booking call found, were moved, cancelled ahead, or are still pending.</div>
-      <div class="ct-wrap"><table><thead><tr><th>BDR</th><th>Cold-call bookings</th><th>Counted</th><th>Typical booking call</th><th>All counted</th><th>Calls under 5 min</th><th>Calls 5 min or more</th></tr></thead><tbody>${bdr||`<tr><td colspan="7">Not enough bookings yet.</td></tr>`}</tbody></table></div>
+      <div class="ct-wrap"><table><thead><tr><th>BDR</th><th>Cold-call bookings</th><th>Counted</th><th>Typical booking call</th><th>All counted</th><th>Calls under 5 min</th><th>Calls 5 min or more</th><th>Closed won, all calls</th></tr></thead><tbody>${bdr||`<tr><td colspan="8">Not enough bookings yet.</td></tr>`}</tbody></table></div>
     </details>`;
   }
   async function load(){

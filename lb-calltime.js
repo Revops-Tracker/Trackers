@@ -23,31 +23,36 @@
   #ctPanel tr.tot td{border-top:2px solid var(--line)}
   #ctPanel .grp th{text-align:center;border-bottom:0;padding-bottom:0}
   #ctPanel .grp th:first-child{text-align:left;vertical-align:bottom}
+  #ctPanel .few{color:var(--muted);font-style:italic}
+  #ctPanel td{line-height:1.25}
   #ctPanel h4{margin:10px 0 2px;font-size:14px}
   `;
   document.head.appendChild(css);
-  const pct = (a,b) => b ? Math.round(100*a/b)+"%" : "–";
-  const cell = (x, first) => { const a = first ? x.first_show : x.show, b = first ? x.first_show + x.first_noshow : x.show + x.noshow; return b ? `${pct(a,b)} <small>(${b})</small>` : "–"; };
+  const MIN = 15;   // fewer than this many decided bookings = too few to show a percentage
+  const cell = (x, first) => { const a = first ? x.first_show : x.show, b = first ? x.first_show + x.first_noshow : x.show + x.noshow;
+    if(!b) return "<small>none</small>";
+    const t = `<small>${a} of ${b} showed</small>`;
+    return b < MIN ? `<span class="few">too few</span><br>${t}` : `<b>${Math.round(100*a/b)}%</b><br>${t}`; };
   function render(d){
     let el = document.getElementById("ctPanel");
     if(!el){
       const anchor = document.getElementById("drBar") || document.getElementById("reviewBar"); if(!anchor) return;
       el = document.createElement("div"); el.id = "ctPanel"; anchor.parentNode.insertBefore(el, anchor.nextSibling);
     }
-    const row = (label, i, strong) => { const c = i==null ? d.cold.all : d.cold.bands[i], n = i==null ? d.inbound.all : d.inbound.bands[i]; const w = x => strong ? `<b>${x}</b>` : x;
-      return `<tr${strong?' class="tot"':""}><td>${w(esc(label))}</td><td>${w(cell(c,true))}</td><td>${w(cell(c,false))}</td><td>${w(cell(n,true))}</td><td>${w(cell(n,false))}</td></tr>`; };
+    const row = (label, i, strong) => { const c = i==null ? d.cold.all : d.cold.bands[i], n = i==null ? d.inbound.all : d.inbound.bands[i];
+      return `<tr${strong?' class="tot"':""}><td>${strong?`<b>${esc(label)}</b>`:esc(label)}</td><td>${cell(c,true)}</td><td>${cell(c,false)}</td><td>${cell(n,true)}</td><td>${cell(n,false)}</td></tr>`; };
     const rows = d.bands.map((b,i)=>row(b,i,false)).join("") + row("All lengths", null, true);
-    const bdr = d.bdrs.map(b=>`<tr><td>${esc(b.name)}</td><td>${b.median_min} min</td><td>${cell(b.all,true)}</td><td>${cell(b.short,true)}</td><td>${cell(b.long,true)}</td></tr>`).join("");
+    const bdr = d.bdrs.map(b=>{ const cnt = b.all.first_show + b.all.first_noshow; return `<tr><td>${esc(b.name)}</td><td>${b.total}</td><td>${cnt}</td><td>${b.median_min} min</td><td>${cell(b.all,true)}</td><td>${cell(b.short,true)}</td><td>${cell(b.long,true)}</td></tr>`; }).join("");
     el.innerHTML = `<details><summary>Booking call length vs show-up<span class="prog">does a longer booking call mean a better show rate?</span></summary>
-      <div class="ct-note">Length of the call that booked the meeting (Nooks calls logged in HubSpot). Each cell is the show rate, with the number of bookings in brackets. <b>Showed on first slot</b> leaves out calls that were moved. <b>Showed at all</b> also counts people who showed after a move. Cancelled-ahead and pending bookings are left out of both.</div>
+      <div class="ct-note"><b>How to read it.</b> We find the call that booked each meeting (Nooks calls logged in HubSpot) and group the meetings by how long that call lasted. Each cell shows the % who showed up, and underneath, how many showed out of how many were counted (people who showed plus people who no-showed). <b>Showed on first slot</b> leaves out calls that were moved. <b>Showed at all</b> also counts people who showed after a move. Cancelled-ahead, pending and no-call-found bookings are not counted. A cell with fewer than ${MIN} counted bookings says "too few" instead of a percentage, because one booking would swing it too much.</div>
       <div class="ct-wrap"><table><thead>
         <tr class="grp"><th rowspan="2">Booking call length</th><th colspan="2">Cold calls <small>(first touch was a cold call)</small></th><th colspan="2">Inbound leads <small>(a rep booked them by phone)</small></th></tr>
         <tr><th>Showed on first slot</th><th>Showed at all</th><th>Showed on first slot</th><th>Showed at all</th></tr>
       </thead><tbody>${rows}</tbody></table></div>
-      <div class="ct-note"><small>Matched to a booking call: ${d.cold.matched} of ${d.cold.total} cold-call bookings, ${d.inbound.matched} of ${d.inbound.total} inbound bookings (most inbound leads book themselves, so they have no call).</small></div>
-      <h4>By BDR: cold-call bookings, showed on first slot</h4>
-      <div class="ct-note">If call length really drives showing, each BDR's longer calls should beat their own shorter ones.</div>
-      <div class="ct-wrap"><table><thead><tr><th>BDR</th><th>Typical booking call</th><th>All calls</th><th>Calls under 5 min</th><th>Calls 5 min or more</th></tr></thead><tbody>${bdr||`<tr><td colspan="5">Not enough bookings yet.</td></tr>`}</tbody></table></div>
+      <div class="ct-note"><small>A booking call was found for ${d.cold.matched} of ${d.cold.total} cold-call bookings and ${d.inbound.matched} of ${d.inbound.total} inbound bookings (most inbound leads book themselves, so there is no call).</small></div>
+      <h4>By BDR (cold-call bookings, showed on first slot)</h4>
+      <div class="ct-note">If call length really drives showing, a BDR's longer calls should beat their own shorter ones. "Counted" is how many of their bookings made it into the percentages; the rest had no booking call found, were moved, cancelled ahead, or are still pending.</div>
+      <div class="ct-wrap"><table><thead><tr><th>BDR</th><th>Cold-call bookings</th><th>Counted</th><th>Typical booking call</th><th>All counted</th><th>Calls under 5 min</th><th>Calls 5 min or more</th></tr></thead><tbody>${bdr||`<tr><td colspan="7">Not enough bookings yet.</td></tr>`}</tbody></table></div>
     </details>`;
   }
   async function load(){

@@ -85,9 +85,10 @@
   function renderBar(){
     let el = document.getElementById("drBar");
     if(!el){
-      const anchor = document.getElementById("reviewBar");
-      if(!anchor) return;
-      el = document.createElement("div"); el.id = "drBar"; anchor.parentNode.insertBefore(el, anchor.nextSibling);
+      const anchor = document.getElementById("reviewBar"), mount = document.getElementById("rwMount");
+      if(!anchor && !mount) return;
+      el = document.createElement("div"); el.id = "drBar";
+      if(mount) mount.appendChild(el); else anchor.parentNode.insertBefore(el, anchor.nextSibling);   // Sales L10: lives under the To review tab
     }
     if(!S.reviewer){ el.innerHTML = ""; return; }
     const n = total(), d = S.done.length;

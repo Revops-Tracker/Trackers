@@ -36,8 +36,9 @@
   function render(d){
     let el = document.getElementById("ctPanel");
     if(!el){
-      const anchor = document.getElementById("drBar") || document.getElementById("reviewBar"); if(!anchor) return;
-      el = document.createElement("div"); el.id = "ctPanel"; anchor.parentNode.insertBefore(el, anchor.nextSibling);
+      const mount = document.getElementById("bkExtra"), anchor = document.getElementById("drBar") || document.getElementById("reviewBar"); if(!mount && !anchor) return;
+      el = document.createElement("div"); el.id = "ctPanel";
+      if(mount) mount.appendChild(el); else anchor.parentNode.insertBefore(el, anchor.nextSibling);   // Sales L10: under the Bookings tab
     }
     const row = (label, i, strong) => { const c = i==null ? d.cold.all : d.cold.bands[i], n = i==null ? d.inbound.all : d.inbound.bands[i];
       return `<tr${strong?' class="tot"':""}><td>${strong?`<b>${esc(label)}</b>`:esc(label)}</td><td>${cell(c,true)}</td><td>${cell(c,false)}</td><td>${cell(n,true)}</td><td>${cell(n,false)}</td></tr>`; };

@@ -1182,14 +1182,17 @@ function renderScorecard(){
     if(m.grp){ grp = {name:m.grp, rows:[]}; groups.push(grp); return; }
     const src = m.act ? "act" : m.slot ? "slot" : null;
     if(src && !SRC[src].show) return;
+    if(SC.only && !SC.only.has(m.id)) return;   // funnel tabs (lb-nav.js) show only their own rows
     grp.rows.push({m, mi});
   });
   const shown = groups.filter(g=>g.rows.length);
   SC.groups = shown.filter(g=>g.rows.some(r=>!r.m.core)).map(g=>g.name);
   document.getElementById("scAll").textContent = SC.groups.every(n=>SC.open.has(n)) ? "Headline rows only" : "Show all rows";
+  document.getElementById("scAll").hidden = !!SC.full;
   shown.forEach(gr=>{
-  const open = SC.open.has(gr.name), more = gr.rows.filter(r=>!r.m.core).length;
-  html += `<tr class="grp${more?" tog":""}"${more?` data-grp="${esc(gr.name)}" title="${open?"Show headline rows only":"Show all "+gr.name+" rows"}"`:""}><td colspan="${cols.length+3+(CMP?1:0)}"><span class="grp-lbl">${gr.name}${more?`<span class="grp-more">${open?"fewer ▴":more+" more ▾"}</span>`:""}</span></td></tr>`;
+  const open = SC.full || SC.open.has(gr.name), more = SC.full ? 0 : gr.rows.filter(r=>!r.m.core).length;
+  const grName = (SC.relabel && SC.relabel[gr.name]) || gr.name;
+  html += `<tr class="grp${more?" tog":""}"${more?` data-grp="${esc(gr.name)}" title="${open?"Show headline rows only":"Show all "+gr.name+" rows"}"`:""}><td colspan="${cols.length+3+(CMP?1:0)}"><span class="grp-lbl">${grName}${more?`<span class="grp-more">${open?"fewer ▴":more+" more ▾"}</span>`:""}</span></td></tr>`;
   gr.rows.forEach(({m, mi})=>{
     if(!open && !m.core) return;
     const src = m.act ? "act" : m.slot ? "slot" : null;

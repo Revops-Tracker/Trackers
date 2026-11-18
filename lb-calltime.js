@@ -28,11 +28,10 @@
   #ctPanel h4{margin:10px 0 2px;font-size:14px}
   `;
   document.head.appendChild(css);
-  const MIN = 15;   // fewer than this many decided bookings = too few to show a percentage
   const cell = (x, first) => { const a = first ? x.first_show : x.show, b = first ? x.first_show + x.first_noshow : x.show + x.noshow;
     if(!b) return "<small>none</small>";
     const t = `<small>${a} of ${b} showed</small>`;
-    return b < MIN ? `<span class="few">too few</span><br>${t}` : `<b>${Math.round(100*a/b)}%</b><br>${t}`; };
+    return `<b>${Math.round(100*a/b)}%</b><br>${t}`; };
   function render(d){
     let el = document.getElementById("ctPanel");
     if(!el){
@@ -45,7 +44,7 @@
     const rows = d.bands.map((b,i)=>row(b,i,false)).join("") + row("All lengths", null, true);
     const bdr = d.bdrs.map(b=>{ const cnt = b.all.first_show + b.all.first_noshow; return `<tr><td>${esc(b.name)}</td><td>${b.total}</td><td>${cnt}</td><td>${b.median_min} min</td><td>${cell(b.all,true)}</td><td>${cell(b.short,true)}</td><td>${cell(b.long,true)}</td></tr>`; }).join("");
     el.innerHTML = `<details open><summary>Booking call length vs show-up<span class="prog">does a longer booking call mean a better show rate?</span></summary>
-      <div class="ct-note"><b>How to read it.</b> We find the call that booked each meeting (Nooks calls logged in HubSpot) and group the meetings by how long that call lasted. Each cell shows the % who showed up, and underneath, how many showed out of how many were counted (people who showed plus people who no-showed). <b>Showed on first slot</b> leaves out calls that were moved. <b>Showed at all</b> also counts people who showed after a move. Cancelled-ahead, pending and no-call-found bookings are not counted. A cell with fewer than ${MIN} counted bookings says "too few" instead of a percentage, because one booking would swing it too much.</div>
+      <div class="ct-note"><b>How to read it.</b> We find the call that booked each meeting (Nooks calls logged in HubSpot) and group the meetings by how long that call lasted. Each cell shows the % who showed up, and underneath, how many showed out of how many were counted (people who showed plus people who no-showed). <b>Showed on first slot</b> leaves out calls that were moved. <b>Showed at all</b> also counts people who showed after a move. Cancelled-ahead, pending and no-call-found bookings are not counted.</div>
       <div class="ct-wrap"><table><thead>
         <tr class="grp"><th rowspan="2">Booking call length</th><th colspan="2">Cold calls <small>(first touch was a cold call)</small></th><th colspan="2">Inbound leads <small>(a rep booked them by phone)</small></th></tr>
         <tr><th>Showed on first slot</th><th>Showed at all</th><th>Showed on first slot</th><th>Showed at all</th></tr>

@@ -9,14 +9,16 @@
 
   // which scorecard rows belong to which stage
   const ROWS = {
-    bk:["dials","connects","rate","conv","c2b","books","rtbl","rtb"],
+    cs:["dials","connects","rate","conv","c2b"],
+    bk:["books","rtbl","rtb"],
     su:["due","had","ns","ca","show","rec","first","firstAll","firstExT","cunk","dq"],
     pl:["des","b2d","r2d","dheld","diag","prop","con","arun","ans","ashow","pbook","prun","pns","pshow","slots","cps","sran","rps","cvd","cva","cvp"],
     rv:["won","cwd","crate","cvw","d2w","c2w"],
   };
   const TABS = [
     {id:"ov",  label:"Overview",  kind:"sc", title:"Overview", desc:"The headline numbers for the whole sales process, one column per week or month. Click a group to see more rows, or open one of the stage tabs to go deeper."},
-    {id:"bk",  label:"Bookings",  kind:"sc", rows:ROWS.bk, title:"Bookings", relabel:{"Activity (Nooks)":"Calling activity (Nooks)", "Discovery calls":"Calls booked"}, desc:"Calling and booking: how much we dial, how many conversations that creates, and how many discovery calls get booked. Below the table: how long the booking call was against whether the prospect showed up."},
+    {id:"cs",  label:"Calls",     kind:"sc", rows:ROWS.cs, title:"Calls", relabel:{"Activity (Nooks)":"Calling activity (Nooks)"}, desc:"The phone work: dials, connects and conversations from Nooks, and above the table, how long the call that booked each meeting was against whether the prospect showed up."},
+    {id:"bk",  label:"Bookings",  kind:"sc", rows:ROWS.bk, title:"Bookings", relabel:{"Discovery calls":"Discovery calls booked"}, desc:"How many discovery calls get booked, and how many of them come from the RTB list or follow an RTB hit."},
     {id:"su",  label:"Show-up",   kind:"sc", rows:ROWS.su, title:"Show-up", relabel:{"Discovery calls":"Did the prospect show up?"}, desc:"Of the calls that were booked, how many happened, who cancelled, how many were no-shows, and how many came back."},
     {id:"pl",  label:"Pipeline",  kind:"sc", rows:ROWS.pl, title:"Pipeline", relabel:{"Pipeline":"After the discovery call","Conversion (from calls that ran)":"Stage to stage conversion"}, desc:"What happens after the discovery call: designs and audits, prop reviews, contracts, AE time, and how deals convert from one stage to the next."},
     {id:"rv",  label:"Revenue",   kind:"sc", rows:ROWS.rv, title:"Revenue", relabel:{"Revenue":"Closed business"}, desc:"Deals closed won, the monthly revenue they bring, and close rates."},
@@ -46,7 +48,7 @@
   rw.innerHTML = `<div class="sec-head"><h2>To review</h2></div><p class="sc-note">Nothing here changes by itself: you accept or correct each item.</p><div id="rwMount"></div>`;
   $("scSec").before(rw);
   // booking call length vs show-up lives under Bookings
-  const bkx = document.createElement("div"); bkx.id = "bkExtra"; bkx.hidden = true; $("scNote").after(bkx);
+  const bkx = document.createElement("div"); bkx.id = "bkExtra"; bkx.hidden = true; document.querySelector("#scSec .sec-head").after(bkx);   // call length panel sits right under the Calls heading
   // who the numbers are for sits with the Sales process filter
   const who = $("scView").closest("label");
   if(who){ if(who.firstChild && who.firstChild.nodeType===3) who.firstChild.textContent = "Who "; who.classList.add("nn-who"); era.insertBefore(who, era.querySelector(".era-help")); }
@@ -76,7 +78,7 @@
   const tabOfRow = id => Object.keys(ROWS).find(k=>ROWS[k].includes(id));
   const IDX = []; const seen = new Set();
   (typeof SC_ROWS_ALL !== "undefined" ? SC_ROWS_ALL : []).forEach(m=>{ if(!m.id || !m.label || seen.has(m.label)) return; const t = tabOfRow(m.id); if(!t) return; seen.add(m.label); IDX.push({label:m.label, tab:t, row:m.label}); });
-  [["Booking call length vs show-up","bk","#ctPanel"],["Who cancelled (ours or theirs)","su",null],["Deals to review (ARR, DQ, closed lost)","rw",null],["Cancelled calls to settle","rw",null],
+  [["Call length vs show-up","cs","#ctPanel"],["Call length","cs","#ctPanel"],["Booking call length","cs","#ctPanel"],["Who cancelled (ours or theirs)","su",null],["Deals to review (ARR, DQ, closed lost)","rw",null],["Cancelled calls to settle","rw",null],
    ["Close rate by revenue band","cl","#bnTables"],["Why deals were DQ'd or lost","cl","#dqTables"],["Time and calls to close","cl","#tcTiles"],
    ["BDRs, one row per rep","pp",null],["AEs, one row per AE","pp",null],["Inbound channels","pp",null],["Charts over time","tr",null],["Old vs 3-call close","cmp",null]]
     .forEach(([label,tab,sel])=>IDX.push({label,tab,sel}));
@@ -137,11 +139,11 @@
     try{ localStorage.setItem("jf_l10_tab", cur); }catch(e){}
     const h2 = document.querySelector("#scSec .sec-head h2"); if(h2 && T.kind==="sc") h2.textContent = T.title;
     $("nnDesc").textContent = T.desc;
-    bkx.hidden = cur!=="bk";
+    bkx.hidden = cur!=="cs";
     era.hidden = tm.hidden = T.kind==="rw";   // the filters do not apply to the review list
     if(who) who.hidden = T.kind!=="sc";
     // hints under the time bar used the old tab ids
-    ["ov","bk","su","pl","rv"].forEach(k=>{ if(typeof G_HINT!=="undefined") G_HINT[k] = G_HINT.sc; });
+    ["ov","cs","bk","su","pl","rv"].forEach(k=>{ if(typeof G_HINT!=="undefined") G_HINT[k] = G_HINT.sc; });
     if(typeof G_HINT!=="undefined"){ G_HINT.rw = ""; }
     if(typeof gUI==="function") gUI();
     scopeNow(); badge();

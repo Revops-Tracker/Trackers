@@ -822,9 +822,9 @@ function tcPanel(rows){
     tile("Close after call 3", pctS(op3.length ? l3.length/op3.length : null), `${l3.length} of ${op3.length} still open after call 3`, "tO3") +
     tile("Calls past call 3, no close", fmt(extra(lost, 3)), `on ${lost.filter(x=>x.ca>3).length} deals that never closed`, "tL3");
   const recent = D.filter(x=>x.age<30).length, noRec = D.filter(x=>!String(x.a.call_days||"")).length;
-  document.getElementById("tcNote").innerHTML = `Of the discos run in the period (filters above apply), how many closed and how fast. <b>Held call</b> = a day with a held meeting on the deal from the disco on: the disco, a held design/audit meeting, or a recorded call matched to the deal. <b>Calls to close</b> counts held calls up to the close day. `
+  document.getElementById("tcNote").innerHTML = `Of the discos run in the period (filters above apply), how many closed and how fast. <b>Held call</b> = a day with a held meeting on the deal from the disco on: the disco, a held design/audit meeting, a meeting logged on the deal in HubSpot (not marked no-show, cancelled or rescheduled), or a recorded call matched to the deal. <b>Calls to close</b> counts held calls up to the close day. `
     + `<b>Still open after call N / on day N</b> = of the deals that got that far without closing, the share that closed later. That is the payoff from keeping on following up. `
-    + `${recent ? `${fmt(recent)} discos are under 30 days old, so they can't show up in the 30+ day rows yet. ` : ""}${noRec ? `${fmt(noRec)} deals have no recorded call matched, so their count may be low. ` : ""}Click any number to see the deals.`;
+    + `${recent ? `${fmt(recent)} discos are under 30 days old, so they can't show up in the 30+ day rows yet. ` : ""}${noRec ? `${fmt(noRec)} deals have no held meeting beyond the disco on record, so their count may be low. ` : ""}Click any number to see the deals.`;
   const head = cols => `<thead><tr>${cols.map(c=>`<th>${c}</th>`).join("")}</tr></thead>`;
   document.getElementById("tcTables").innerHTML =
     `<div><div class="bn-t">By held calls</div><div class="table-wrap"><table class="ib-tbl cl-tbl">${head(["Held call","Deals that got there","Closed on this call","Closes done by this call","Still open after it → closed later"])}<tbody>${callRows}</tbody></table></div></div>`

@@ -668,7 +668,7 @@ function dealHTML(r, isEv){
 /* ---------- who cancelled: verdict + the decision tree + evidence, and a one-click flip (same as the leaderboard) ---------- */
 const WC_SRC = {hs_stage:"HubSpot stage", msp_verify:"MSP Verify", slack_slotguard:"Slack slot guard", slack_icp:"Slack ICP alert", gcal:"Calendar",
   ghl_appt:"GHL appointment", ghl_sms:"GHL text", ghl_email:"GHL email", ghl_call:"GHL call", hs_email:"HubSpot email", hs_note:"HubSpot note", hs_call:"HubSpot call log", ai:"AI"};
-const WC_WHO = {ours:"Our cancel", theirs:"Their cancel", unknown:"Who cancelled: unknown"};
+const WC_WHO = {ours:"Our cancel", theirs:"Their cancel", nobody:"Nobody cancelled", unknown:"Who cancelled: unknown"};
 function whoHTML(r){
   if(!r.ahead) return "";
   const c = r.ca, ov = r.ov && r.ov.who ? r.ov : null, pend = r.pend && r.pend.who ? r.pend : null;

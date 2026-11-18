@@ -26,6 +26,17 @@
   #ctPanel .few{color:var(--muted);font-style:italic}
   #ctPanel td{line-height:1.25}
   #ctPanel h4{margin:10px 0 2px;font-size:14px}
+  #ctPanel h5{margin:10px 0 4px;font-size:13px}
+  #ctPanel .lr{display:grid;grid-template-columns:minmax(120px,210px) 1fr minmax(110px,150px);gap:10px;align-items:center;margin:0 0 5px;font-size:13px}
+  #ctPanel .ln.st{font-weight:600}
+  #ctPanel .lbar{position:relative;height:16px;background:var(--line);border-radius:4px;opacity:1}
+  #ctPanel .lf{height:16px;border-radius:0 4px 4px 0;background:#2a78d6}
+  #ctPanel .lf.few{opacity:.3}
+  #ctPanel .lb{position:absolute;top:-2px;height:20px;width:2px;background:var(--muted)}
+  #ctPanel .lv{white-space:nowrap}
+  #ctPanel .lh{margin:8px 0 3px;font-size:12px;color:var(--muted)}
+  #ctPanel .lfam{margin:0 0 8px}
+  #ctPanel .lfam details summary{font-size:12px;color:var(--muted);margin:4px 0}
   `;
   document.head.appendChild(css);
   const cell = (x, first) => { const a = first ? x.first_show : x.show, b = first ? x.first_show + x.first_noshow : x.show + x.noshow;
@@ -35,6 +46,31 @@
   const ccell = x => { if(!x || !x.discos) return "<small>none</small>";
     const m = x.mature ? `<br><small>45+ days old: ${x.mature_won} of ${x.mature}</small>` : "";
     return `<b>${(100*x.won/x.discos).toFixed(1).replace(/\.0$/,"")}%</b><br><small>${x.won} of ${x.discos} closed</small>${m}`; };
+  const sumM = (a,b) => ({first_show:a.first_show+b.first_show, first_noshow:a.first_noshow+b.first_noshow, show:a.show+b.show, noshow:a.noshow+b.noshow, n:a.n+b.n});
+  const zeroM = () => ({first_show:0, first_noshow:0, show:0, noshow:0, n:0});
+  function listBar(label, x, base, strong){
+    const den = x.first_show + x.first_noshow;
+    if(!den) return `<div class="lr"><div class="ln">${esc(label)}</div><div class="lbar"></div><div class="lv"><small>none counted</small></div></div>`;
+    const p = Math.round(100*x.first_show/den), few = den < 10;
+    return `<div class="lr"><div class="ln${strong?" st":""}">${esc(label)}</div><div class="lbar"><div class="lf${few?" few":""}" style="width:${p}%"></div>${base!=null?`<div class="lb" style="left:${base}%"></div>`:""}</div><div class="lv"><b>${p}%</b> <small>${x.first_show} of ${den}${few?" (few)":""}</small></div></div>`; }
+  function listBlock(d){
+    const L = d.lists; if(!L || !L.rows || !L.rows.length) return "";
+    const c = d.cold.all, cd = c.first_show + c.first_noshow, base = cd ? Math.round(100*c.first_show/cd) : null;
+    const OWN = ["Brandon","Issa","Previous reps"];
+    const owners = L.rows.map(r=>r.owner), ordered = OWN.filter(o=>owners.includes(o)).concat(owners.filter((o,i)=>!OWN.includes(o) && owners.indexOf(o)===i));
+    const fams = ["Reschedule Needed","TVL","Other lists"].filter(f=>L.rows.some(r=>r.family===f));
+    const body = fams.map(f=>{
+      const rs = L.rows.filter(r=>r.family===f), tot = rs.reduce(sumM, zeroM());
+      const byOwner = ordered.map(o=>{ const t = rs.filter(r=>r.owner===o).reduce(sumM, zeroM()); return t.n ? listBar(o, t, base, false) : ""; }).join("");
+      const lists = [...new Set(rs.map(r=>r.list))].map(l=>{
+        const rr = rs.filter(r=>r.list===l), t = rr.reduce(sumM, zeroM());
+        return `<div class="lh">${esc(l)}</div>` + ordered.map(o=>{ const x = rr.find(r=>r.owner===o); return x ? listBar(o, x, base, false) : ""; }).join(""); }).join("");
+      return `<div class="lfam"><h5>${esc(f)} lists</h5>${listBar("All "+f+" lists", tot, base, true)}${byOwner}<details><summary>By list</summary>${lists}</details></div>`; }).join("");
+    const u = L.untagged, ud = u.first_show + u.first_noshow;
+    return `<h4>Show-up by calling list <span style="font-weight:400;color:var(--muted)">(cold-call bookings)</span></h4>
+      <div class="ct-note"><b>How to read it.</b> Each bar is the % of cold-call bookings that showed on the first slot they booked, grouped by the Nooks list the booking call came from (taken from the call notes). Brandon and Issa are shown on their own. Everyone who has left is combined as "Previous reps". The line marks the overall cold-call rate (${base==null?"n/a":base+"%"}). A faded bar means fewer than 10 bookings counted, so it is too small to trust.</div>
+      <div class="ct-lists">${body}</div>
+      <div class="ct-note"><small>Not included: ${u.n} cold-call bookings whose booking call has no list name in its notes${ud?` (they showed ${Math.round(100*u.first_show/ud)}% on the first slot, ${u.first_show} of ${ud})`:""}. Only bookings with a matched booking call are counted.</small></div>`; }
   function closeBlock(d){
     if(!d.close) return "";
     const rows = d.bands.map((b,i)=>`<tr><td>${esc(b)}</td><td>${ccell(d.close.cold.bands[i])}</td><td>${ccell(d.close.inbound.bands[i])}</td></tr>`).join("")
@@ -61,6 +97,7 @@
         <tr><th>Showed on first slot</th><th>Showed at all</th><th>Showed on first slot</th><th>Showed at all</th></tr>
       </thead><tbody>${rows}</tbody></table></div>
       <div class="ct-note"><small>A booking call was found for ${d.cold.matched} of ${d.cold.total} cold-call bookings and ${d.inbound.matched} of ${d.inbound.total} inbound bookings (most inbound leads book themselves, so there is no call).</small></div>
+      ${listBlock(d)}
       ${closeBlock(d)}
       <h4>By BDR (cold-call bookings, showed on first slot)</h4>
       <div class="ct-note">If call length really drives showing, a BDR's longer calls should beat their own shorter ones. "Counted" is how many of their bookings made it into the percentages; the rest had no booking call found, were moved, cancelled ahead, or are still pending.</div>

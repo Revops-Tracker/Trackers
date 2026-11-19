@@ -219,10 +219,14 @@
       <div class="cl-row">
         <label class="cl-f"><span>Meta channel</span><select data-flt="mc"></select></label>
         <label class="cl-f"><span>Show-up confirmed</span><select data-flt="conf"></select></label>
-        <label class="cl-f"><span>Pre-call VSL</span><select data-flt="vsl"></select></label>
-        <label class="cl-f"><span>Audit videos</span><select data-flt="hw"></select></label>
-        <label class="cl-f"><span>Audit videos watched</span><select data-flt="hwmax"></select></label>
-        <label class="cl-f"><span>AE flag (asked on call)</span><select data-flt="aeflag"></select></label>
+        <label class="cl-f"><span>1 · Pre-disco VSL link</span><select data-flt="vsl"></select></label>
+        <label class="cl-f"><span>1 · Pre-disco VSL watched</span><select data-flt="vslpct"></select></label>
+        <label class="cl-f"><span>2 · Pre-audit videos</span><select data-flt="hw"></select></label>
+        <label class="cl-f"><span>2 · Pre-audit watched</span><select data-flt="hwmax"></select></label>
+        <label class="cl-f"><span>2 · Pre-audit AE confirmed</span><select data-flt="aeflag"></select></label>
+        <label class="cl-f"><span>3 · Pre-proposal video</span><select data-flt="po"></select></label>
+        <label class="cl-f"><span>3 · Program overview watched</span><select data-flt="popct"></select></label>
+        <label class="cl-f"><span>3 · Pre-proposal AE confirmed</span><select data-flt="poflag"></select></label>
         <label class="cl-f"><span>Offer</span><select data-flt="offer"></select></label>
         <label class="cl-f"><span>Outcome / reason</span><select data-flt="oc"></select></label>
       </div></details>
@@ -247,7 +251,7 @@
     <div id="clRank"></div>
     <details class="how"><summary>How this is counted</summary><div>
       <b>Runs</b> = deals whose disco was held in the period (one per deal). Each deal is followed forward: <b>Designs</b> = it reached Design / Prop Review, <b>Closes</b> = it closed won, whenever that happened. <b>Close rate</b> = closes ÷ runs (per disco run, never won ÷ lost), so recent periods keep rising as their deals close. <b>MRR</b> = closed-won amount (USD/month).<br>
-      Everything else comes from the HubSpot deal, refreshed every morning. <b>Show-up confirmed</b> = confirmed on the call with Sara (our AI assistant), replied YES to the reminder text, or clicked "I'll be there" on the thank-you or pre-call VSL page (one per deal, strongest first). <b>Pre-call VSL</b> = clicked the pre-call VSL link. <b>Audit videos</b> = the tracked pre-audit video page (6 Killers + Scaling &amp; Authority, live from Oct 27): Opened = entered their email, Started = watched part of a video, Watched = both videos 75%+. <b>Audit videos watched</b> = the most of either video. <b>AE flag</b> = what the AE recorded after asking on the call (HubSpot "Audit videos: AE flag"), kept separate from the tracking. <b>Revenue band</b> = <b>Best known</b> by default: the JF Verified ARR Band (picked by the AE after the disco, else read from the call transcript), and the self-claimed ARR when there is no verified band. Switch to <b>JF verified</b> or <b>Self-claimed</b> to see just one source. <b>Offer</b> = HT / LT, set by the AE after the disco. Deals with no value get their own row, so the table always adds up to the total. Click any number to see the deals.
+      Everything else comes from the HubSpot deal, refreshed every morning. <b>Show-up confirmed</b> = confirmed on the call with Sara (our AI assistant), replied YES to the reminder text, or clicked "I'll be there" on the thank-you or pre-call VSL page (one per deal, strongest first). Videos are numbered by stage, like the HubSpot deal card. <b>1 · Pre-disco VSL</b> = clicked the pre-call VSL link / how much of it they watched. <b>2 · Pre-audit videos</b> = the tracked pre-audit video page (6 Killers + Scaling &amp; Authority, live from Oct 27): Opened = entered their email, Started = watched part of a video, Watched = both videos 75%+; <b>watched</b> = the most of either video. <b>3 · Pre-proposal video</b> = the tracked Program Overview page (live from Nov 19), same steps. <b>AE confirmed</b> (stage 2 and 3) = whether the prospect said on the call that they watched, set by the AE or filled every morning from the call transcript when the prospect clearly said so; kept separate from the tracking. <b>Revenue band</b> = <b>Best known</b> by default: the JF Verified ARR Band (picked by the AE after the disco, else read from the call transcript), and the self-claimed ARR when there is no verified band. Switch to <b>JF verified</b> or <b>Self-claimed</b> to see just one source. <b>Offer</b> = HT / LT, set by the AE after the disco. Deals with no value get their own row, so the table always adds up to the total. Click any number to see the deals.
     </div></details>
   </section>
 `);
@@ -518,15 +522,21 @@ const CL_DIMS = [
   {id:"conf", title:"Show-up confirmed", filter:true, order:["Confirmed on call with Sara","Replied YES to the reminder text","Clicked \"I'll be there\" (thank-you page)","Clicked \"I'll be there\" (pre-call VSL page)","Tapped Confirm via Text, no YES","No confirmation"],
     f:a => String(a.showup_confirmed_sara_call)==="true" ? "Confirmed on call with Sara" : a.showup_confirmed_replied_yes==="Yes" ? "Replied YES to the reminder text" : a.showup_confirmed_thankyou_page==="Yes" ? "Clicked \"I'll be there\" (thank-you page)"
       : a.showup_confirmed_vsl_page==="Yes" ? "Clicked \"I'll be there\" (pre-call VSL page)" : a.showup_thankyou_text_clicked==="Yes" ? "Tapped Confirm via Text, no YES" : "No confirmation"},
-  {id:"vsl", title:"Pre-call VSL link", filter:true, order:["Clicked","Not clicked"], f:a => a.precall_vsl_link_clicked==="Yes" ? "Clicked" : "Not clicked"},
-  {id:"hw", title:"Audit videos", filter:true, order:["Watched (both 75%+)","Started","Opened (entered email)","Not opened"],
+  {id:"vsl", title:"1 · Pre-disco VSL link", filter:true, order:["Clicked","Not clicked"], f:a => a.precall_vsl_link_clicked==="Yes" ? "Clicked" : "Not clicked"},
+  {id:"vslpct", title:"1 · Pre-disco VSL watched", filter:true, order:WATCH, f:a => pctBand(a.video_vsl_watch_pct)},
+  {id:"hw", title:"2 · Pre-audit videos", filter:true, order:["Watched (both 75%+)","Started","Opened (entered email)","Not opened"],
     f:a => ({watched:"Watched (both 75%+)", started:"Started", opted_in:"Opened (entered email)"})[a.video_homework_status] || "Not opened"},
-  {id:"hwmax", title:"Audit videos watched (most of either)", filter:true, order:WATCH,
+  {id:"hwmax", title:"2 · Pre-audit watched (most of either)", filter:true, order:WATCH,
     f:a => pctBand(Math.max(Number(a.video_6_killers_watch_pct)||0, Number(a.video_scaling_authority_watch_pct)||0))},
-  {id:"aeflag", title:"Audit videos: AE flag", filter:true, order:["Watched both","Watched 6 Killers only","Watched Scaling & Authority only","Started, did not finish","Did not watch","Not flagged"],
+  {id:"aeflag", title:"2 · Pre-audit videos: AE confirmed", filter:true, order:["Watched both","Watched 6 Killers only","Watched Scaling & Authority only","Started, did not finish","Did not watch","Not flagged"],
     f:a => ({watched_both:"Watched both", watched_6_killers:"Watched 6 Killers only", watched_scaling:"Watched Scaling & Authority only", partial:"Started, did not finish", not_watched:"Did not watch"})[a.audit_videos_ae_flag] || "Not flagged"},
-  {id:"k6", title:"6 Killers watched", order:WATCH, f:a => pctBand(a.video_6_killers_watch_pct)},
-  {id:"sa", title:"Scaling & Authority watched", order:WATCH, f:a => pctBand(a.video_scaling_authority_watch_pct)},
+  {id:"k6", title:"2 · 6 Killers watched", order:WATCH, f:a => pctBand(a.video_6_killers_watch_pct)},
+  {id:"sa", title:"2 · Scaling & Authority watched", order:WATCH, f:a => pctBand(a.video_scaling_authority_watch_pct)},
+  {id:"po", title:"3 · Pre-proposal video", filter:true, order:["Watched (75%+)","Started","Opened (entered email)","Not opened"],
+    f:a => ({watched:"Watched (75%+)", started:"Started", opted_in:"Opened (entered email)"})[a.program_overview_status] || "Not opened"},
+  {id:"popct", title:"3 · Program overview watched", filter:true, order:WATCH, f:a => pctBand(a.video_program_overview_watch_pct)},
+  {id:"poflag", title:"3 · Pre-proposal video: AE confirmed", filter:true, order:["Watched","Partially watched","Not watched","Not flagged"],
+    f:a => ({watched:"Watched", partial:"Partially watched", not_watched:"Not watched"})[a.program_overview_ae_flag] || "Not flagged"},
   {id:"band", title:"Revenue band", filter:true, order:[...BANDS, UNK], f:a => String((BAND_OF[CL.band] || bestBand)(a) || UNK).split(";")[0]},
   {id:"oc", title:"Outcome / reason (DQ'd or lost)", filter:true, order:OC_ORDER, f:ocOf},
   {id:"offer", title:"Offer", filter:true, order:["High ticket (HT)","Low ticket (LT)","Not set"], f:a => ({ht:"High ticket (HT)", lt:"Low ticket (LT)"})[a.offer] || "Not set"},

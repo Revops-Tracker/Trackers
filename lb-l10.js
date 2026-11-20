@@ -949,7 +949,7 @@ const isLeadIn = r => isInbLead(r) && (NOT_A_BDR.has(r.booker) || isBdrBooked(r)
 // views: who the numbers are for. key = person key for statsFor/openList, nooks = which BDRs' activity counts
 function scViews(){
   const v = [
-    {id:"team", name:"Whole team", key:"sc:team", pred:r=>true, nooks:"all", split:true, slots:true, g:"team"},
+    {id:"team", name:"Whole team", key:"sc:team", pred:r=>true, nooks:"all", split:true, slots:true, rtb:true, g:"team"},
     {id:"bdrs", name:"BDR team", key:"sc:bdrs", pred:isBdrBooked, nooks:"all", g:"bdrteam"},
     ...BDRS.map(b=>({id:b.key, name:b.name, key:"sc:"+b.key, pred:r=>r.booker===b.key, nooks:firstName(b.key), g:"bdr"})),
     {id:"inb", name:"Inbound leads", key:"sc:inb", pred:isLeadIn, g:"inb"},
@@ -1166,9 +1166,10 @@ function renderScorecard(){
   const avgP = done.length ? {start:done[0].p.start, end:done[done.length-1].p.end, label:"Average of "+done.length+" "+(SC.kind==="week"?"weeks":"months")} : null;
   // stats per column (+ the average span)
   const T = cols.map(c=>scStats(view, c.p)), A = cols.map(c=>scActivity(view, c.p)), SL = cols.map(c=>scSlots(view, c.p));
+  const RT = cols.map(c=>typeof scRtb==="function" ? scRtb(view, c.p) : null);
   const avgT = avgP ? scStats(view, avgP) : null, avgA = avgP ? scActivity(view, avgP) : null, avgSL = avgP ? scSlots(view, avgP) : null;
   const baseSL = scSlots(view, SLOT_BASE);
-  const SRC = {act:{cols:A, avg:avgA, show:!!view.nooks}, slot:{cols:SL, avg:avgSL, show:!!view.slots}};
+  const SRC = {act:{cols:A, avg:avgA, show:!!view.nooks}, slot:{cols:SL, avg:avgSL, show:!!view.slots}, rtb:{cols:RT, show:!!view.rtb && typeof scRtb==="function"}};
   const n = done.length;
   const showAct = !!view.nooks;
   const CMP = REPORTING && gCmpOn() ? {p:gP(), q:gPrev()} : null;
@@ -1176,7 +1177,7 @@ function renderScorecard(){
   const cut = state.cutover, cutTxt = (d=>MON[d.getMonth()]+" "+d.getDate())(new Date(cut+"T12:00:00"));
   // a column the chosen process can't fill: New + before the cutover, Old + after it; 3-call-close rows before the cutover
   const offEra = c => (state.era==="new" && c.p.end < cut) || (state.era==="old" && c.p.start >= cut);
-  const rowOff = (m, c) => !m.act && !m.slot && (offEra(c) || (m.era==="new" && c.p.end < cut));
+  const rowOff = (m, c) => !m.act && !m.slot && !m.rtb && (offEra(c) || (m.era==="new" && c.p.end < cut));
   const offTitle = c => c.p.end < cut ? "Before the 3-call close started ("+cutTxt+"): only deals that moved into it show here" : "After the switch: only old-process deals still moving show here";
   const stCache = new Map(), stAt = (key, sp) => { const k = key+"|"+sp.start+"|"+sp.end; if(!stCache.has(k)) stCache.set(k, key===null ? scStats(view, sp) : statsFor(key, "bdr", sp)); return stCache.get(k); };
   // average over the finished columns this row can use (counts = per column, ratios pooled over the span)
@@ -1184,7 +1185,8 @@ function renderScorecard(){
     const v = m.f(stAt(key, {start:ok[0].p.start, end:ok[ok.length-1].p.end})); return v==null ? null : m.ratio ? v : v/ok.length; };
   // value of a row over any span (for the chosen-period column)
   const valAt = (m, key, sp) => { if(m.act){ const a = scActivity(view, sp); return a ? m.f(a, stAt(null, sp)) : null; }
-    if(m.slot){ const x = scSlots(view, sp); return x ? m.f(x) : null; } return m.f(stAt(key, sp)); };
+    if(m.slot){ const x = scSlots(view, sp); return x ? m.f(x) : null; }
+    if(m.rtb){ const x = scRtb(view, sp); return x ? m.f(x) : null; } return m.f(stAt(key, sp)); };
   const cmpCell = (m, key) => { if(!CMP) return ""; const v = valAt(m, key, CMP.p), w = valAt(m, key, CMP.q);
     return `<td class="cmpc">${scFmt(m, v)}${dl(v, w, {pct:m.ratio, money:m.money, lower:m.lower})}</td>`; };
   const offCell = (m, v, sub, click, c) => { const z = v==null || v===0, shown = z ? "–" : scFmt(m, v);
@@ -1193,7 +1195,7 @@ function renderScorecard(){
   const groups = []; let grp = null;
   SC_ROWS.forEach((m, mi)=>{
     if(m.grp){ grp = {name:m.grp, rows:[]}; groups.push(grp); return; }
-    const src = m.act ? "act" : m.slot ? "slot" : null;
+    const src = m.act ? "act" : m.slot ? "slot" : m.rtb ? "rtb" : null;
     if(src && !SRC[src].show) return;
     if(SC.only && !SC.only.has(m.id)) return;   // funnel tabs (lb-nav.js) show only their own rows
     grp.rows.push({m, mi});
@@ -1208,7 +1210,7 @@ function renderScorecard(){
   html += `<tr class="grp${more?" tog":""}"${more?` data-grp="${esc(gr.name)}" title="${open?"Show headline rows only":"Show all "+gr.name+" rows"}"`:""}><td colspan="${cols.length+3+(CMP?1:0)}"><span class="grp-lbl">${grName}${more?`<span class="grp-more">${open?"fewer ▴":more+" more ▾"}</span>`:""}</span></td></tr>`;
   gr.rows.forEach(({m, mi})=>{
     if(!open && !m.core) return;
-    const src = m.act ? "act" : m.slot ? "slot" : null;
+    const src = m.act ? "act" : m.slot ? "slot" : m.rtb ? "rtb" : null;
     const g = m.base ? (baseSL ? m.f(baseSL) : null) : scGoal(m, view.g), goal = g==null ? null : ((m.ratio||m.dec) ? g : g*mult);
     const goalTxt = goal==null ? "" : scFmt(m, goal) + (m.base ? "<small>Jan 1–Oct 4</small>" : "");
     html += `<tr><td>${m.label}${m.tip?`<button type="button" class="tip" data-tip="${esc(m.tip)}" aria-label="What is ${esc(m.label)}?">ⓘ</button>`:""}</td><td class="goal">${goalTxt}</td>`;
@@ -1216,7 +1218,7 @@ function renderScorecard(){
       const t = T[ci], a = src ? SRC[src].cols[ci] : null;
       if(src){
         const v = a ? m.f(a, t) : null;
-        html += scCell(m, v, goal, c.pace, a && m.sub ? m.sub(a,t) : "", "").replace("<td class=\"", `<td class="${c.cur?"cur ":""}`);
+        html += scCell(m, v, goal, c.pace, a && m.sub ? m.sub(a,t) : "", src==="rtb" && m.list && a ? `data-rtb="${mi}|${ci}"` : "").replace("<td class=\"", `<td class="${c.cur?"cur ":""}`);
       } else {
         const v = m.f(t);
         const click = m.list ? `data-sc="${mi}|${ci}|"` : "";
@@ -1230,8 +1232,10 @@ function renderScorecard(){
       if(src){
         // only the finished columns that have this data (Nooks uploads start in June), so the books side matches
         const okc = cols.filter((c,ci)=>!c.cur && SRC[src].cols[ci]);
-        if(okc.length){ const sp = {start:okc[0].p.start, end:okc[okc.length-1].p.end};
-          const aa = src==="act" ? scActivity(view, sp) : scSlots(view, sp), v = aa ? m.f(aa, stAt(null, sp)) : null;
+        // RTB counts are distinct companies per column: average the column values (a company in 2 weeks counts in both)
+        if(okc.length && src==="rtb" && !m.ratio){ const vs = okc.map(c=>m.f(SRC.rtb.cols[cols.indexOf(c)])).filter(v=>v!=null); av = vs.length ? vs.reduce((a,b)=>a+b,0)/vs.length : null; }
+        else if(okc.length){ const sp = {start:okc[0].p.start, end:okc[okc.length-1].p.end};
+          const aa = src==="act" ? scActivity(view, sp) : src==="slot" ? scSlots(view, sp) : scRtb(view, sp), v = aa ? m.f(aa, stAt(null, sp)) : null;
           av = v==null ? null : (m.ratio||m.dec) ? v : v/okc.length; } }
       else av = rowAvg(m, null);
     }

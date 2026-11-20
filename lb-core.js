@@ -816,6 +816,7 @@ async function refresh(){
   applyEra();
   render();
   if(REPORTING && !state.act) loadActivity();
+  if(REPORTING && typeof loadRtb==="function") loadRtb();   // RTB waterfall rows (lb-rtb.js, Sales L10 only)
 }
 // Nooks dials / connects / conversations (weekly upload on the RevOps L10 tab), for the Sales L10 scorecard
 async function loadActivity(){

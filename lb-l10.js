@@ -1284,7 +1284,7 @@ document.getElementById("scAll").onclick = ()=>{ const all = SC.groups.every(n=>
    calls still waiting on an answer are shown, never folded in. Click a number to see the deals. */
 function renderStages(){
   const box = document.getElementById("stgPanel"); if(!box) return;
-  if(SC.only){ box.innerHTML = ""; return; }
+  if(SC.only && !SC.only.has("show")){ box.innerHTML = ""; return; }   // Overview (all rows) + the Show-up tab only
   const p = gP(), q = gCmpOn() ? gPrev() : null;
   const D = (f, o) => q ? dl(f(p), f(q), o) : "";
   const st = (key, role, sp) => statsFor(key, roleOf(key, role), sp);

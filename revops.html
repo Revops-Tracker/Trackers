@@ -272,6 +272,91 @@ html.view-reporting .lb-only{display:none!important}
 .rp-tabs button[aria-selected="true"]{background:var(--panel);color:var(--ink);box-shadow:0 1px 2px rgba(20,33,61,.12)}
 .rp-tabs button{border:0;background:transparent;padding:8px 18px;border-radius:7px;cursor:pointer;font-weight:600;color:var(--muted)}
 section[hidden]{display:none}
+
+/* RTB Review Panel */
+#rtbReview{margin-bottom:36px}
+#rtbReview .rtb-count{display:inline-flex;align-items:center;font-size:13px;font-weight:600;letter-spacing:.01em;background:var(--chip);color:var(--muted);border-radius:999px;padding:6px 12px;font-variant-numeric:tabular-nums}
+#rtbReview .rtb-count.has{background:color-mix(in srgb,var(--gold) 18%,var(--panel));color:var(--ink);box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--gold) 55%,var(--line))}
+#rtbReview .rtb-card{background:var(--panel);border:1px solid var(--line);border-radius:14px;overflow:hidden}
+#rtbReview .rtb-lead{margin:0;padding:14px 18px;color:var(--muted);font-size:14px;line-height:1.45;border-bottom:1px solid var(--line)}
+#rtbReview .rtb-banner{padding:10px 18px;font-size:13px;line-height:1.4;color:var(--ink);background:color-mix(in srgb,var(--gold) 12%,var(--panel));border-bottom:1px solid color-mix(in srgb,var(--gold) 35%,var(--line))}
+#rtbReview .rtb-cols{display:grid;grid-template-columns:minmax(200px,250px) minmax(0,1fr) minmax(248px,280px);gap:8px 20px;padding:10px 18px 8px;font-size:12px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;color:var(--muted);border-bottom:1px solid var(--line)}
+#rtbReview .rtb-list{max-height:min(640px,68vh);overflow:auto}
+#rtbReview .rtb-row{display:grid;grid-template-columns:minmax(200px,250px) minmax(0,1fr) minmax(248px,280px);gap:10px 20px;align-items:start;padding:16px 18px;border-top:1px solid var(--line);transition:background .15s}
+#rtbReview .rtb-list .rtb-row:first-child{border-top:0}
+#rtbReview .rtb-row:hover{background:color-mix(in srgb,var(--fill) 5%,var(--panel))}
+#rtbReview .rtb-row.is-busy{background:var(--paper)}
+#rtbReview .rtb-row > *{min-width:0}
+#rtbReview .rtb-name{font-weight:600;font-size:16px;line-height:1.3;overflow-wrap:anywhere}
+#rtbReview .rtb-name a{color:var(--ink);text-decoration:underline dotted;text-underline-offset:3px}
+#rtbReview .rtb-name a:hover{color:var(--fill)}
+#rtbReview .rtb-title{display:block;color:var(--muted);font-size:13px;margin-top:2px}
+#rtbReview .rtb-co{margin-top:4px;font-size:14px;line-height:1.35;overflow-wrap:anywhere}
+#rtbReview .rtb-co a{color:var(--fill);font-weight:600;text-decoration:none}
+#rtbReview .rtb-co a:hover{text-decoration:underline}
+#rtbReview .rtb-sep{margin:0 6px;color:var(--muted)}
+#rtbReview .rtb-meta{display:flex;flex-wrap:wrap;gap:6px 8px;align-items:center;margin-top:8px;color:var(--muted);font-size:13px}
+#rtbReview .pill.q-jf{background:color-mix(in srgb,var(--gold) 20%,transparent);color:var(--ink)}
+#rtbReview .pill.q-cst{background:color-mix(in srgb,var(--fill) 16%,transparent);color:var(--ink)}
+#rtbReview .rtb-reason{font-size:15px;line-height:1.45;overflow-wrap:anywhere}
+#rtbReview .rtb-soft{color:var(--muted)}
+#rtbReview .rtb-warn{margin-top:8px;font-size:13px;line-height:1.4;color:var(--behind);background:color-mix(in srgb,var(--behind) 10%,var(--panel));border-radius:8px;padding:8px 10px}
+#rtbReview .rtb-acts{display:flex;flex-direction:column;gap:8px;align-items:stretch}
+#rtbReview .rtb-note{width:100%;border:1px solid var(--line);background:var(--paper);color:var(--ink);border-radius:8px;padding:8px 10px;font:inherit;font-size:13px}
+#rtbReview .rtb-note::placeholder{color:var(--muted)}
+#rtbReview .rtb-note:focus{outline:none}
+#rtbReview .rtb-note:focus-visible{border-color:var(--fill);box-shadow:0 0 0 3px color-mix(in srgb,var(--fill) 22%,transparent)}
+#rtbReview .rtb-actions{display:flex;gap:8px}
+#rtbReview .rtb-btn{flex:1;display:inline-flex;align-items:center;justify-content:center;gap:6px;height:40px;padding:0 10px;border-radius:10px;border:1px solid var(--line);background:var(--panel);font-weight:700;font-size:14px;line-height:1;white-space:nowrap;cursor:pointer;transition:background .15s,border-color .15s,color .15s,transform .12s}
+#rtbReview .rtb-btn svg{display:block}
+#rtbReview .rtb-btn.tick{color:var(--ahead);border-color:color-mix(in srgb,var(--ahead) 45%,var(--line))}
+#rtbReview .rtb-btn.tick:hover:not(:disabled){background:color-mix(in srgb,var(--ahead) 16%,var(--panel));border-color:var(--ahead)}
+#rtbReview .rtb-btn.cross{color:var(--behind);border-color:color-mix(in srgb,var(--behind) 45%,var(--line))}
+#rtbReview .rtb-btn.cross:hover:not(:disabled){background:color-mix(in srgb,var(--behind) 14%,var(--panel));border-color:var(--behind)}
+#rtbReview .rtb-btn:disabled{opacity:.45;cursor:not-allowed}
+#rtbReview .rtb-btn:active:not(:disabled){transform:translateY(1px)}
+#rtbReview .rtb-saving{display:flex;align-items:center;justify-content:center;gap:8px;height:40px;border-radius:10px;background:var(--chip);color:var(--ink);font-weight:600;font-size:14px}
+#rtbReview .rtb-spin{width:14px;height:14px;border-radius:50%;border:2px solid color-mix(in srgb,var(--ink) 22%,transparent);border-top-color:var(--ink);display:inline-block;flex:none;animation:rtb-spin .7s linear infinite}
+@keyframes rtb-spin{to{transform:rotate(360deg)}}
+#rtbReview .rtb-confirm{background:color-mix(in srgb,var(--behind) 8%,var(--panel));border:1px solid color-mix(in srgb,var(--behind) 35%,var(--line));border-radius:10px;padding:10px;font-size:13px;line-height:1.4}
+#rtbReview .rtb-confirm p{margin:0 0 8px}
+#rtbReview .rtb-confirm .rtb-actions{flex-direction:column}
+#rtbReview .rtb-confirm .btn,#rtbReview .rtb-confirm .rtb-btn{flex:none;width:100%;height:38px;padding:0 10px;border-radius:8px}
+#rtbReview .rtb-err{grid-column:1 / -1;font-size:13px;line-height:1.4;color:var(--behind);background:color-mix(in srgb,var(--behind) 8%,var(--panel));border-radius:8px;padding:8px 10px}
+#rtbReview .rtb-viewtag{align-self:center;color:var(--muted);font-size:13px;font-weight:600}
+#rtbReview .rtb-empty{display:flex;flex-direction:column;align-items:center;gap:4px;padding:36px 20px 32px;text-align:center;color:var(--muted);font-size:14px}
+#rtbReview .rtb-empty b{color:var(--ink);font-size:16px;font-weight:600}
+#rtbReview .rtb-mark{width:42px;height:42px;border-radius:50%;display:flex;align-items:center;justify-content:center;background:color-mix(in srgb,var(--ahead) 14%,var(--panel));color:var(--ahead);margin-bottom:6px}
+#rtbReview .rtb-mark svg{width:20px;height:20px}
+#rtbReview .rtb-empty .btn{margin-top:10px}
+#rtbReview .rtb-recent{border-top:1px solid var(--line)}
+#rtbReview .rtb-recent summary{margin:0;padding:12px 18px;cursor:pointer;color:var(--ink);font-size:14px;font-weight:600;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;list-style:none}
+#rtbReview .rtb-recent summary::-webkit-details-marker{display:none}
+#rtbReview .rtb-recent summary:hover{background:color-mix(in srgb,var(--fill) 5%,var(--panel))}
+#rtbReview .rtb-sum-l{display:inline-flex;align-items:center;gap:8px}
+#rtbReview .rtb-caret{display:inline-block;width:12px;color:var(--muted);transition:transform .15s;font-style:normal}
+#rtbReview .rtb-recent[open] .rtb-caret{transform:rotate(90deg)}
+#rtbReview .rtb-sum-r{color:var(--muted);font-weight:500;font-size:13px}
+#rtbReview .rtb-done-wrap{max-height:320px;overflow:auto;border-top:1px solid var(--line)}
+#rtbReview .rtb-none{padding:14px 18px 16px;color:var(--muted);font-size:14px}
+#rtbReview .rtb-done{display:grid;grid-template-columns:auto minmax(0,1fr);gap:2px 12px;align-items:start;padding:12px 18px;border-top:1px solid var(--line)}
+#rtbReview .rtb-done:first-child{border-top:0}
+#rtbReview .rtb-done .pill{margin-top:2px}
+#rtbReview .rtb-done-top{font-weight:600;font-size:14px;overflow-wrap:anywhere}
+#rtbReview .rtb-done-top a{color:var(--ink);text-decoration:underline dotted;text-underline-offset:3px}
+#rtbReview .rtb-done-top a:hover{color:var(--fill)}
+#rtbReview .rtb-who{color:var(--muted);font-size:13px;margin-top:2px;overflow-wrap:anywhere}
+#rtbReview .rtb-sub{color:var(--muted);font-size:13px;margin-top:3px;overflow-wrap:anywhere}
+@media (max-width:680px){
+  #rtbReview .rtb-cols{display:none}
+  #rtbReview .rtb-row{grid-template-columns:1fr;gap:10px;padding:14px}
+  #rtbReview .rtb-lead,#rtbReview .rtb-banner,#rtbReview .rtb-recent summary,#rtbReview .rtb-done{padding-left:14px;padding-right:14px}
+  #rtbReview .rtb-btn{height:44px}
+}
+@media (prefers-reduced-motion:reduce){
+  #rtbReview .rtb-spin{animation:none}
+  #rtbReview .rtb-caret,#rtbReview .rtb-row,#rtbReview .rtb-btn{transition:none}
+}
 </style>
 </head>
 <body>
@@ -281,6 +366,22 @@ section[hidden]{display:none}
       <h1 id="pageTitle">RevOps L10 <span class="auto-tag">Admins</span></h1>
     </div>
   </header>
+
+  <section id="rtbReview" aria-labelledby="rtbTitle">
+    <div class="sec-head">
+      <h2 id="rtbTitle">RTB Review Panel</h2>
+      <div class="nav">
+        <span class="rtb-count" id="rtbCount" aria-live="polite"></span>
+        <button class="btn ghost" type="button" id="rtbRefresh">Refresh</button>
+      </div>
+    </div>
+    <div class="rtb-card">
+      <p class="rtb-lead">Tick a contact if it looks fine. Cross it if it's bad data. A cross sets Contact.RTB Bad Contact to True in HubSpot.</p>
+      <div id="rtbBody">
+        <div class="rtb-empty"><b>Loading the review queue…</b></div>
+      </div>
+    </div>
+  </section>
 
   <section class="cr-root" id="crSec">
     <div class="sec-head">
@@ -893,6 +994,327 @@ wire();
 load().then(()=>{ render(); }).catch(e=>{
   $("crTable").innerHTML = '<tbody><tr><td class="empty">Could not load the connect rate data: '+h(e.message)+'</td></tr></tbody>';
 });
+})();
+</script>
+<script>
+/* RTB Review Panel. Bots queue HubSpot contacts; a reviewer ticks (fine, no HubSpot write)
+   or crosses (bad data). A cross is applied by the bad-data-review function, which sets
+   contact property Contact.RTB Bad Contact = True. Same jf_token as the rest of the page.
+   This function's base URL is not /api or /auth, so the Bearer header is added here.
+   sso.js still sends the user to the login page on any 401. */
+(function(){
+"use strict";
+const API = ((window.JF_CONFIG||{}).API_BASE||"").replace(/\/jf-sso$/, "/bad-data-review");
+const PORTAL = "1905790";
+const $ = id => document.getElementById(id);
+const h = s => String(s??"").replace(/[&<>"']/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const token = () => { try{ return localStorage.getItem("jf_token"); }catch(e){ return null; } };
+const say = m => { if(typeof toast === "function") toast(m); };
+const ICON_TICK = '<svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>';
+const ICON_CROSS = '<svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>';
+const S = { pending:[], recent:[], canReview:true, loaded:false, sawList:false, loadError:"", notes:{}, errors:{}, busy:null, confirm:null, recentOpen:false, focusCancel:false };
+
+function mayReview(){
+  if(window.JF_USER && window.JF_USER.role === "view") return false;
+  return S.canReview !== false;
+}
+function sid(id){ return String(id); }
+
+async function call(path, opts){
+  opts = opts || {};
+  const headers = Object.assign({ Authorization: "Bearer " + token() }, opts.headers || {});
+  const r = await fetch(API + path, { method: opts.method || "GET", headers: headers, body: opts.body, cache: "no-store" });
+  const j = await r.json().catch(()=>({}));
+  if(r.status === 401) return null;
+  if(!r.ok || j.ok === false){
+    const err = new Error(j.error || ("Request failed (" + r.status + ")"));
+    err.status = r.status;
+    err.body = j;
+    throw err;
+  }
+  return j;
+}
+
+function contactHref(id){
+  const s = String(id == null ? "" : id);
+  if(!/^(?:\d+|TEST-[A-Za-z0-9_-]+)$/.test(s)) return "";
+  return "https://app.hubspot.com/contacts/" + PORTAL + "/record/0-1/" + encodeURIComponent(s);
+}
+function companyHref(id){
+  const s = String(id == null ? "" : id);
+  if(!/^\d+$/.test(s)) return "";
+  return "https://app.hubspot.com/contacts/" + PORTAL + "/record/0-2/" + encodeURIComponent(s);
+}
+function fmtDay(s){
+  if(!s) return "";
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(s));
+  if(!m) return String(s);
+  const d = new Date(Date.UTC(+m[1], +m[2]-1, +m[3]));
+  return d.toLocaleDateString("en-US", { month:"short", day:"numeric", year:"numeric", timeZone:"UTC" });
+}
+function fmtWhen(iso){
+  if(!iso) return "";
+  const d = new Date(iso);
+  if(isNaN(d.getTime())) return "";
+  return d.toLocaleString("en-US", { month:"short", day:"numeric", hour:"numeric", minute:"2-digit", timeZone:"America/Toronto" }) + " ET";
+}
+function queueHTML(q){
+  if(q == null || q === "") return "";
+  const s = String(q);
+  let label = s, cls = "";
+  if(s === "20129" || s === "JF"){ label = "JF RTB TVL"; cls = " q-jf"; }
+  else if(s === "20384" || s === "CST"){ label = "CST TOFU/BOFU"; cls = " q-cst"; }
+  return '<span class="pill'+cls+'">'+h(label)+'</span>';
+}
+function contactLink(it, label){
+  const text = label || it.contact_name || it.contact_id || "Contact";
+  const href = contactHref(it.contact_id);
+  return href ? '<a href="'+href+'" target="_blank" rel="noopener">'+h(text)+'</a>' : h(text);
+}
+function companyBits(it){
+  const name = it.company_name || "";
+  const href = companyHref(it.company_id);
+  const bits = [];
+  if(name && href) bits.push('<a href="'+href+'" target="_blank" rel="noopener">'+h(name)+'</a>');
+  else if(name) bits.push(h(name));
+  else if(href) bits.push('<a href="'+href+'" target="_blank" rel="noopener">Company</a>');
+  if(it.domain) bits.push(h(it.domain));
+  return bits.join('<span class="rtb-sep">·</span>');
+}
+
+function setCount(){
+  const c = $("rtbCount");
+  if(!c) return;
+  if(!S.loaded || !token() || !S.sawList){ c.textContent = ""; c.classList.remove("has"); return; }
+  const n = S.pending.length;
+  c.textContent = n ? (n + " pending") : "None pending";
+  c.classList.toggle("has", n > 0);
+}
+
+function rowHTML(it){
+  const id = sid(it.id);
+  const busy = S.busy === id;
+  const confirming = S.confirm === id && !busy;
+  const err = S.errors[id] || "";
+  const note = S.notes[id] || "";
+  const review = mayReview();
+  const day = fmtDay(it.run_date);
+  const q = queueHTML(it.source_queue);
+  const meta = [q, day ? '<span>Run '+h(day)+'</span>' : ""].filter(Boolean).join("");
+  const prior = !err && it.hubspot_error ? '<div class="rtb-warn">HubSpot did not accept the last cross: '+h(it.hubspot_error)+' The row is still pending. Try again.</div>' : "";
+  let acts;
+  if(!review){
+    acts = '<div class="rtb-viewtag">View only</div>';
+  }else if(busy){
+    acts = '<input class="rtb-note" value="'+h(note)+'" disabled aria-label="Note">' +
+      '<div class="rtb-saving" role="status"><span class="rtb-spin" aria-hidden="true"></span> Saving…</div>';
+  }else if(confirming){
+    acts = '<input class="rtb-note" value="'+h(note)+'" placeholder="Note (optional)" aria-label="Note for '+h(it.contact_name || it.contact_id || "this contact")+'">' +
+      '<div class="rtb-confirm"><p>Sets Contact.RTB Bad Contact = True in HubSpot.</p>' +
+      '<div class="rtb-actions"><button class="btn ghost" type="button" data-cancel>Cancel</button>' +
+      '<button class="rtb-btn cross" type="button" data-docross>'+ICON_CROSS+'<span>Mark bad data</span></button></div></div>';
+  }else{
+    const who = h(it.contact_name || it.contact_id || "this contact");
+    acts = '<input class="rtb-note" value="'+h(note)+'" placeholder="Note (optional)" aria-label="Note for '+who+'">' +
+      '<div class="rtb-actions">' +
+      '<button class="rtb-btn tick" type="button" data-tick aria-label="Tick '+who+', looks fine" title="Looks fine. Nothing is written to HubSpot.">'+ICON_TICK+'<span>Tick</span></button>' +
+      '<button class="rtb-btn cross" type="button" data-cross aria-label="Cross '+who+', bad data" title="Bad data. Sets Contact.RTB Bad Contact = True in HubSpot.">'+ICON_CROSS+'<span>Cross</span></button>' +
+      '</div>';
+  }
+  const errHTML = err ? '<div class="rtb-err" role="alert">'+h(err)+'</div>' : "";
+  return '<article class="rtb-row'+(busy?" is-busy":"")+'" data-id="'+h(id)+'" aria-busy="'+(busy?"true":"false")+'">' +
+    '<div class="rtb-id"><div class="rtb-name">'+contactLink(it)+'</div>' +
+    (it.title ? '<span class="rtb-title">'+h(it.title)+'</span>' : "") +
+    (companyBits(it) ? '<div class="rtb-co">'+companyBits(it)+'</div>' : "") +
+    (meta ? '<div class="rtb-meta">'+meta+'</div>' : "") +
+    '</div>' +
+    '<div><div class="rtb-reason'+(it.reason?"":" rtb-soft")+'">'+(it.reason ? h(it.reason) : "No reason given")+'</div>'+prior+'</div>' +
+    '<div class="rtb-acts">'+acts+'</div>'+errHTML+'</article>';
+}
+
+function recentHTML(){
+  const n = S.recent.length;
+  const open = S.recentOpen ? " open" : "";
+  const rows = n ? S.recent.map(doneHTML).join("") : '<div class="rtb-none">Nothing decided in the last 7 days.</div>';
+  return '<details class="rtb-recent" id="rtbRecent"'+open+'>' +
+    '<summary><span class="rtb-sum-l"><i class="rtb-caret" aria-hidden="true">▸</i> Recently reviewed</span>' +
+    '<span class="rtb-sum-r">'+(n ? n + " in the last 7 days" : "Last 7 days")+'</span></summary>' +
+    '<div class="rtb-done-wrap">'+rows+'</div></details>';
+}
+function doneHTML(it){
+  const pill = it.status === "crossed" ? '<span class="pill bad">Bad data</span>'
+    : it.status === "ticked" ? '<span class="pill good">Looks fine</span>'
+    : '<span class="pill">'+h(it.status || "Decided")+'</span>';
+  const verb = it.status === "crossed" ? "Crossed" : "Ticked";
+  const who = it.reviewed_by ? h(it.reviewed_by) : "unknown";
+  const when = fmtWhen(it.reviewed_at);
+  const hs = it.status === "crossed" && it.hubspot_updated ? " · HubSpot updated" : "";
+  const co = companyBits(it);
+  return '<div class="rtb-done">'+pill+'<div>' +
+    '<div class="rtb-done-top">'+contactLink(it)+(co ? '<span class="rtb-sep">·</span>'+co : "")+'</div>' +
+    '<div class="rtb-who">'+verb+' by '+who+(when ? " · "+h(when) : "")+hs+'</div>' +
+    (it.reason ? '<div class="rtb-sub">'+h(it.reason)+'</div>' : "") +
+    (it.note ? '<div class="rtb-sub">Note: '+h(it.note)+'</div>' : "") +
+    '</div></div>';
+}
+function emptyHTML(){
+  return '<div class="rtb-empty"><div class="rtb-mark" aria-hidden="true">'+ICON_TICK+'</div><b>Nothing pending</b><span>The queue is clear.</span></div>';
+}
+
+function render(){
+  const body = $("rtbBody");
+  if(!body) return;
+  try{
+    setCount();
+    const banner = (S.loaded && !mayReview())
+      ? '<div class="rtb-banner" role="note">View-only account. You can see the queue, but you can\'t tick or cross.</div>'
+      : "";
+    let main;
+    if(!token()){
+      main = '<div class="rtb-empty"><b>Sign in to open the RTB Review Panel.</b></div>';
+    }else if(!S.loaded){
+      main = '<div class="rtb-empty"><span class="rtb-spin" aria-hidden="true"></span><b>Loading the review queue…</b></div>';
+    }else if(S.loadError && !S.sawList){
+      main = '<div class="rtb-empty"><b>Could not load the review queue</b><span>'+h(S.loadError)+'</span><button class="btn ghost" type="button" id="rtbRetry">Try again</button></div>';
+    }else if(!S.pending.length){
+      main = emptyHTML();
+    }else{
+      main = '<div class="rtb-cols" aria-hidden="true"><span>Contact</span><span>Why it was flagged</span><span>Decision</span></div>' +
+        '<div class="rtb-list">'+S.pending.map(rowHTML).join("")+'</div>';
+    }
+    body.innerHTML = banner + main + (token() && S.loaded && (S.sawList || !S.loadError) ? recentHTML() : "");
+    const det = $("rtbRecent");
+    if(det) det.addEventListener("toggle", () => { S.recentOpen = det.open; });
+    if(S.focusCancel){
+      S.focusCancel = false;
+      const b = body.querySelector("[data-cancel]");
+      if(b) b.focus();
+    }
+  }catch(e){
+    console.error("RTB Review Panel", e);
+    body.innerHTML = '<div class="rtb-empty"><b>Could not show the review queue.</b></div>';
+  }
+}
+
+function takeDecided(item, id){
+  const key = sid(item && item.id != null ? item.id : id);
+  S.pending = S.pending.filter(x => sid(x.id) !== key);
+  if(item && item.status && item.status !== "pending"){
+    S.recent = [item].concat(S.recent.filter(x => sid(x.id) !== key)).slice(0, 100);
+  }
+  delete S.errors[key];
+  delete S.notes[key];
+  if(S.confirm === key) S.confirm = null;
+}
+function successMessage(which, j){
+  if(j && j.unchanged) return "Already decided. Nothing changed.";
+  if(which === "tick") return "Ticked. Nothing was written to HubSpot.";
+  if(j && j.hubspot === "skipped (test row)") return "Crossed. Test row, so HubSpot was not changed.";
+  return "Crossed. Contact.RTB Bad Contact is True in HubSpot.";
+}
+
+async function verdict(id, which){
+  if(!mayReview() || S.busy) return;
+  const key = sid(id);
+  const it = S.pending.find(x => sid(x.id) === key);
+  const sentId = it ? it.id : (/^\d+$/.test(key) ? Number(key) : id);
+  const note = (S.notes[key] || "").trim();
+  S.busy = key;
+  S.confirm = null;
+  S.errors[key] = "";
+  render();
+  try{
+    const body = { id: sentId, verdict: which };
+    if(note) body.note = note;
+    const j = await call("/verdict", { method:"POST", headers:{ "Content-Type":"application/json" }, body: JSON.stringify(body) });
+    if(!j) return;
+    takeDecided(j.item, key);
+    say(successMessage(which, j));
+  }catch(e){
+    const item = e.body && e.body.item;
+    if(e.status === 409){
+      if(item) takeDecided(item, key);
+      else S.errors[key] = e.message || "That contact was already decided.";
+      say(e.message || "That contact was already decided.");
+    }else if(e.status === 403){
+      S.canReview = false;
+      S.errors[key] = e.message || "View-only account";
+    }else if(e.status === 502){
+      S.errors[key] = e.message || "HubSpot did not accept it. The row is still pending. Try again.";
+    }else{
+      S.errors[key] = e.message || "Could not save. Try again.";
+    }
+  }finally{
+    S.busy = null;
+    render();
+  }
+}
+
+async function load(isRefresh){
+  const btn = $("rtbRefresh");
+  if(btn){ btn.disabled = true; btn.textContent = "Loading…"; }
+  try{
+    const j = await call("/list");
+    if(!j) return;
+    S.pending = Array.isArray(j.pending) ? j.pending : [];
+    S.recent = Array.isArray(j.recent) ? j.recent : [];
+    S.canReview = j.canReview !== false && !(window.JF_USER && window.JF_USER.role === "view");
+    S.sawList = true;
+    S.loadError = "";
+    S.loaded = true;
+  }catch(e){
+    if(S.sawList && isRefresh) say("Could not refresh. " + (e.message || "Try again."));
+    else S.loadError = e.message || "Request failed";
+    S.loaded = true;
+  }finally{
+    if(btn){ btn.disabled = !token(); btn.textContent = "Refresh"; }
+    render();
+  }
+}
+
+function boot(){
+  const body = $("rtbBody");
+  const btn = $("rtbRefresh");
+  if(!body) return;
+  if(btn) btn.addEventListener("click", () => { if(token() && !S.busy) load(true); });
+  body.addEventListener("input", e => {
+    const input = e.target.closest(".rtb-note");
+    const row = e.target.closest(".rtb-row");
+    if(input && row) S.notes[row.dataset.id] = input.value;
+  });
+  body.addEventListener("click", e => {
+    if(e.target.closest("#rtbRetry")){ load(false); return; }
+    const row = e.target.closest(".rtb-row");
+    if(!row || S.busy) return;
+    const id = row.dataset.id;
+    const input = row.querySelector(".rtb-note");
+    if(input) S.notes[id] = input.value;
+    if(e.target.closest("[data-cancel]")){ S.confirm = null; S.errors[id] = ""; render(); return; }
+    if(e.target.closest("[data-docross]")){ verdict(id, "cross"); return; }
+    if(e.target.closest("[data-tick]")){ S.confirm = null; verdict(id, "tick"); return; }
+    if(e.target.closest("[data-cross]")){ S.confirm = id; S.errors[id] = ""; S.focusCancel = true; render(); }
+  });
+  if(!token()){
+    if(btn) btn.hidden = true;
+    S.loaded = true;
+    render();
+    return;
+  }
+  render();
+  load(false);
+  let tries = 0;
+  const iv = setInterval(() => {
+    tries++;
+    if(!(window.JF_USER || tries > 50)) return;
+    clearInterval(iv);
+    if(window.JF_USER && window.JF_USER.role === "view" && S.canReview !== false){
+      S.canReview = false;
+      if(S.loaded) render();
+    }
+  }, 100);
+}
+
+try{ boot(); }catch(e){ console.error("RTB Review Panel", e); }
 })();
 </script>
 </body>

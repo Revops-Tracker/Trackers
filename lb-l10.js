@@ -1014,9 +1014,9 @@ const SC_ROWS_ALL = [
   {id:"ans",      label:"Audit no-shows", tip:"Audit calls the prospect missed",        f:t=>t.ans.length, list:"ans", lower:true, era:"new"},
   {id:"ashow",    label:"Audit show rate", tip:"Audits run ÷ (run + no-shows)",       ratio:true, f:t=>(t.arun.length+t.ans.length)?t.arun.length/(t.arun.length+t.ans.length):null, list:"ashow", sub:t=>(t.arun.length+t.ans.length)?t.arun.length+" of "+(t.arun.length+t.ans.length):"", era:"new"},
   {id:"pbook",    label:"Moved to Prop Review/Contract", tip:"Deals moved to Prop Review / Contract (call booked)", f:t=>t.pbook.length, list:"pbook", era:"new"},
-  {id:"prun", core:true,     label:"Prop reviews run", core:true, tip:"Prop review calls that happened (from the AE tracker)",      f:t=>t.prun.length, list:"prun", era:"new"},
-  {id:"pns",      label:"Prop review no-shows", tip:"Prop review calls the prospect missed",  f:t=>t.pns.length, list:"pns", lower:true, era:"new"},
-  {id:"pshow",    label:"Prop review show rate", tip:"Prop reviews run ÷ (run + no-shows)", ratio:true, f:t=>(t.prun.length+t.pns.length)?t.prun.length/(t.prun.length+t.pns.length):null, list:"pshow", sub:t=>(t.prun.length+t.pns.length)?t.prun.length+" of "+(t.prun.length+t.pns.length):"", era:"new"},
+  {id:"prun", core:true,     label:"Prop reviews run", core:true, tip:"Prop review calls that happened (from the AE tracker). Before Oct 27 this is the old process’s Proposal Review call (the design was presented there); a missed one went to Proposal No-Show. Backfilled from Jan 1 (Dipen + Armin).",      f:t=>t.prun.length, list:"prun"},
+  {id:"pns",      label:"Prop review no-shows", tip:"Prop review calls the prospect missed. Before Oct 27 this is the old process’s Proposal Review call (the design was presented there); a missed one went to Proposal No-Show. Backfilled from Jan 1 (Dipen + Armin).",  f:t=>t.pns.length, list:"pns", lower:true},
+  {id:"pshow",    label:"Prop review show rate", tip:"Prop reviews run ÷ (run + no-shows)", ratio:true, f:t=>(t.prun.length+t.pns.length)?t.prun.length/(t.prun.length+t.pns.length):null, list:"pshow", sub:t=>(t.prun.length+t.pns.length)?t.prun.length+" of "+(t.prun.length+t.pns.length):""},
   {grp:"AE time (slots)"},
   {id:"slots", label:"AE slots that came up", tip:"One AE + one start time that came up", slot:true, f:x=>x.slots},
   {id:"cps",   label:"Calls per slot", tip:"Calls due ÷ slots (1.0 = no double booking)",        slot:true, dec:true, base:true, f:x=>x.slots?x.calls/x.slots:null, sub:x=>x.slots?x.calls+" calls":""},
@@ -1301,14 +1301,18 @@ function renderStages(){
     {id:"audit", name:"Design/Audit", who:"Credited to the AE", role:"ae", team:"sc:team", f:audit, list:"ashow",
      tip:"Audit calls in the period, from the AE tracker. Held ÷ (held + no-shows). A no-show is the deal moving to Design/Audit - No Show (or the AE marking it). Not confirmed yet = slot passed, the AE has not answered on the AE tracker."},
     {id:"prop", name:"Prop Review", who:"Credited to the AE", role:"ae", team:"sc:team", f:prop, list:"pshow",
-     tip:"Proposal review calls in the period, from the AE tracker. Held ÷ (held + no-shows). A no-show is the deal moving to Proposal No-Show (or the AE marking it)."},
+     tip:"Proposal review calls in the period, from the AE tracker. Held ÷ (held + no-shows). A no-show is the deal moving to Proposal No-Show (or the AE marking it). Before Oct 27 (old process) this is the Proposal Review call, where the design was presented: backfilled from Jan 1 for Dipen and Armin. Held = Fathom recording, Completed meeting or the deal moving on to Prop Update; no-show = Proposal No-Show near the call. Days when 5+ deals were bulk-moved into Proposal No-Show are cleanups and don't count. Calls with no recording and no stage move stay as not confirmed yet (many of Armin's)."},
   ];
   const cell = (s, key, role, x, what) => `<span class="click" data-stg="${s.id}|${esc(key)}|${role}">${what}</span>`;
+  const cut = state.cutover || "2026-10-27", cutTxt = (d=>MON[d.getMonth()]+" "+d.getDate())(new Date(cut+"T12:00:00"));
   const card = s => {
+    if(s.id==="audit" && p.end < cut) return `<div class="stg-card"><div class="stg-h"><b>${s.name}</b><small>${s.who}</small></div>
+      <div class="stg-v stg-na">–</div><p class="stg-s">The audit call started with the 3-call close on ${cutTxt}. Before that the design was presented on the Proposal Review call: see Prop Review.</p></div>`;
+    const note = s.id==="audit" && p.start < cut ? `<small class="stg-note">Audits only exist from ${cutTxt}</small>` : s.id==="prop" && p.start < cut ? `<small class="stg-note">Before ${cutTxt}: the old Proposal Review (design) call</small>` : "";
     const team = s.f(st(s.team, s.role, p)), r = rate(team);
     const rows = people(s.role).map(pp=>({pp, x:s.f(st(pp.key, s.role, p))})).filter(o=>o.x.held+o.x.ns+o.x.wait);
     return `<div class="stg-card">
-      <div class="stg-h"><b>${s.name}</b><button type="button" class="tip" data-tip="${esc(s.tip)}" aria-label="How ${esc(s.name)} show rate is counted">ⓘ</button><small>${s.who}</small></div>
+      <div class="stg-h"><b>${s.name}</b><button type="button" class="tip" data-tip="${esc(s.tip)}" aria-label="How ${esc(s.name)} show rate is counted">ⓘ</button><small>${s.who}</small>${note}</div>
       <div class="stg-v">${cell(s, s.team, s.role, team, pctS(r))}${D(sp=>rate(s.f(st(s.team, s.role, sp))), {pct:true})}</div>
       <div class="stg-s">${team.held} held · ${team.ns} no-show${team.ns===1?"":"s"}${team.wait?` · ${team.wait} not confirmed yet`:""}</div>
       ${rows.length ? `<div class="stg-t">${rows.map(o=>`<div class="stg-r"><span class="n">${esc(o.pp.name)}</span><b>${cell(s, o.pp.key, s.role, o.x, pctS(rate(o.x)))}</b><small>${o.x.held} of ${o.x.held+o.x.ns}${o.x.wait?` · ${o.x.wait} waiting`:""}</small></div>`).join("")}</div>` : `<p class="stg-s">No calls in this period.</p>`}
@@ -1371,8 +1375,8 @@ const AX_COLS_ALL = [
   {id:"desn", core:true,  label:"Design/Audit",    f:t=>t.des.length, list:"des", era:"new"},
   {id:"arun", core:true,  label:"Audits run",      f:t=>t.arun.length, list:"arun", era:"new"},
   {id:"ans",   label:"Audit no-shows",  f:t=>t.ans.length, list:"ans", era:"new"},
-  {id:"prun", core:true,  label:"Prop reviews run", f:t=>t.prun.length, list:"prun", era:"new"},
-  {id:"pns",   label:"Prop review no-shows", f:t=>t.pns.length, list:"pns", era:"new"},
+  {id:"prun", core:true,  label:"Prop reviews run", f:t=>t.prun.length, list:"prun"},
+  {id:"pns",   label:"Prop review no-shows", f:t=>t.pns.length, list:"pns"},
   {id:"won", core:true,   label:"Closes",          f:t=>t.won.length, list:"won"},
   {id:"crate", core:true, label:"Close rate (simple)", ratio:true, f:t=>t.had.length?t.won.length/t.had.length:null, list:"won", sub:t=>t.had.length?t.won.length+" ÷ "+t.had.length+" runs":""},
   {id:"cvw", core:true, label:"Close rate (by call)", ratio:true, f:t=>t.cvD.length?t.cvDw.length/t.cvD.length:null, list:"cvw", sub:t=>t.cvD.length?t.cvDw.length+" of "+t.cvD.length:""},

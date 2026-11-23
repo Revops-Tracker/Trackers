@@ -209,3 +209,5 @@ html.view-reporting .l10-time.stuck{padding-top:6px;padding-bottom:6px;border-ra
 .stg-r .n{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .stg-r b{font-variant-numeric:tabular-nums}
 .stg-r small{color:var(--muted);white-space:nowrap;min-width:84px;text-align:right}
+.stg-h small.stg-note{color:var(--muted);font-style:italic}
+.stg-v.stg-na{color:var(--muted)}

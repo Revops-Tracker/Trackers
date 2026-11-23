@@ -143,6 +143,14 @@
   .dsp-t th { font-size: 11px; }
   .ls-sum { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 14px; }
   .ls-sum .stat { min-width: 150px; flex: 0 1 200px; }
+  .od-bar { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 14px; }
+  .od-in { display: flex; gap: 14px; flex-wrap: wrap; margin-bottom: 14px; }
+  .od-in label { display: flex; flex-direction: column; gap: 4px; font-size: 12px; text-transform: uppercase; letter-spacing: 0.07em; color: var(--muted); font-weight: 600; }
+  .od-in input { width: 130px; font-size: 18px; font-weight: 600; }
+  .od-res { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 12px; }
+  .od-res .stat { min-width: 150px; flex: 0 1 210px; }
+  .od-chance { font-size: 15px; padding: 10px 14px; border-radius: 10px; background: var(--accent-soft); }
+  .od-best { margin: 0 0 12px; font-size: 15.5px; }
   .pctu { display: block; font-size: 11.5px; color: var(--muted); font-weight: 400; line-height: 1.3; }
 </style>
 </head>
@@ -1211,13 +1219,128 @@
     });
   }
 
+  // ---------- Odds & dial calculator ----------
+  // Everything here is read from the same weekly uploads as the Lists section: dials / connects per list (Nooks) and discos booked (HubSpot).
+  var od = { weeks: 8, scope: 'week', who: null, want: null };
+  function odStats(ws) {
+    var L = state.lists, weeks = [];
+    L.rows.forEach(function (r) { if (ws.indexOf(r.bdr) !== -1 && weeks.indexOf(r.week_ending) === -1) weeks.push(r.week_ending); });
+    weeks.sort().reverse();
+    if (od.weeks) weeks = weeks.slice(0, od.weeks);
+    var inW = {}, T = { d: 0, c: 0, b: 0 }, lists = {}, wk = {};
+    weeks.forEach(function (w) { inW[w] = 1; wk[w] = { d: 0, c: 0, b: 0 }; });
+    L.rows.forEach(function (r) {
+      if (!inW[r.week_ending] || ws.indexOf(r.bdr) === -1) return;
+      var d = Number(r.dials || 0), c = Number(r.connects || 0);
+      T.d += d; T.c += c; wk[r.week_ending].d += d; wk[r.week_ending].c += c;
+      var k = r.tier + '|' + r.list_name, o = lists[k] || (lists[k] = { tier: r.tier, name: r.list_name, d: 0, c: 0, b: 0 });
+      o.d += d; o.c += c;
+    });
+    (L.discos || []).forEach(function (r) {
+      if (!inW[r.week_ending] || ws.indexOf(r.bdr) === -1) return;
+      var b = Number(r.discos_booked || 0); T.b += b; wk[r.week_ending].b += b;
+    });
+    (L.books || []).forEach(function (r) {
+      if (!inW[r.week_ending] || ws.indexOf(r.bdr) === -1 || r.tier === 'None') return;
+      var o = lists[r.tier + '|' + r.list_name];
+      if (o) o.b += Number(r.outbound_books || 0);
+    });
+    return { weeks: weeks, T: T, lists: lists, wk: wk };
+  }
+
+  function renderOdds(host, mode, who) {
+    var v = document.createElement('div');
+    v.style.marginTop = '20px';
+    host.appendChild(v);
+    if (!state.lists) return;
+    var reps = state.settings.map(function (s) { return s.rep; });
+    var ws = mode === 'rep' ? [who] : reps;
+    var key = mode === 'rep' ? who : '*';
+    if (od.who !== key) { od.who = key; od.want = null; }
+    var S = odStats(ws), T = S.T;
+    if (!S.weeks.length || !T.d) { v.innerHTML = '<div class="card"><h2>Odds &amp; dial calculator</h2><p class="hint">Shows up once there is a week of dial data from the Nooks upload.</p></div>'; return; }
+
+    var nW = S.weeks.length, perMonth = 52 / 12, month = od.scope === 'month', day = od.scope === 'day';
+    var tgt = ws.reduce(function (a, r) { return a + (settingsFor(r).monthly_target || 48); }, 0);
+    if (od.want == null) od.want = Math.max(1, Math.round(month ? tgt : day ? tgt / 21.7 : tgt / perMonth));
+    var perDisco = T.b ? T.d / T.b : 0, p0 = T.d ? T.b / T.d : 0;   // dials it currently takes to book one disco; discos per dial
+
+    var oldest = S.weeks[S.weeks.length - 1], newest = S.weeks[0];
+    var label = shortDate(mondayOf(oldest)) + ' – ' + shortDate(parse(newest));
+    var bar = '<div class="ls-bar"><div class="seg">'
+      + [[4, '4 weeks'], [8, '8 weeks'], [12, '12 weeks'], [0, 'All']].map(function (k) { return "<button data-w='" + k[0] + "' class='" + (od.weeks === k[0] ? 'on' : '') + "'>" + k[1] + '</button>'; }).join('')
+      + '</div><div class="label" style="font-size:18px;min-width:0">' + esc(label) + '</div></div>';
+
+    var funnel = '<div class="ls-sum">'
+      + '<div class="stat"><div class="k">Dials</div><div class="v">' + f0(T.d) + '</div><div class="sub">' + f0(T.d / nW) + ' a week</div></div>'
+      + '<div class="stat"><div class="k">Connects</div><div class="v">' + f0(T.c) + '</div><div class="sub">' + pct(T.c, T.d) + ' of dials</div></div>'
+      + '<div class="stat"><div class="k">Disco booked</div><div class="v">' + f0(T.b) + '</div><div class="sub">' + pct(T.b, T.c) + ' of connects</div></div>'
+      + '<div class="stat"><div class="k">Dials per disco</div><div class="v">' + (T.b ? f0(perDisco) : '&mdash;') + '</div><div class="sub">' + (T.b ? 'one disco every ' + f0(perDisco) + ' dials' : 'no discos yet') + '</div></div></div>';
+
+    var calc = '<div class="card"><h2>How many dials for my goal?</h2>'
+      + '<div class="od-bar"><div class="seg" id="od-scope">' + [['day', 'Per day'], ['week', 'Per week'], ['month', 'Per month']].map(function (k) { return "<button data-s='" + k[0] + "' class='" + (od.scope === k[0] ? 'on' : '') + "'>" + k[1] + '</button>'; }).join('') + '</div></div>'
+      + '<div class="od-in"><label>Discos I want<input type="number" id="od-want" min="0" step="1" value="' + od.want + '"></label></div>'
+      + '<div id="od-out"></div>'
+      + '<p class="hint">Worked out from your numbers for the weeks shown (' + esc(label) + '): one disco for every ' + (T.b ? f0(perDisco) : '?') + ' dials. Use the 4, 8, 12 weeks or All buttons above to change which weeks it looks at.</p></div>';
+
+    // list ranking: rates are pulled toward the overall rate when a list has few dials, so one lucky booking cannot top the chart
+    var K = 300, elig = [], rows = [];
+    var pool = { d: 0, b: 0 };
+    Object.keys(S.lists).forEach(function (k) { var o = S.lists[k]; if (!/missed/i.test(o.name)) { pool.d += o.d; pool.b += o.b; } });
+    var pp = pool.d ? pool.b / pool.d : p0;
+    Object.keys(S.lists).forEach(function (k) {
+      var o = S.lists[k]; if (!o.d) return;
+      o.post = (o.b + K * pp) / (o.d + K);
+      o.ok = !/missed/i.test(o.name) && o.d >= 100;
+      rows.push(o); if (o.ok) elig.push(o);
+    });
+    rows.sort(function (a, b) { return b.post - a.post; });
+    elig.sort(function (a, b) { return b.post - a.post; });
+    var best = elig[0];
+    var rank = '<div class="card"><h2>Which list pays off?</h2>'
+      + (best ? '<p class="od-best">Best use of your next dials right now: <b>' + esc(best.name) + '</b> &mdash; about <b>' + f1(best.post * 1000) + '</b> discos per 1,000 dials' + (elig[1] ? ', then ' + esc(elig[1].name) + ' at ' + f1(elig[1].post * 1000) : '') + '.</p>' : '')
+      + '<div class="tablewrap"><table><thead><tr><th>List</th><th>Dials</th><th>Connect rate</th><th>Discos</th><th>Dials per disco</th><th>Discos per 1,000 dials</th></tr></thead><tbody>'
+      + rows.map(function (o) {
+        var ix = elig.indexOf(o), star = best && o === best ? ' <span class="st ok">Dial next</span>' : (ix === 1 || ix === 2 ? ' <span class="st flat">' + (ix === 1 ? '2nd' : '3rd') + '</span>' : '');
+        return '<tr><td>' + esc(o.name) + star + '<span class="pctu">' + esc(o.tier) + (/missed/i.test(o.name) ? ' &middot; not a daily dial' : o.d < 100 ? ' &middot; small sample' : '') + '</span></td><td>' + f0(o.d) + '</td><td>' + pct(o.c, o.d) + '</td><td>' + f1(o.b).replace(/\.0$/, '') + '</td>'
+          + '<td>' + (o.b ? f0(o.d / o.b) : '&mdash;') + '</td><td><b>' + f1(o.post * 1000) + '</b></td></tr>';
+      }).join('') + '</tbody></table></div><p class="hint">Discos per 1,000 dials is adjusted for sample size: a list with few dials is pulled toward your overall rate so one lucky booking cannot top the chart. Dial next, 2nd and 3rd rank the best lists to work day to day. Discos are credited to the list the lead came from.</p></div>';
+
+    v.innerHTML = '<h2 style="font-family:var(--display);font-size:26px;margin:0 0 10px">Odds &amp; dial calculator</h2>' + bar + funnel + calc + '<div style="height:20px"></div>' + rank;
+
+    function upd() {
+      var N = Number(document.getElementById('od-want').value) || 0, o = document.getElementById('od-out');
+      od.want = N;
+      if (!T.b) { o.innerHTML = '<p class="hint">No discos in these weeks yet, so there is nothing to work from.</p>'; return; }
+      if (!(N > 0)) { o.innerHTML = '<p class="hint">Type how many discos you want.</p>'; return; }
+      var days = month ? 21.7 : 5, need = Math.ceil(N * perDisco), div = day ? 5 : month ? 1 / perMonth : 1;
+      var now = T.d / nW / div, nowDiscos = T.b / nW / div, per = month ? 'month' : day ? 'day' : 'week', diff = need - now;
+      var today = ws.reduce(function (a, r) { var e = entryFor(r, iso(new Date())); return a + (e ? Number(e.dials || 0) : 0); }, 0);
+      var mid = day
+        ? '<div class="stat"><div class="k">Logged today</div><div class="v">' + f0(today) + '</div><div class="sub">' + (need > today ? f0(need - today) + ' to go' : 'goal dials reached') + '</div></div>'
+        : '<div class="stat"><div class="k">That is</div><div class="v">' + f0(need / days) + '</div><div class="sub">dials every weekday</div></div>';
+      o.innerHTML = '<div class="od-res">'
+        + '<div class="stat"><div class="k">Dials you need</div><div class="v">' + f0(need) + '</div><div class="sub">to book ' + f0(N) + ' disco' + (N === 1 ? '' : 's') + (day ? ' today' : ' this ' + per) + '</div></div>'
+        + mid
+        + '<div class="stat"><div class="k">You are at</div><div class="v">' + f0(now) + '</div><div class="sub">dials a ' + per + ' &middot; about ' + f1(nowDiscos) + ' disco' + (Math.round(nowDiscos * 10) === 10 ? '' : 's') + '</div></div></div>'
+        + '<div class="od-chance">' + (diff > 1
+          ? 'You would need about <b>' + f0(diff) + ' more dials</b> a ' + per + ' than you are doing now (' + f1(need / now) + 'x your current pace).'
+          : 'Your current dialing already covers it: about <b>' + f1(nowDiscos) + '</b> discos a ' + per + ' at this pace.') + '</div>';
+    }
+    document.getElementById('od-want').oninput = upd;
+    upd();
+    v.querySelectorAll('.ls-bar .seg button').forEach(function (b) { b.onclick = function () { od.weeks = Number(b.dataset.w); render(); }; });
+    var sc = document.getElementById('od-scope');
+    if (sc) sc.querySelectorAll('button').forEach(function (b) { b.onclick = function () { od.scope = b.dataset.s; od.want = null; render(); }; });
+  }
+
   function render() {
     renderTabs();
     var v = document.getElementById('view');
     if (active !== 'summary' && active !== 'history' && !state.settings.some(function (s) { return s.rep === active; })) active = 'summary';
-    if (active === 'summary') { renderSummary(v); renderLists(v, 'team'); }
+    if (active === 'summary') { renderSummary(v); renderOdds(v, 'team'); renderLists(v, 'team'); }
     else if (active === 'history') renderHistory(v);
-    else { renderRep(v, active); renderLists(v, 'rep', active); }
+    else { renderRep(v, active); renderOdds(v, 'rep', active); renderLists(v, 'rep', active); }
   }
 
   load();

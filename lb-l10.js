@@ -509,7 +509,7 @@ const DQ_LABEL = {cms:"CMS", revenue_too_low:"Revenue too low (old DQ value, now
 const DQ_ORDER = ["not_an_msp","geography","cms","msp_section_too_small","msp_out_of_scope","niche_vertical_only","other"];   // the ranking: first match wins
 const LOST_LABEL = {"Revenue too low":"Revenue too low (revisit with low-ticket offer)","Cost":"Pricing objection","Bad timing":"Bad timing","No Response":"No response","No Interest":"No interest","Unqualified - No pain":"No pain",
   "Competitor":"Went with competitor","Negative Reviews":"Negative reviews","Business Closed/Out Of Business":"Business closed","Contract Disagreement":"Contract disagreement (complexity)",
-  "Doesnt see value":"Doesn't see value","Duplicate Deal":"Duplicate deal","Unqualified":"Unqualified - ICP fit (retired)","Went with competitor":"Went with competitor (old)",
+  "Doesnt see value":"Doesn't see value","CMS migration":"Won't migrate CMS (declined WordPress move)","Duplicate Deal":"Duplicate deal","Unqualified":"Unqualified - ICP fit (retired)","Went with competitor":"Went with competitor (old)",
   "0-500K Revenue":"0-500K revenue (retired)","500-1M Revenue":"500-1M revenue (retired)","1M-1.15M Revenue":"1M-1.5M revenue (retired)"};
 const NO_REASON = "No reason recorded";
 const isDq = a => DQ_STAGES.has(String(a.dealstage)) || (!!a.dq_category && a.hs_is_closed_won!=="true");

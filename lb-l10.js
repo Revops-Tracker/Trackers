@@ -75,6 +75,7 @@
         </div>
       </div>
     </div>
+    <div class="stg" id="stgPanel"></div>
     <div class="sc-topscroll" id="scTop" hidden aria-hidden="true"><div></div></div>
     <div class="sc-wrap" id="scTable"></div>
     <p class="sc-note" id="scNote"></p>
@@ -1260,6 +1261,7 @@ function renderScorecard(){
   });
   html += `</tbody></table>`;
   box.innerHTML = html;
+  renderStages();
   box.scrollLeft = box.scrollWidth;   // newest columns (and the chosen-period column) in view
   const last = (state.act && state.act.rows.length) ? state.act.rows.reduce((a,r)=>r.week_ending>a?r.week_ending:a, "") : null;
   document.getElementById("scNote").textContent = !showAct ? "" :
@@ -1276,6 +1278,51 @@ document.getElementById("scRange").onchange = e=>{ SC.range = e.target.value; SC
 document.getElementById("scPrev").onclick = ()=>{ SC.shift -= Math.max(1, SC_N[SC.kind]-2); renderScorecard(); };
 document.getElementById("scNext").onclick = ()=>{ SC.shift = Math.min(0, SC.shift + Math.max(1, SC_N[SC.kind]-2)); renderScorecard(); };
 document.getElementById("scAll").onclick = ()=>{ const all = SC.groups.every(n=>SC.open.has(n)); SC.groups.forEach(n=>all ? SC.open.delete(n) : SC.open.add(n)); scSaveOpen(); renderScorecard(); };
+/* ---------- Scorecard: show-up by stage (Vianney 11-23) ----------
+   One row per sales call stage for the period in the time bar, credited to whoever owns that call:
+   Disco = the booker (BDR / inbound), Design/Audit + Prop Review = the AE. Rate = held ÷ (held + no-shows);
+   calls still waiting on an answer are shown, never folded in. Click a number to see the deals. */
+function renderStages(){
+  const box = document.getElementById("stgPanel"); if(!box) return;
+  if(SC.only){ box.innerHTML = ""; return; }
+  const p = gP(), q = gCmpOn() ? gPrev() : null;
+  const D = (f, o) => q ? dl(f(p), f(q), o) : "";
+  const st = (key, role, sp) => statsFor(key, roleOf(key, role), sp);
+  const disco = t => ({held:t.had.length, ns:t.ns.length, wait:Math.max(0, t.dueN - t.had.length - t.ns.length)});
+  const audit = t => ({held:t.arun.length, ns:t.ans.length, wait:t.apend.length});
+  const prop  = t => ({held:t.prun.length, ns:t.pns.length, wait:t.ppend.length});
+  const rate = x => (x.held + x.ns) ? x.held/(x.held + x.ns) : null;
+  const people = role => role==="ae" ? [...AES.map(a=>({key:a.key, name:a.name})), {key:FORMER, name:"Former AEs"}]
+    : [...BDRS.map(b=>({key:b.key, name:b.name})), {key:INB_ALL, name:"Inbound (no BDR)"}, {key:OTHER, name:"Booked by an AE"}, {key:FORMER, name:"Former BDRs"}];
+  const roleOf = (key, role) => key==="sc:team" ? "bdr" : role;   // the team row matches through PRED, which only answers for "bdr"
+  const STG = [
+    {id:"disco", name:"Discovery call", who:"Credited to the booker", role:"bdr", team:"sc:team", f:disco, list:"due",
+     tip:"Discovery calls whose slot came up in the period. Held ÷ (held + no-shows), counted per call: a no-show that is rebooked and held counts once each way. Same numbers as Runs had / No-shows on the Scorecard."},
+    {id:"audit", name:"Design/Audit", who:"Credited to the AE", role:"ae", team:"sc:team", f:audit, list:"ashow",
+     tip:"Audit calls in the period, from the AE tracker. Held ÷ (held + no-shows). A no-show is the deal moving to Design/Audit - No Show (or the AE marking it). Not confirmed yet = slot passed, the AE has not answered on the AE tracker."},
+    {id:"prop", name:"Prop Review", who:"Credited to the AE", role:"ae", team:"sc:team", f:prop, list:"pshow",
+     tip:"Proposal review calls in the period, from the AE tracker. Held ÷ (held + no-shows). A no-show is the deal moving to Proposal No-Show (or the AE marking it)."},
+  ];
+  const cell = (s, key, role, x, what) => `<span class="click" data-stg="${s.id}|${esc(key)}|${role}">${what}</span>`;
+  const card = s => {
+    const team = s.f(st(s.team, s.role, p)), r = rate(team);
+    const rows = people(s.role).map(pp=>({pp, x:s.f(st(pp.key, s.role, p))})).filter(o=>o.x.held+o.x.ns+o.x.wait);
+    return `<div class="stg-card">
+      <div class="stg-h"><b>${s.name}</b><button type="button" class="tip" data-tip="${esc(s.tip)}" aria-label="How ${esc(s.name)} show rate is counted">ⓘ</button><small>${s.who}</small></div>
+      <div class="stg-v">${cell(s, s.team, s.role, team, pctS(r))}${D(sp=>rate(s.f(st(s.team, s.role, sp))), {pct:true})}</div>
+      <div class="stg-s">${team.held} held · ${team.ns} no-show${team.ns===1?"":"s"}${team.wait?` · ${team.wait} not confirmed yet`:""}</div>
+      ${rows.length ? `<div class="stg-t">${rows.map(o=>`<div class="stg-r"><span class="n">${esc(o.pp.name)}</span><b>${cell(s, o.pp.key, s.role, o.x, pctS(rate(o.x)))}</b><small>${o.x.held} of ${o.x.held+o.x.ns}${o.x.wait?` · ${o.x.wait} waiting`:""}</small></div>`).join("")}</div>` : `<p class="stg-s">No calls in this period.</p>`}
+    </div>`;
+  };
+  box.innerHTML = `<div class="stg-head"><h3>Show-up by stage</h3><small>${esc(p.label)}${q?` · change vs ${esc(q.label)}`:""}</small></div>
+    <div class="stg-grid">${STG.map(card).join("")}</div>`;
+  box.onclick = e=>{
+    const c = e.target.closest("[data-stg]"); if(!c) return;
+    const [id, key, role] = c.dataset.stg.split("|"), s = STG.find(x=>x.id===id);
+    const nm = key==="sc:team" ? "Whole team" : (people(role).find(x=>x.key===key)||{name:key}).name;
+    openList(key, roleOf(key, role), s.list, nm+": "+s.name+" show-up", p);
+  };
+}
 document.getElementById("scSec").addEventListener("click", e=>{
   const g = e.target.closest("tr[data-grp]");
   if(g){ const k = g.dataset.grp; SC.open.has(k) ? SC.open.delete(k) : SC.open.add(k); scSaveOpen(); renderScorecard(); return; }

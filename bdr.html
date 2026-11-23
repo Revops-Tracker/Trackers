@@ -150,6 +150,7 @@
   .od-res { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 12px; }
   .od-res .stat { min-width: 150px; flex: 0 1 210px; }
   .od-chance { font-size: 15px; padding: 10px 14px; border-radius: 10px; background: var(--accent-soft); }
+  .od-div { height: 1px; background: var(--line); margin: 22px 0 18px; }
   .od-best { margin: 0 0 12px; font-size: 15.5px; }
   .pctu { display: block; font-size: 11.5px; color: var(--muted); font-weight: 400; line-height: 1.3; }
 </style>
@@ -1279,7 +1280,7 @@
       + '<div class="od-bar"><div class="seg" id="od-scope">' + [['day', 'Per day'], ['week', 'Per week'], ['month', 'Per month']].map(function (k) { return "<button data-s='" + k[0] + "' class='" + (od.scope === k[0] ? 'on' : '') + "'>" + k[1] + '</button>'; }).join('') + '</div></div>'
       + '<div class="od-in"><label>Discos I want<input type="number" id="od-want" min="0" step="1" value="' + od.want + '"></label></div>'
       + '<div id="od-out"></div>'
-      + '<p class="hint">Worked out from your numbers for the weeks shown (' + esc(label) + '): one disco for every ' + (T.b ? f0(perDisco) : '?') + ' dials.</p></div>';
+      + '<p class="hint">Worked out from your last ' + nW + ' weeks: one disco for every ' + (T.b ? f0(perDisco) : '?') + ' dials. &ldquo;Done so far&rdquo; counts what you have logged in your daily entries.</p>';
 
     // list ranking: rates are pulled toward the overall rate when a list has few dials, so one lucky booking cannot top the chart
     var K = 300, elig = [], rows = [];
@@ -1295,7 +1296,7 @@
     rows.sort(function (a, b) { return b.post - a.post; });
     elig.sort(function (a, b) { return b.post - a.post; });
     var best = elig[0];
-    var rank = '<div class="card"><h2>Which list pays off?</h2>'
+    var rank = '<div class="od-div"></div><h2>Which list pays off?</h2>'
       + (best ? '<p class="od-best">Best use of your next dials right now: <b>' + esc(best.name) + '</b> &mdash; about <b>' + f1(best.post * 1000) + '</b> discos per 1,000 dials' + (elig[1] ? ', then ' + esc(elig[1].name) + ' at ' + f1(elig[1].post * 1000) : '') + '.</p>' : '')
       + '<div class="tablewrap"><table><thead><tr><th>List</th><th>Dials</th><th>Connect rate</th><th>Discos</th><th>Dials per disco</th><th>Discos per 1,000 dials</th></tr></thead><tbody>'
       + rows.map(function (o) {
@@ -1304,26 +1305,40 @@
           + '<td>' + (o.b ? f0(o.d / o.b) : '&mdash;') + '</td><td><b>' + f1(o.post * 1000) + '</b></td></tr>';
       }).join('') + '</tbody></table></div><p class="hint">Discos per 1,000 dials is adjusted for sample size: a list with few dials is pulled toward your overall rate so one lucky booking cannot top the chart. Dial next, 2nd and 3rd rank the best lists to work day to day. Discos are credited to the list the lead came from.</p></div>';
 
-    v.innerHTML = '<h2 style="font-family:var(--display);font-size:26px;margin:0 0 10px">Odds &amp; dial calculator</h2>' + bar + funnel + calc + '<div style="height:20px"></div>' + rank;
+    v.innerHTML = '<h2 style="font-family:var(--display);font-size:26px;margin:0 0 10px">Odds &amp; dial calculator</h2>' + bar + funnel + calc + rank;
 
     function upd() {
       var N = Number(document.getElementById('od-want').value) || 0, o = document.getElementById('od-out');
       od.want = N;
       if (!T.b) { o.innerHTML = '<p class="hint">No discos in these weeks yet, so there is nothing to work from.</p>'; return; }
       if (!(N > 0)) { o.innerHTML = '<p class="hint">Type how many discos you want.</p>'; return; }
-      var days = month ? 21.7 : 5, need = Math.ceil(N * perDisco), div = day ? 5 : month ? 1 / perMonth : 1;
-      var now = T.d / nW / div, nowDiscos = T.b / nW / div, per = month ? 'month' : day ? 'day' : 'week', diff = need - now;
-      var today = ws.reduce(function (a, r) { var e = entryFor(r, iso(new Date())); return a + (e ? Number(e.dials || 0) : 0); }, 0);
-      var mid = day
-        ? '<div class="stat"><div class="k">Logged today</div><div class="v">' + f0(today) + '</div><div class="sub">' + (need > today ? f0(need - today) + ' to go' : 'goal dials reached') + '</div></div>'
-        : '<div class="stat"><div class="k">That is</div><div class="v">' + f0(need / days) + '</div><div class="sub">dials every weekday</div></div>';
+      // the period we are in, what is already logged in it, and the weekdays still to dial (today counts until it is over)
+      var t0 = new Date(); t0.setHours(0, 0, 0, 0);
+      var start, end, per;
+      if (month) { var mw = monthWindow(); start = mw.start; end = mw.end; per = 'month'; }
+      else if (day) { start = t0; end = t0; per = 'day'; }
+      else { start = new Date(t0.getFullYear(), t0.getMonth(), t0.getDate() - ((t0.getDay() + 6) % 7)); end = new Date(start.getFullYear(), start.getMonth(), start.getDate() + 4); per = 'week'; }
+      var remDays = day ? (t0.getDay() === 0 || t0.getDay() === 6 ? 0 : 1) : workdays(t0 > start ? t0 : start, end);
+      var done = { d: 0, b: 0 };
+      state.entries.forEach(function (e) {
+        if (ws.indexOf(e.rep) === -1) return;
+        var dt = parse(e.entry_date);
+        if (dt >= start && dt <= end) { done.d += Number(e.dials || 0); done.b += Number(e.booked || 0); }
+      });
+      var usual = T.d / nW / 5;                       // your usual dials on a weekday
+      var left = Math.max(0, N - done.b), need = Math.ceil(left * perDisco);
+      var perDay = remDays ? need / remDays : 0;
+      var when = day ? 'today' : 'this ' + per, plural = function (n) { return n === 1 ? '' : 's'; };
+      var msg;
+      if (left <= 0) msg = 'Goal hit: <b>' + f1(done.b).replace(/\.0$/, '') + '</b> disco' + plural(done.b) + ' booked ' + when + ' already. Anything more is a bonus.';
+      else if (!remDays) msg = (day ? 'Today is not a dialing day.' : 'No weekdays left this ' + per + '.') + ' You logged <b>' + f0(done.d) + '</b> dials and <b>' + f1(done.b).replace(/\.0$/, '') + '</b> disco' + plural(done.b) + '.';
+      else if (day) msg = 'To book <b>' + f0(left) + '</b> more ' + (left === 1 ? 'disco' : 'discos') + ' today you need about <b>' + f0(need) + '</b> dials. Your usual weekday is ' + f0(usual) + ' (' + f1(need / usual) + 'x).';
+      else msg = 'For the <b>' + remDays + '</b> weekday' + plural(remDays) + ' left, that is about <b>' + f0(perDay) + ' dials a day</b>. Your usual weekday is ' + f0(usual) + (perDay > usual * 1.05 ? ' (' + f1(perDay / usual) + 'x), so it needs a bigger push.' : ', so you are on pace.');
       o.innerHTML = '<div class="od-res">'
-        + '<div class="stat"><div class="k">Dials you need</div><div class="v">' + f0(need) + '</div><div class="sub">to book ' + f0(N) + ' disco' + (N === 1 ? '' : 's') + (day ? ' today' : ' this ' + per) + '</div></div>'
-        + mid
-        + '<div class="stat"><div class="k">You are at</div><div class="v">' + f0(now) + '</div><div class="sub">dials a ' + per + ' &middot; about ' + f1(nowDiscos) + ' disco' + (Math.round(nowDiscos * 10) === 10 ? '' : 's') + '</div></div></div>'
-        + '<div class="od-chance">' + (diff > 1
-          ? 'You would need about <b>' + f0(diff) + ' more dials</b> a ' + per + ' than you are doing now (' + f1(need / now) + 'x your current pace).'
-          : 'Your current dialing already covers it: about <b>' + f1(nowDiscos) + '</b> discos a ' + per + ' at this pace.') + '</div>';
+        + '<div class="stat"><div class="k">Dials still needed</div><div class="v">' + f0(need) + '</div><div class="sub">' + (left > 0 ? 'to book ' + f1(left).replace(/\.0$/, '') + ' more ' + when : 'goal already hit') + '</div></div>'
+        + '<div class="stat"><div class="k">' + (day ? 'Logged today' : 'Per day, ' + remDays + ' day' + plural(remDays) + ' left') + '</div><div class="v">' + (day ? f0(done.d) : remDays ? f0(perDay) : '&mdash;') + '</div><div class="sub">' + (day ? (need > 0 ? 'dials so far' : 'dials so far') : 'dials a weekday, starting today') + '</div></div>'
+        + '<div class="stat"><div class="k">' + (day ? 'Booked today' : 'Done so far') + '</div><div class="v">' + (day ? f1(done.b).replace(/\.0$/, '') : f0(done.d)) + '</div><div class="sub">' + (day ? 'of ' + f0(N) + ' wanted' : 'dials &middot; ' + f1(done.b).replace(/\.0$/, '') + ' disco' + plural(done.b) + ' booked ' + when) + '</div></div></div>'
+        + '<div class="od-chance">' + msg + '</div>';
     }
     document.getElementById('od-want').oninput = upd;
     upd();

@@ -1267,9 +1267,7 @@
 
     var oldest = S.weeks[S.weeks.length - 1], newest = S.weeks[0];
     var label = shortDate(mondayOf(oldest)) + ' – ' + shortDate(parse(newest));
-    var bar = '<div class="ls-bar"><div class="seg">'
-      + [[4, '4 weeks'], [8, '8 weeks'], [12, '12 weeks'], [0, 'All']].map(function (k) { return "<button data-w='" + k[0] + "' class='" + (od.weeks === k[0] ? 'on' : '') + "'>" + k[1] + '</button>'; }).join('')
-      + '</div><div class="label" style="font-size:18px;min-width:0">' + esc(label) + '</div></div>';
+    var bar = '<p class="hint" style="margin:0 0 14px">Based on the last ' + nW + ' weeks (' + esc(label) + ').</p>';
 
     var funnel = '<div class="ls-sum">'
       + '<div class="stat"><div class="k">Dials</div><div class="v">' + f0(T.d) + '</div><div class="sub">' + f0(T.d / nW) + ' a week</div></div>'
@@ -1281,7 +1279,7 @@
       + '<div class="od-bar"><div class="seg" id="od-scope">' + [['day', 'Per day'], ['week', 'Per week'], ['month', 'Per month']].map(function (k) { return "<button data-s='" + k[0] + "' class='" + (od.scope === k[0] ? 'on' : '') + "'>" + k[1] + '</button>'; }).join('') + '</div></div>'
       + '<div class="od-in"><label>Discos I want<input type="number" id="od-want" min="0" step="1" value="' + od.want + '"></label></div>'
       + '<div id="od-out"></div>'
-      + '<p class="hint">Worked out from your numbers for the weeks shown (' + esc(label) + '): one disco for every ' + (T.b ? f0(perDisco) : '?') + ' dials. Use the 4, 8, 12 weeks or All buttons above to change which weeks it looks at.</p></div>';
+      + '<p class="hint">Worked out from your numbers for the weeks shown (' + esc(label) + '): one disco for every ' + (T.b ? f0(perDisco) : '?') + ' dials.</p></div>';
 
     // list ranking: rates are pulled toward the overall rate when a list has few dials, so one lucky booking cannot top the chart
     var K = 300, elig = [], rows = [];
@@ -1329,7 +1327,6 @@
     }
     document.getElementById('od-want').oninput = upd;
     upd();
-    v.querySelectorAll('.ls-bar .seg button').forEach(function (b) { b.onclick = function () { od.weeks = Number(b.dataset.w); render(); }; });
     var sc = document.getElementById('od-scope');
     if (sc) sc.querySelectorAll('button').forEach(function (b) { b.onclick = function () { od.scope = b.dataset.s; od.want = null; render(); }; });
   }

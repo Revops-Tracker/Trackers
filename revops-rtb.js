@@ -9,7 +9,10 @@
      src   [date, site jf|cst, domain, sources, flags]  (11-24) every company the product team identified, before our engine
            (n8n hGVLl6MHWvYTqBd6 copies the product MariaDB daily 7:30). flags: 1 product scored MSP, 2 person email,
            4 seen on an earlier day, 8 already in the product leads table (the bridge never forwards it),
-           16 our engine received it (JF stream), 32 received as a CST cross-seed */
+           16 our engine received it (JF stream), 32 received as a CST cross-seed
+     flags [domain, bits]  (11-24) the company's CURRENT HubSpot RTB flags (n8n XHIQ3neRVrWQ0Ttq daily 7:40, table rtb_company_flag):
+           1 found, 2 flagged not MSP, 4 permanently excluded, 8 RTB active, 16 business line JF, 32 RTB TVL Due = To Do,
+           64 intent standard/high. Used so "waiting for TVL" follows the JF RTB Fishing Queue (list 20129) rules. */
 (function(){
 "use strict";
 const API = ((window.JF_CONFIG||{}).API_BASE||"").replace(/\/jf-sso$/, "/lb-auto");
@@ -38,6 +41,15 @@ const NO_BOOK = new Set(["live_deal","client","dq_deal",""]);
 
 const S = { data:null, view:"week", site:"jf", idx:0, open:null, err:"" };
 const F = { MSP:1, EMAIL:2, SEEN:4, LEAD:8, JF:16, CS:32 };
+const HF = { FOUND:1, NONMSP:2, EXCL:4, ACTIVE:8, JFLINE:16, TODO:32, INTENT:64 };
+/* where a TVL-bucket MSP with no TVL since the hit stands today (current HubSpot flags) */
+const TVL_STATE = {
+  queue: "in the fishing queue",
+  notq:  "not queued: the engine found a deal or a booked call",
+  noco:  "no HubSpot company with this domain",
+  prior: "verified before the hit, not re-queued",
+  unk:   "HubSpot flags not read yet",
+};
 const SRC_LABEL = { "SRC-B":"Source B · company only (no contact)", "SRC-C":"Source C · visitor ID (VV)", "SRC-F":"Source F · Vector", "SRC-X":"Source X", "SRC-A":"Source A" };
 const srcName = k => SRC_LABEL[k] || (k ? "Source "+k.replace(/^SRC-/,"") : "No source");
 
@@ -96,14 +108,23 @@ function cohort(p){
     if(!c.stage && x.stage) c.stage = x.stage;
     if(!c.touch && x.touch){ c.touch = x.touch; c.ttype = x.ttype; c.tby = x.tby; }
   });
-  const all = [...by.values()], jf = all.filter(c=>c.seg!==2), msp = jf.filter(c=>c.cls==="msp");
+  const all = [...by.values()], jf = all.filter(c=>c.seg!==2);
+  // 11-24: MSPs that HubSpot has since flagged not-MSP or permanently excluded are not MSPs (the fishing queue skips them too)
+  const later = jf.filter(c=>c.cls==="msp" && D.flags.has(c.dom) && (D.flags.get(c.dom) & (HF.NONMSP|HF.EXCL)));
+  later.forEach(c=>{ c.cls = "later"; });
+  const msp = jf.filter(c=>c.cls==="msp");
   const today = torNow();
   msp.forEach(c=>{
     const b = BK[c.stage||""] || BK[""]; c.how = b.how;
+    const fl = D.flags.has(c.dom) ? D.flags.get(c.dom) : null;
+    c.otherLine = fl!=null && (fl & HF.FOUND) && !(fl & HF.JFLINE);   // a CST company: not the JF queue's job
+    if(c.otherLine) c.how = "out";
     const tv = ((D.down.get(c.dom)||{}).t||[]).filter(d=>d>=c.first)[0] || null;
     c.tvl = tv;
-    c.handed = c.how==="dm" ? c.first : c.how==="tvl" ? tv : null;
-    c.waitTvl = c.how==="tvl" && !tv;
+    c.tvlState = c.how!=="tvl" || tv ? "" : fl==null ? "unk" : !(fl & HF.FOUND) ? "noco" : !(fl & HF.ACTIVE) ? "notq"
+      : (fl & HF.TODO) && (fl & HF.INTENT) ? "queue" : (fl & HF.TODO) ? "notq" : "prior";
+    c.handed = c.how==="dm" ? c.first : c.how==="tvl" ? (tv || (c.tvlState==="prior" ? c.first : null)) : null;
+    c.waitTvl = c.tvlState==="queue" || c.tvlState==="unk";
     c.hitMs = Date.parse(c.at || (c.first+"T12:00:00-05:00"));
     c.touchMs = c.touch ? Date.parse(c.touch) : null;
     c.biz = c.touchMs ? bizMins(c.hitMs, c.touchMs) : null;
@@ -114,7 +135,9 @@ function cohort(p){
     c.booked = (D.books.get(c.dom)||[]).some(d=>d>=c.first && days(c.first, d) <= BOOK_DAYS);
   });
   const act = msp.filter(c=>c.how!=="out"), bookable = msp.filter(c=>!NO_BOOK.has(c.stage||""));
-  return { p, today, vis:visitors(p), all, jf, msp, non:jf.filter(c=>c.cls==="non"), act,
+  const stuck = k => act.filter(c=>c.tvlState===k);
+  return { p, today, vis:visitors(p), all, jf, msp, later, non:jf.filter(c=>c.cls==="non"), act,
+    other:msp.filter(c=>c.otherLine), notq:stuck("notq"), noco:stuck("noco"), prior:stuck("prior"),
     handed:act.filter(c=>c.handed), waiting:act.filter(c=>c.waitTvl),
     worked:act.filter(c=>c.touchMs), fast:act.filter(c=>c.fast), due:act.filter(c=>c.dueYet),
     bookable, booked:bookable.filter(c=>c.booked) };
@@ -290,10 +313,16 @@ function render(){
     {k:"recv", l:jf ? "Companies received by the engine" : "Cross-seeds received", n:eng.length, list:eng, max:P2,
       sub:fromMsp+" were product MSPs this period, "+(eng.length-fromMsp)+" came in otherwise (product non-MSPs, earlier hits)"},
     {k:"msp", l:"Confirmed MSP by our check", n:engMsp.length, of:eng.length, list:engMsp, max:P2,
-      sub:jf ? x.non.length+" not MSPs, "+(x.jf.length-x.msp.length-x.non.length)+" unclear or clients" : "CST cross-seeds are routed by the CST engine"},
+      sub:jf ? x.non.length+" not MSPs, "+x.later.length+" flagged not MSP in HubSpot after the hit, "+(x.jf.length-x.msp.length-x.non.length-x.later.length)+" unclear or clients" : "CST cross-seeds are routed by the CST engine"},
   ].concat(jf ? [
-    {k:"act", l:"Routable to a rep", n:x.act.length, of:x.msp.length, list:x.act, max:P2, sub:(x.msp.length-x.act.length)+" clients, DQ'd or not checked"},
-    {k:"handed", l:"Handed to a rep", n:x.handed.length, of:x.act.length, list:x.handed, max:P2, sub:x.waiting.length ? x.waiting.length+" still waiting for TVL" : "none waiting for TVL", warn:x.waiting.length},
+    {k:"act", l:"Routable to a rep", n:x.act.length, of:x.msp.length, list:x.act, max:P2,
+      sub:(x.msp.length-x.act.length-x.other.length)+" clients, DQ'd or not checked"+(x.other.length ? " · "+x.other.length+" CST companies" : "")},
+    {k:"handed", l:"Handed to a rep", n:x.handed.length, of:x.act.length, list:x.handed, max:P2,
+      sub:[x.waiting.length ? x.waiting.length+" in the fishing queue" : "none in the fishing queue",
+           x.notq.length ? x.notq.length+" not queued (deal or booked call)" : "",
+           x.noco.length ? x.noco.length+" with no HubSpot company" : "",
+           x.prior.length ? x.prior.length+" verified before the hit" : ""].filter(Boolean).join(" · "),
+      warn:x.waiting.length + x.noco.length},
     {k:"worked", l:"Worked (call, email or meeting after the hit)", n:x.worked.length, of:x.act.length, list:x.worked, max:P2, sub:(x.act.length-x.worked.length)+" with no touch yet"},
     {k:"fast", l:"Worked within 1 business day", n:x.fast.length, of:fastBase, list:x.fast, max:P2, sub:"of the "+fastBase+" whose first business day has passed"},
     {k:"booked", l:"Booked a call (within 90 days)", n:x.booked.length, of:x.bookable.length, list:x.bookable, max:P2, sub:"of "+x.bookable.length+" not already a live deal, client or DQ"},
@@ -353,7 +382,9 @@ function render(){
     'Reached = our engine logged the company from the day before to 3 days after the hit, on '+(jf?"any RTB stream":"any stream (cross-seed or JF)")+'. '+
     (jf ? 'Inside our engine: '+'Cohort: companies hit in the period, followed to today, one line per company (its first hit in the period decides the stage). ' : '')+
     'Worked = the first call (any attempt), outgoing email or meeting logged on the company in HubSpot after the hit, by anyone. Times are business time: 9am to 6pm Toronto, Monday to Friday (1 day = 9 hours). '+
-    'Owned deals (missed, stalled, re-engage, live) are DMed to the rep at the hit; everything else is handed over only after TVL. Data from Aug 17, refreshed daily at 7:45am.</p>';
+    'Owned deals (missed, stalled, re-engage, live) are DMed to the rep at the hit; everything else is handed over only after TVL. '+
+    (jf ? 'HubSpot flags are read as they are today (daily 7:40): MSPs later flagged not-MSP or permanently excluded leave the MSP count, CST companies are not routable here, and "in the fishing queue" uses the JF RTB Fishing Queue rules (To Do, RTB active, standard or high intent). The queue can also hold MSPs that came in as CST cross-seeds, which this JF view does not count. ' : '')+
+    'Data from Aug 17, refreshed daily at 7:45am.</p>';
 }
 function listSrcHtml(list){
   if(!list || !list.length) return '<div class="wf-list"><p class="wf-none">None</p></div>';
@@ -370,9 +401,10 @@ function listHtml(list, k){
   const L = list.slice().sort((a,b)=>a.first<b.first?1:-1);
   return '<div class="wf-list"><table class="wf-tbl small"><thead><tr><th>Company</th><th>Hit</th><th>HubSpot</th><th>Handed</th><th>First touch</th>'+(k==="booked"?"<th>Booked</th>":"")+'</tr></thead><tbody>'+
     L.map(c=>{ const b = BK[c.stage||""] || BK[""];
-      const handed = c.cls!=="msp" ? "–" : c.how==="dm" ? "DM at the hit" : c.how==="tvl" ? (c.tvl ? "TVL "+lbl(c.tvl) : '<span class="warn">waiting for TVL</span>') : "not routed";
+      const handed = c.cls!=="msp" ? "–" : c.otherLine ? "CST company" : c.how==="dm" ? "DM at the hit" : c.how==="tvl" ? (c.tvl ? "TVL "+lbl(c.tvl)
+        : (c.tvlState==="queue" || c.tvlState==="noco" || c.tvlState==="unk" ? '<span class="warn">'+h(TVL_STATE[c.tvlState])+'</span>' : h(TVL_STATE[c.tvlState]||""))) : "not routed";
       const t = c.touchMs ? h(c.ttype)+" by "+h(c.tby||"?")+" · "+fmtBiz(c.biz) : (c.cls==="msp" && c.how!=="out" ? '<span class="warn">none yet'+(c.bizOpen!=null?" ("+fmtBiz(c.bizOpen)+" open)":"")+'</span>' : "–");
-      return '<tr><td><b>'+h(c.dom)+'</b></td><td>'+lbl(c.first)+'</td><td>'+(c.cls==="msp"?h(b.label):h(c.cls||"not classified"))+'</td><td>'+handed+'</td><td>'+t+'</td>'+
+      return '<tr><td><b>'+h(c.dom)+'</b></td><td>'+lbl(c.first)+'</td><td>'+(c.cls==="msp"?h(b.label):c.cls==="later"?"flagged not MSP later":h(c.cls||"not classified"))+'</td><td>'+handed+'</td><td>'+t+'</td>'+
         (k==="booked"?'<td>'+(c.booked?"Yes":"–")+'</td>':"")+'</tr>'; }).join("")+'</tbody></table></div>';
 }
 
@@ -389,7 +421,8 @@ async function load(){
     const down = new Map(); (j.down||[]).forEach(([d, dom, k])=>{ const x = down.get(dom) || {t:[], c:[]}; x[k].push(d); down.set(dom, x); });
     const books = new Map(); (j.books||[]).forEach(([d, dom])=>{ (books.get(dom) || books.set(dom, []).get(dom)).push(d); });
     const src = (j.src||[]).map(([d, site, dom, s, f])=>({d, site, dom, srcs:String(s||"").split(",").filter(Boolean), f:+f||0}));
-    S.data = {ga, hits, down, books, src};
+    const flags = new Map((j.flags||[]).map(([dom, b])=>[dom, +b||0]));
+    S.data = {ga, hits, down, books, src, flags};
   }catch(e){ S.err = e.message; }
   render();
 }

@@ -1405,31 +1405,26 @@
       + '<div id="od-out"></div>'
       + '<p class="hint">It takes about ' + (T.b ? f0(perDisco) : '?') + ' dials to book one disco from a cold call, based on the date range above. Discos count every booking on the leaderboard, inbound included, so &ldquo;Done so far&rdquo; matches the leaderboard (through yesterday); dials come from the latest Nooks upload. The dials still needed assume the rest come from cold calls. Your own daily log is not used here.</p>';
 
-    // Which list pays off: grouped by tier (Tier 1, 2, 3), best first inside each tier. Every number is the plain rate for the range.
-    // The recommendation only considers lists with enough data to trust (300+ dials and 3+ discos), never the reschedule lists.
-    var MIN_D = 300, MIN_B = 3, rows = [], elig = [];
+    // Which list pays off: grouped by tier (Tier 1, 2, 3), best rate first inside each tier. Every number is the plain rate for the range.
+    // No "best list" pick (Vianney 11-24: removed); lists with too little data to trust (under 300 dials or 3 discos) are labelled instead.
+    var MIN_D = 300, MIN_B = 3, rows = [];
     Object.keys(S.lists).forEach(function (k) {
       var o = S.lists[k]; if (o.d < 0.5) return;
       o.rate = o.b / o.d;
       o.missed = /missed|reschedule/i.test(o.name);
       o.small = o.d < MIN_D || o.b < MIN_B;
-      rows.push(o); if (!o.missed && !o.small) elig.push(o);
+      rows.push(o);
     });
     var tierN = function (t) { var m = /(\d)/.exec(t || ''); return m ? Number(m[1]) : 9; };
     rows.sort(function (a, b) { return tierN(a.tier) - tierN(b.tier) || b.rate - a.rate || b.d - a.d; });
-    elig.sort(function (a, b) { return b.rate - a.rate; });
-    var best = elig[0];
     var rank = '<div class="od-div"></div><h2>Which list pays off?</h2>'
-      + (best ? '<p class="od-best">Best use of your next dials right now: <b>' + esc(best.name) + '</b> (' + esc(best.tier) + ') &mdash; <b>' + f1(best.rate * 1000) + '</b> discos per 1,000 dials' + (elig[1] ? ', then ' + esc(elig[1].name) + ' at ' + f1(elig[1].rate * 1000) : '') + '.</p>'
-        : '<p class="od-best">No list has enough data in this range to recommend one (needs ' + MIN_D + '+ dials and ' + MIN_B + '+ discos). Pick a longer range.</p>')
       + '<div class="tablewrap"><table><thead><tr><th>List</th><th>Dials</th><th>Connect rate</th><th>Discos</th><th>Dials per disco</th><th>Discos per 1,000 dials</th></tr></thead><tbody>'
       + rows.map(function (o, i) {
         var head = (i === 0 || rows[i - 1].tier !== o.tier) ? '<tr><td class="tierhead" colspan="6">' + esc(o.tier === 'None' ? 'No tier' : o.tier) + '</td></tr>' : '';
-        var tag = o === best ? ' <span class="st ok">Best</span>' : '';
         var note = o.missed ? 'reschedule list, not a daily dial' : o.d < MIN_D ? 'small sample' : o.small ? 'too few discos to rank' : '';
-        return head + '<tr><td>' + esc(o.name) + tag + (note ? '<span class="pctu">' + note + '</span>' : '') + '</td><td>' + f0(o.d) + '</td><td>' + pct(o.c, o.d) + '</td><td>' + trim(o.b) + '</td>'
+        return head + '<tr><td>' + esc(o.name) + (note ? '<span class="pctu">' + note + '</span>' : '') + '</td><td>' + f0(o.d) + '</td><td>' + pct(o.c, o.d) + '</td><td>' + trim(o.b) + '</td>'
           + '<td>' + (o.b >= 0.5 ? f0(o.d / o.b) : '&mdash;') + '</td><td><b>' + (o.b ? f1(o.rate * 1000) : '0') + '</b></td></tr>';
-      }).join('') + '</tbody></table></div><p class="hint">Same date range as above' + (S.listClipped && S.firstList ? ', from the week ending ' + shortDate(parse(S.firstList)) + ' (when list-level bookings start)' : '') + '. Lists are grouped by tier, best rate first inside each tier. Only cold-call bookings tagged to a list can be credited to one, so this table will not add up to the discos total above (inbound and untagged bookings have no list). Discos are credited to the list the lead came from. <b>Best</b> = the highest rate among daily-dial lists with ' + MIN_D + '+ dials and ' + MIN_B + '+ discos; lists below that are marked small sample.</p></div>';
+      }).join('') + '</tbody></table></div><p class="hint">Same date range as above' + (S.listClipped && S.firstList ? ', from the week ending ' + shortDate(parse(S.firstList)) + ' (when list-level bookings start)' : '') + '. Lists are grouped by tier, best rate first inside each tier. Only cold-call bookings tagged to a list can be credited to one, so this table will not add up to the discos total above (inbound and untagged bookings have no list). Discos are credited to the list the lead came from. Small sample = under ' + MIN_D + ' dials; too few discos to rank = under ' + MIN_B + ' discos, so its rate can swing a lot with one booking.</p></div>';
     v.innerHTML = title + bar + notes + funnel + calc + rank;
     wire();
 

@@ -1227,9 +1227,13 @@
   }
 
   // ---------- Dial planner ----------
-  // Reads only the automated feeds, never the reps' own daily log: dials / connects per list come from the Nooks CSV upload and discos
-  // booked from HubSpot (n8n BDR Tracker Auto-Update, hourly). One date range drives all three parts: the funnel tiles, the goal and
-  // the list ranking. A week that straddles the edge of the range counts by its share of weekdays (Mon-Fri), like the Lists section.
+  // Reads only the automated feeds, never the reps' own daily log: dials / connects per list come from the Nooks CSV upload and
+  // discos booked from the Sales Floor Leaderboard (state.lists.deals = lb_auto_showup with its approved corrections, by Toronto
+  // booking day, through yesterday), so the totals match the leaderboard. Dials per disco uses cold-call bookings only: inbound
+  // bookings count toward the goal but do not come from dialing. Discos per list can only come from cold-call bookings tagged to a
+  // list (bdr_report_books_by_list, from the week ending Jun 13), so the list table will not add up to the total.
+  // One date range drives all three parts: the funnel tiles, the goal and the list ranking. A week that straddles the edge of the
+  // range counts its dials by its share of weekdays (Mon-Fri), like the Lists section; bookings count by their exact day.
   var OD_KEY = 'bdr-dial-planner';
   var OD_RANGES = [['4w', 'Last 4 weeks'], ['8w', 'Last 8 weeks'], ['12w', 'Last 12 weeks'], ['month', 'This month'], ['quarter', 'This quarter'], ['ytd', 'Year to date'], ['custom', 'Custom']];
   var od = { range: 'ytd', from: '', to: '', partial: false, scope: 'month', who: null, want: null };
@@ -1273,29 +1277,47 @@
     var hasPartial = all.some(function (w) { return w >= curWE; });
     var full = all.filter(function (w) { return od.partial || w < curWE; });
     var R = odRange(full);
-    // HubSpot disco history starts later than the Nooks dials. Weeks without disco data are left out of everything here, or the dials
-    // of those weeks would count against zero discos and make every rate look worse than it is.
-    var firstDisco = null;
-    (L.discos || []).forEach(function (r) { if (!firstDisco || r.week_ending < firstDisco) firstDisco = r.week_ending; });
+    // Leaderboard bookings start later than the Nooks dials. Weeks before the first booking day are left out of everything here, or
+    // their dials would count against zero discos and make every rate look worse than it is.
+    var deals = L.deals || [], firstDeal = null;
+    deals.forEach(function (x) { if (!firstDeal || x.day < firstDeal) firstDeal = x.day; });
+    var firstDealWE = firstDeal ? weekEndOf(parse(firstDeal)) : null;
     var wts = {}, weeks = [], clipped = false, nW = 0;
     if (R) full.forEach(function (w) {
       var s = weekShare(w, R.start, R.end);
       if (!s) return;
-      if (!firstDisco || w < firstDisco) { clipped = true; return; }
+      if (!firstDealWE || w < firstDealWE) { clipped = true; return; }
       wts[w] = s; weeks.push(w); nW += s;
     });
-    var T = { d: 0, c: 0, b: 0 }, lists = {};
+    var from = null, to = null;
+    if (weeks.length) {
+      var a = mondayOf(weeks[weeks.length - 1]), z = new Date(parse(weeks[0]).getTime() + 86400000);   // Mon .. Sun of the week
+      from = R.start > a ? R.start : a;
+      to = R.end < z ? R.end : z;
+    }
+    var T = { d: 0, c: 0, b: 0, bIn: 0, bAll: 0 }, lists = {};
     L.rows.forEach(function (r) {
       var s = wts[r.week_ending];
       if (!s || ws.indexOf(r.bdr) === -1) return;
-      var d = Number(r.dials || 0) * s, c = Number(r.connects || 0) * s;
-      T.d += d; T.c += c;
-      var k = r.tier + '|' + r.list_name, o = lists[k] || (lists[k] = { tier: r.tier, name: r.list_name, d: 0, c: 0, b: 0 });
-      o.d += d; o.c += c;
+      T.d += Number(r.dials || 0) * s; T.c += Number(r.connects || 0) * s;
     });
-    (L.discos || []).forEach(function (r) {
+    deals.forEach(function (x) {   // leaderboard bookings, by their exact day
+      if (ws.indexOf(x.rep) === -1 || !from) return;
+      var dt = parse(x.day);
+      if (dt < from || dt > to || !wts[weekEndOf(dt)]) return;
+      T.bAll++;
+      if (x.kind === 'outbound') T.b++; else T.bIn++;
+    });
+    // Per list: only weeks that have list-level bookings (cold calls tagged to a list), so list dials never count against missing data
+    var firstList = null;
+    (L.books || []).forEach(function (r) { if (!firstList || r.week_ending < firstList) firstList = r.week_ending; });
+    var listClipped = false;
+    L.rows.forEach(function (r) {
       var s = wts[r.week_ending];
-      if (s && ws.indexOf(r.bdr) !== -1) T.b += Number(r.discos_booked || 0) * s;
+      if (!s || ws.indexOf(r.bdr) === -1) return;
+      if (!firstList || r.week_ending < firstList) { listClipped = true; return; }
+      var k = r.tier + '|' + r.list_name, o = lists[k] || (lists[k] = { tier: r.tier, name: r.list_name, d: 0, c: 0, b: 0 });
+      o.d += Number(r.dials || 0) * s; o.c += Number(r.connects || 0) * s;
     });
     (L.books || []).forEach(function (r) {
       var s = wts[r.week_ending];
@@ -1303,33 +1325,24 @@
       var o = lists[r.tier + '|' + r.list_name];
       if (o) o.b += Number(r.outbound_books || 0) * s;
     });
-    var from = null, to = null;
-    if (weeks.length) {
-      var a = mondayOf(weeks[weeks.length - 1]), z = parse(weeks[0]);
-      from = R.start > a ? R.start : a;
-      to = R.end < z ? R.end : z;
-    }
-    return { weeks: weeks, nW: nW, T: T, lists: lists, clipped: clipped, firstDisco: firstDisco, from: from, to: to, hasPartial: hasPartial, curWE: curWE };
+    var toLbl = to && to.getDay() === 0 ? new Date(to.getTime() - 86400000) : to;   // label ends on the Saturday, like the Nooks weeks
+    return { weeks: weeks, nW: nW, T: T, lists: lists, clipped: clipped, firstDeal: firstDeal, toLbl: toLbl, listClipped: listClipped, firstList: firstList, from: from, to: to, hasPartial: hasPartial, curWE: curWE };
   }
-  // Done so far in the goal period, from the same automated feeds (Nooks dials, HubSpot discos). For a week that crosses into another
-  // month, discos use the exact by-call-date month split when there is one; everything else is split by weekdays.
+  // Done so far in the goal period: Nooks dials (a week that crosses the period edge is split by weekdays) and every leaderboard
+  // booking in the period by its exact day, inbound included, so it matches the leaderboard.
   function odDone(ws, start, end) {
-    var L = state.lists, d = 0, b = 0, latest = null;
+    var L = state.lists, d = 0, b = 0, bOut = 0, latest = null;
     L.rows.forEach(function (r) {
       if (ws.indexOf(r.bdr) === -1) return;
       var s = weekShare(r.week_ending, start, end);
       if (s) { d += Number(r.dials || 0) * s; if (!latest || r.week_ending > latest) latest = r.week_ending; }
     });
-    var mk = monthKey(start), oneMonth = monthKey(end) === mk;
-    (L.discos || []).forEach(function (r) {
-      if (ws.indexOf(r.bdr) === -1) return;
-      var s = weekShare(r.week_ending, start, end);
-      if (!s) return;
-      var sp = s < 1 && oneMonth ? (L.monthSplit || []).filter(function (x) { return x.week_ending === r.week_ending && x.bdr === r.bdr; }) : [];
-      if (sp.length) sp.forEach(function (x) { if (x.month === mk) b += Number(x.outbound || 0); });
-      else b += Number(r.discos_booked || 0) * s;
+    (L.deals || []).forEach(function (x) {
+      if (ws.indexOf(x.rep) === -1) return;
+      var dt = parse(x.day);
+      if (dt >= start && dt <= end) { b++; if (x.kind === 'outbound') bOut++; }
     });
-    return { d: Math.round(d), b: Math.round(b * 10) / 10, latest: latest };
+    return { d: Math.round(d), b: b, bOut: bOut, latest: latest };
   }
 
   function renderOdds(host, mode, who) {
@@ -1353,11 +1366,11 @@
       + (S.hasPartial ? '<label class="od-tog"><input type="checkbox" id="od-partial"' + (od.partial ? ' checked' : '') + '> Include this week so far</label>' : '')
       + '</div>';
     var nWr = Math.round(S.nW * 10) / 10;
-    var span = S.from ? shortDate(S.from) + ' &ndash; ' + shortDate(S.to) + ', ' + S.from.getFullYear() + ' &middot; ' + trim(nWr) + ' week' + plural(nWr) : '';
+    var span = S.from ? shortDate(S.from) + ' &ndash; ' + shortDate(S.toLbl) + ', ' + S.from.getFullYear() + ' &middot; ' + trim(nWr) + ' week' + plural(nWr) : '';
     var notes = '<p class="hint" style="margin:0 0 14px">'
-      + (span ? 'Rates from <b>' + span + '</b>. Dials from the Nooks upload, discos from HubSpot.' : 'No weeks with data in this range.')
+      + (span ? 'Rates from <b>' + span + '</b>. Dials from the Nooks upload, discos from the leaderboard.' : 'No weeks with data in this range.')
       + (!od.partial && S.hasPartial ? ' This week is left out until it is over.' : '')
-      + (S.clipped && S.firstDisco ? ' HubSpot disco history starts the week ending ' + shortDate(parse(S.firstDisco)) + ', so earlier weeks are left out of every number here.' : '')
+      + (S.clipped && S.firstDeal ? ' Leaderboard bookings start ' + shortDate(parse(S.firstDeal)) + ', so earlier weeks are left out of every number here.' : '')
       + '</p>';
 
     function wire() {
@@ -1381,14 +1394,14 @@
     var funnel = '<div class="ls-sum">'
       + '<div class="stat"><div class="k">Dials</div><div class="v">' + f0(T.d) + '</div><div class="sub">' + f0(T.d / S.nW) + ' a week</div></div>'
       + '<div class="stat"><div class="k">Connects</div><div class="v">' + f0(T.c) + '</div><div class="sub">' + pct(T.c, T.d) + ' of dials</div></div>'
-      + '<div class="stat"><div class="k">Discos booked</div><div class="v">' + trim(T.b) + '</div><div class="sub">' + pct(T.b, T.c) + ' of connects</div></div>'
-      + '<div class="stat"><div class="k">Dials per disco</div><div class="v">' + (T.b ? f0(perDisco) : '&mdash;') + '</div><div class="sub">' + (T.b ? 'one disco every ' + f0(perDisco) + ' dials' : 'no discos in this range') + '</div></div></div>';
+      + '<div class="stat"><div class="k">Discos booked</div><div class="v">' + f0(T.bAll) + '</div><div class="sub">' + f0(T.b) + ' from cold calls (' + pct(T.b, T.c) + ' of connects) &middot; ' + f0(T.bIn) + ' inbound or other</div></div>'
+      + '<div class="stat"><div class="k">Dials per disco</div><div class="v">' + (T.b ? f0(perDisco) : '&mdash;') + '</div><div class="sub">' + (T.b ? 'one cold-call disco every ' + f0(perDisco) + ' dials' : 'no cold-call discos in this range') + '</div></div></div>';
 
     var calc = '<div class="card"><h2>How many dials for my goal?</h2>'
       + '<div class="od-bar"><span class="od-lbl">Goal for</span><div class="seg" id="od-scope">' + [['day', 'Today'], ['week', 'This week'], ['month', 'This month']].map(function (k) { return "<button data-s='" + k[0] + "' class='" + (od.scope === k[0] ? 'on' : '') + "'>" + k[1] + '</button>'; }).join('') + '</div></div>'
       + '<div class="od-in"><label>Discos I want<input type="number" id="od-want" min="0" step="1" value="' + od.want + '"></label></div>'
       + '<div id="od-out"></div>'
-      + '<p class="hint">It takes about ' + (T.b ? f0(perDisco) : '?') + ' dials to book one disco, based on the date range above. &ldquo;Done so far&rdquo; comes from the latest Nooks upload and HubSpot, not from the daily log.</p>';
+      + '<p class="hint">It takes about ' + (T.b ? f0(perDisco) : '?') + ' dials to book one disco from a cold call, based on the date range above. Discos count every booking on the leaderboard, inbound included, so &ldquo;Done so far&rdquo; matches the leaderboard (through yesterday); dials come from the latest Nooks upload. The dials still needed assume the rest come from cold calls. Your own daily log is not used here.</p>';
 
     // list ranking: rates are pulled toward the overall rate when a list has few dials, so one lucky booking cannot top the chart
     var K = 300, elig = [], rows = [];
@@ -1411,7 +1424,7 @@
         var ix = elig.indexOf(o), star = best && o === best ? ' <span class="st ok">Dial next</span>' : (ix === 1 || ix === 2 ? ' <span class="st flat">' + (ix === 1 ? '2nd' : '3rd') + '</span>' : '');
         return '<tr><td>' + esc(o.name) + star + '<span class="pctu">' + esc(o.tier) + (/missed/i.test(o.name) ? ' &middot; not a daily dial' : o.d < 100 ? ' &middot; small sample' : '') + '</span></td><td>' + f0(o.d) + '</td><td>' + pct(o.c, o.d) + '</td><td>' + trim(o.b) + '</td>'
           + '<td>' + (o.b >= 0.5 ? f0(o.d / o.b) : '&mdash;') + '</td><td><b>' + f1(o.post * 1000) + '</b></td></tr>';
-      }).join('') + '</tbody></table></div><p class="hint">Same date range as above. Discos per 1,000 dials is adjusted for sample size: a list with few dials is pulled toward your overall rate so one lucky booking cannot top the chart. Dial next, 2nd and 3rd rank the best lists to work day to day. Discos are credited to the list the lead came from.</p></div>';
+      }).join('') + '</tbody></table></div><p class="hint">Same date range as above' + (S.listClipped && S.firstList ? ', from the week ending ' + shortDate(parse(S.firstList)) + ' (when list-level bookings start)' : '') + '. Only cold-call bookings tagged to a list can be credited to one, so this table will not add up to the discos total above (inbound and untagged bookings have no list). Discos per 1,000 dials is adjusted for sample size: a list with few dials is pulled toward your overall rate so one lucky booking cannot top the chart. Dial next, 2nd and 3rd rank the best lists to work day to day. Discos are credited to the list the lead came from.</p></div>';
 
     v.innerHTML = title + bar + notes + funnel + calc + rank;
     wire();
@@ -1419,7 +1432,7 @@
     function upd() {
       var N = Number(document.getElementById('od-want').value) || 0, o = document.getElementById('od-out');
       od.want = N;
-      if (!T.b) { o.innerHTML = '<p class="hint">No discos in this date range, so there is nothing to work from. Pick a longer range.</p>'; return; }
+      if (!T.b) { o.innerHTML = '<p class="hint">No cold-call discos in this date range, so there is nothing to work from. Pick a longer range.</p>'; return; }
       if (!(N > 0)) { o.innerHTML = '<p class="hint">Type how many discos you want.</p>'; return; }
       var t0 = todayD(), usual = T.d / S.nW / 5;   // usual dials on a weekday in the chosen range
       if (day) {   // Nooks reports whole weeks, so there is no automated count for today yet: plan it as a fresh day
@@ -1440,13 +1453,13 @@
       var when = 'this ' + per;
       var msg;
       if (left <= 0) msg = 'Goal hit: <b>' + trim(done.b) + '</b> disco' + plural(done.b) + ' booked ' + when + ' already. Anything more is a bonus.';
-      else if (!remDays) msg = 'No weekdays left this ' + per + '. Nooks shows <b>' + f0(done.d) + '</b> dials and HubSpot <b>' + trim(done.b) + '</b> disco' + plural(done.b) + '.';
+      else if (!remDays) msg = 'No weekdays left this ' + per + '. Nooks shows <b>' + f0(done.d) + '</b> dials and the leaderboard <b>' + f0(done.b) + '</b> disco' + plural(done.b) + '.';
       else msg = 'For the <b>' + remDays + '</b> weekday' + plural(remDays) + ' left, that is about <b>' + f0(perDay) + ' dials a day</b>. Your usual weekday is ' + f0(usual) + (perDay > usual * 1.05 ? ' (' + f1(perDay / usual) + 'x), so it needs a bigger push.' : ', so you are on pace.');
       var thru = done.latest ? (done.latest >= S.curWE ? 'includes this week&rsquo;s Nooks upload so far' : 'Nooks through ' + shortDate(parse(done.latest))) : 'no Nooks upload yet';
       o.innerHTML = '<div class="od-res">'
         + '<div class="stat"><div class="k">Dials still needed</div><div class="v">' + f0(need) + '</div><div class="sub">' + (left > 0 ? 'to book ' + trim(left) + ' more ' + when : 'goal already hit') + '</div></div>'
         + '<div class="stat"><div class="k">Per day, ' + remDays + ' day' + plural(remDays) + ' left</div><div class="v">' + (remDays ? f0(perDay) : '&mdash;') + '</div><div class="sub">dials a weekday, starting today</div></div>'
-        + '<div class="stat"><div class="k">Done so far</div><div class="v">' + f0(done.d) + '</div><div class="sub">dials &middot; ' + trim(done.b) + ' disco' + plural(done.b) + ' booked ' + when + ' (' + thru + ')</div></div></div>'
+        + '<div class="stat"><div class="k">Done so far</div><div class="v">' + f0(done.d) + '</div><div class="sub">dials (' + thru + ') &middot; <b>' + f0(done.b) + '</b> disco' + plural(done.b) + ' booked ' + when + ' on the leaderboard (' + f0(done.bOut) + ' cold calls)</div></div></div>'
         + '<div class="od-chance">' + msg + '</div>';
     }
     document.getElementById('od-want').oninput = upd;

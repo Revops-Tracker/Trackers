@@ -1109,8 +1109,8 @@
   // Same layout as the BDR tracker's Dial planner, built on the data CST has (Vianney 11-24: "just use the data we have"):
   // - funnel + goal = the rep's own daily log (dials, connects, discos = Discovery Booked + Analysis Booked). Nooks only captures
   //   part of Ali's dialing (11-24: ~280 of 1,488 logged dials in the week of Nov 15), so rates from Nooks dials would be far too good.
-  // - "Which list pays off?" = the CST Nooks upload (dials + connects per list). CST has no list-level booking data, so there is no
-  //   discos column; the page says how much of the logged dialing Nooks covers.
+  // - "Which list pays off?" = the CST Nooks upload (dials + connects per list) + HubSpot bookings credited to a list
+  //   (cst_report_bookings, n8n 8Or3X4kpyfUG0tWy, 11-24); the page says how much of the logged dialing Nooks covers.
   // One date range drives all three parts. A Nooks week that straddles the range edge counts by its share of weekdays (Mon-Fri).
   var OD_KEY = 'cst-dial-planner';
   var OD_RANGES = [['4w', 'Last 4 weeks'], ['8w', 'Last 8 weeks'], ['12w', 'Last 12 weeks'], ['month', 'This month'], ['quarter', 'This quarter'], ['ytd', 'Year to date'], ['custom', 'Custom']];
@@ -1227,21 +1227,39 @@
       + '<div id="od-out"></div>'
       + '<p class="hint">It takes about ' + (T.b ? f0(perDisco) : '?') + ' dials to book one disco, based on the date range above. Everything here comes from your daily log, so log every day for it to stay right.</p>';
 
-    // Which list pays off: Nooks only (dials, connects); grouped in the tier order of the CST scheme
+    // Which list pays off: Nooks dials/connects per list + bookings credited to that list (HubSpot DB/AB calls, n8n 8Or3X4kpyfUG0tWy:
+    // the list tag on the booking call, else the contact's latest earlier tagged Nooks call). Grouped in the CST tier order,
+    // best rate first inside each tier, plain rates (same as the BDR tracker).
+    var MIN_D = 100, MIN_B = 3;   // CST volumes are a fraction of JF's, so "small sample" starts lower than JF's 300 dials
+    var bk = { all: 0, onList: 0, noDials: 0, notScheme: 0, noTag: 0 };
+    ((L && L.bookings) || []).forEach(function (x) {
+      if (ws.indexOf(x.bdr) === -1) return;
+      var dt = parse(x.booked_day);
+      if (dt < R.start || dt > R.end) return;
+      bk.all++;
+      if (x.tier === 'None') { if (x.how === 'none') bk.noTag++; else bk.notScheme++; return; }
+      var o = lists[x.tier + '|' + x.list_name];
+      if (o && o.d >= 0.5) { o.b = (o.b || 0) + 1; bk.onList++; } else bk.noDials++;
+    });
     var order = {};
     (L ? L.tierLists : []).forEach(function (t, i) { if (order[t.tier] == null) order[t.tier] = i; });
-    var rows = Object.keys(lists).map(function (k) { return lists[k]; }).filter(function (o) { return o.d >= 0.5; });
-    rows.sort(function (a, b) { return (order[a.tier] == null ? 99 : order[a.tier]) - (order[b.tier] == null ? 99 : order[b.tier]) || (b.c / b.d) - (a.c / a.d) || b.d - a.d; });
+    var rows = Object.keys(lists).map(function (k) { var o = lists[k]; o.b = o.b || 0; o.rate = o.d ? o.b / o.d : 0; return o; }).filter(function (o) { return o.d >= 0.5; });
+    rows.sort(function (a, b) { return (order[a.tier] == null ? 99 : order[a.tier]) - (order[b.tier] == null ? 99 : order[b.tier]) || b.rate - a.rate || b.d - a.d; });
+    var bkLine = bk.all ? '<p class="hint" style="margin:0 0 10px">' + bk.all + ' booking' + plural(bk.all) + ' in HubSpot in this range: <b>' + bk.onList + '</b> credited to a list below'
+      + (bk.noDials ? ', ' + bk.noDials + ' to a CST list with no Nooks dials in this range' : '')
+      + (bk.notScheme ? ', ' + bk.notScheme + ' to a Nooks sequence that is not in the CST tier list' : '')
+      + (bk.noTag ? ', ' + bk.noTag + ' with no Nooks list on the call or the contact' : '') + '.</p>' : '';
     var rank = '<div class="od-div"></div><h2>Which list pays off?</h2>'
       + (!L ? '<p class="hint">Could not load the Nooks list data. Refresh to retry.</p>'
         : !rows.length ? '<p class="hint">No Nooks dials in this range.</p>'
-        : '<div class="tablewrap"><table><thead><tr><th>List</th><th>Dials</th><th>Connects</th><th>Connect rate</th><th>Share of Nooks dials</th></tr></thead><tbody>'
+        : bkLine + '<div class="tablewrap"><table><thead><tr><th>List</th><th>Dials</th><th>Connect rate</th><th>Discos</th><th>Dials per disco</th><th>Discos per 1,000 dials</th></tr></thead><tbody>'
           + rows.map(function (o, i) {
-            var head = (i === 0 || rows[i - 1].tier !== o.tier) ? '<tr><td class="tierhead" colspan="5">' + esc(o.tier) + '</td></tr>' : '';
-            return head + '<tr><td>' + esc(o.name) + (o.d < 100 ? '<span class="pctu">small sample</span>' : '') + '</td><td>' + f0(o.d) + '</td><td>' + f0(o.c) + '</td><td><b>' + pct(o.c, o.d) + '</b></td><td>' + pct(o.d, nD) + '</td></tr>';
+            var head = (i === 0 || rows[i - 1].tier !== o.tier) ? '<tr><td class="tierhead" colspan="6">' + esc(o.tier) + '</td></tr>' : '';
+            var note = /no show|reschedule/i.test(o.name) ? 'reschedule list, not a daily dial' : o.d < MIN_D ? 'small sample' : o.b < MIN_B ? 'too few discos to rank' : '';
+            return head + '<tr><td>' + esc(o.name) + (note ? '<span class="pctu">' + note + '</span>' : '') + '</td><td>' + f0(o.d) + '</td><td>' + pct(o.c, o.d) + '</td><td>' + o.b + '</td>'
+              + '<td>' + (o.b ? f0(o.d / o.b) : '&mdash;') + '</td><td><b>' + (o.b ? f1(o.rate * 1000) : '0') + '</b></td></tr>';
           }).join('') + '</tbody></table></div>')
-      + '<p class="hint">Same date range as above, from the CST Nooks upload. Grouped by tier, best connect rate first inside each tier; small sample = under 100 dials. CST has no booking data per list, so this table shows dials and connects only. It covers ' + f0(nD) + ' of your ' + f0(T.d) + ' logged dials; Nooks lists that are not in the CST tier scheme are not counted.</p></div>';
-
+      + '<p class="hint">Same date range as above. Dials come from the CST Nooks upload, which covers ' + f0(nD) + ' of your ' + f0(T.d) + ' logged dials, so the rates per list look better than they really are; compare lists with each other rather than with the funnel above. Discos are bookings in HubSpot (Discovery or Analysis Booked) credited to the Nooks list the lead came from; a repeat booking with the same contact inside 30 days counts once. Small sample = under ' + MIN_D + ' dials; too few discos to rank = under ' + MIN_B + ' discos.</p></div>';
     v.innerHTML = title + bar + notes + funnel + calc + rank;
     wire();
 

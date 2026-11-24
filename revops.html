@@ -318,6 +318,14 @@ section[data-tab][hidden],.ro-badge[hidden]{display:none!important}
 #wfSec .wf-foot{color:var(--muted);font-size:13px;line-height:1.45;margin:12px 0 0}
 #wfSec .wf-empty{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:28px;text-align:center;color:var(--muted)}
 #wfSec .wf-empty b{display:block;color:var(--ink)}
+#wfSec .wf-div{padding:10px 18px 6px;border-top:1px solid var(--line);background:color-mix(in srgb,var(--fill) 4%,var(--panel));font-size:12px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.04em}
+#wfSec .wf-div:first-child{border-top:0}
+#wfSec .wf-step.sub .wf-stepbtn{padding-left:42px}
+#wfSec .wf-step.sub .wf-l{font-weight:500;font-size:14px}
+#wfSec .wf-step.sub .wf-n{font-size:20px}
+#wfSec .wf-step.leak .wf-bar span{background:var(--behind)}
+#wfSec .wf-step.info .wf-bar span{background:var(--fill-soft)}
+#wfSec .wf-tbl td.leak{color:var(--behind)}
 @media (max-width:640px){
   #wfSec .wf-stepbtn{grid-template-columns:1fr 72px;gap:8px 12px}
   #wfSec .wf-bar{grid-column:1 / -1;grid-row:2}
@@ -446,6 +454,7 @@ section[data-tab][hidden],.ro-badge[hidden]{display:none!important}
     <div class="sec-head">
       <h2 id="wfTitle">RTB waterfall</h2>
       <div class="nav">
+        <div class="seg" id="wfSite" role="group" aria-label="Website"><button type="button" data-s="jf" aria-pressed="true">JF site</button><button type="button" data-s="cst" aria-pressed="false">CST site (cross-seeds)</button></div>
         <div class="seg" id="wfView" role="group" aria-label="View"><button type="button" data-v="week" aria-pressed="true">Weekly</button><button type="button" data-v="month" aria-pressed="false">Monthly</button></div>
         <button type="button" id="wfPrev" aria-label="Previous period">‹</button>
         <div class="period" id="wfPeriod" aria-live="polite"></div>
@@ -1531,7 +1540,7 @@ function boot(){
 try{ boot(); }catch(e){ console.error("RTB Review Panel", e); }
 })();
 </script>
-<script src="revops-rtb.js?v=20261124b"></script>
+<script src="revops-rtb.js?v=20261124c"></script>
 <script>
 /* RevOps L10 tabs: one section at a time; the pick is kept in the URL (#rtb, #review) and in this browser */
 (function(){

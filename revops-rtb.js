@@ -143,6 +143,94 @@ function srcCohort(p){
     lead:msp.filter(c=>c.branch==="lead"), noemail:msp.filter(c=>c.branch==="noemail"), email:msp.filter(c=>c.branch==="email"),
     reached:msp.filter(c=>c.reached) };
 }
+/* ---------- trend (JF site): one point per period, oldest -> newest ---------- */
+const FIX_DAY = "2026-11-24";   // bridge + Step 1 fixes went live (repeat visitors, company-only hits, bridge posts)
+function trend(){
+  const keep = S.site; S.site = "jf";
+  const P = periods().slice(0, S.view==="week" ? 12 : 12).reverse();
+  const rows = P.map(p=>{ const y = srcCohort(p), x = cohort(p);
+    const r = (a,b) => b ? Math.round(100*a/b) : null;
+    return { p, label: S.view==="week" ? lbl(p.start) : MON[+p.start.slice(5,7)-1], so: p.end >= torNow(),
+      fix: p.start <= FIX_DAY && p.end >= FIX_DAY, after: p.start > FIX_DAY,
+      msp: y.msp.length, reached: y.reached.length, reachPct: r(y.reached.length, y.msp.length),
+      workPct: r(x.worked.length, x.act.length), fastPct: r(x.fast.length, x.due.length), bookPct: r(x.booked.length, x.bookable.length),
+      n: { act:x.act.length, due:x.due.length, book:x.bookable.length, worked:x.worked.length, fast:x.fast.length, booked:x.booked.length } }; });
+  S.site = keep;
+  return rows;
+}
+function chartSvg(id, rows, series, pct){
+  const W = S.chartW || 560, H = 240, ml = 38, mr = 92, mt = 24, mb = 26, n = rows.length;
+  const vals = series.flatMap(s=>rows.map(r=>r[s.k])).filter(v=>v!=null);
+  let top = pct ? 100 : Math.max(4, ...vals);
+  if(!pct){ const raw = top/4, m = Math.pow(10, Math.floor(Math.log10(raw))), st = [1,2,2.5,5,10].map(k=>k*m).find(k=>k>=raw); top = st*4; }   // 4 whole-number gridlines
+  const iw = W-ml-mr, ih = H-mt-mb, step = n>1 ? iw/(n-1) : 0;
+  const X = i => ml + (n>1 ? i*step : iw/2), Y = v => mt + ih - ih*v/top;
+  let s = '<svg viewBox="0 0 '+W+' '+H+'" role="img" aria-label="'+h(series.map(x=>x.name).join(", "))+' by '+(S.view==="week"?"week":"month")+'">';
+  for(let t=0; t<=4; t++){ const v = top*t/4, y = Y(v);
+    s += '<line class="grid" x1="'+ml+'" x2="'+(W-mr)+'" y1="'+y+'" y2="'+y+'"/><text x="'+(ml-6)+'" y="'+(y+4)+'" text-anchor="end">'+(pct?Math.round(v)+"%":Math.round(v))+'</text>'; }
+  const lw = Math.max(...rows.map(r=>r.label.length+1)) * 6.5 + 12;   // rough label width, so x labels never collide
+  const every = Math.max(1, Math.ceil(n / Math.max(2, Math.floor(iw / lw) + 1)));
+  rows.forEach((r,i)=>{ if((n-1-i) % every === 0) s += '<text x="'+X(i)+'" y="'+(H-8)+'" text-anchor="middle">'+h(r.label)+(r.so?"*":"")+'</text>'; });
+  const fi = rows.findIndex(r=>r.fix), ai = rows.findIndex(r=>r.after);
+  const mi = fi >= 0 ? fi : ai;
+  if(mi >= 0){ const x = X(mi) - (fi >= 0 ? 0 : step/2);
+    s += '<line class="fix" x1="'+x+'" x2="'+x+'" y1="'+(mt-6)+'" y2="'+(mt+ih)+'"/><text class="fixl" x="'+(x+4)+'" y="'+(mt-9)+'">Fixes live Nov 24</text>'; }
+  const ends = [];
+  // the period still in progress is drawn dashed with hollow points: its numbers are not final
+  const live = rows.length && rows[n-1].so ? n-1 : -1;
+  series.forEach(se=>{
+    let d = "", pen = false, dl = "";
+    rows.forEach((r,i)=>{ const v = r[se.k]; if(v==null){ pen = false; return; }
+      if(i===live){ for(let j=i-1;j>=0;j--) if(rows[j][se.k]!=null){ dl = 'M'+X(j).toFixed(1)+' '+Y(rows[j][se.k]).toFixed(1)+'L'+X(i).toFixed(1)+' '+Y(v).toFixed(1); break; } return; }
+      d += (pen?"L":"M")+X(i).toFixed(1)+" "+Y(v).toFixed(1); pen = true; });
+    s += '<path d="'+d+'" fill="none" stroke="var('+se.c+')" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>';
+    if(dl) s += '<path d="'+dl+'" fill="none" stroke="var('+se.c+')" stroke-width="2" stroke-dasharray="3 4" stroke-linecap="round"/>';
+    rows.forEach((r,i)=>{ const v = r[se.k]; if(v!=null) s += i===live
+      ? '<circle cx="'+X(i)+'" cy="'+Y(v)+'" r="4" fill="var(--panel)" stroke="var('+se.c+')" stroke-width="2"/>'
+      : '<circle cx="'+X(i)+'" cy="'+Y(v)+'" r="4" fill="var('+se.c+')" stroke="var(--panel)" stroke-width="2"/>'; });
+    for(let i=n-1;i>=0;i--){ if(rows[i][se.k]!=null){ ends.push({y:Y(rows[i][se.k]), t:(pct?rows[i][se.k]+"% ":rows[i][se.k]+" ")+se.short}); break; } }
+  });
+  // end labels: keep 14px apart and inside the plot
+  ends.sort((a,b)=>a.y-b.y);
+  for(let i=1;i<ends.length;i++) if(ends[i].y - ends[i-1].y < 14) ends[i].y = ends[i-1].y + 14;
+  const over = ends.length ? ends[ends.length-1].y - (mt+ih) : 0;
+  if(over > 0) ends.forEach(e=>e.y -= over);
+  ends.forEach(e=>{ s += '<text class="end" x="'+(W-mr+8)+'" y="'+(e.y+4)+'">'+h(e.t)+'</text>'; });
+  s += '<line class="xh" x1="0" x2="0" y1="'+mt+'" y2="'+(mt+ih)+'"/>';
+  rows.forEach((r,i)=>{ const w = n>1 ? step : iw; s += '<rect class="hit" data-c="'+id+'" data-i="'+i+'" x="'+(X(i)-w/2)+'" y="'+mt+'" width="'+w+'" height="'+ih+'"/>'; });
+  return s + '</svg>';
+}
+const TREND_COUNT = [ {k:"msp", name:"Scored MSP by the product", short:"MSPs", c:"--c-msp"}, {k:"reached", name:"Reached our engine", short:"reached", c:"--c-reach"} ];
+const TREND_RATE = [ {k:"reachPct", name:"Reached our engine", short:"reached", c:"--c-reach"}, {k:"workPct", name:"Worked by a rep", short:"worked", c:"--c-work"},
+  {k:"fastPct", name:"Worked within 1 business day", short:"≤1 day", c:"--c-fast"}, {k:"bookPct", name:"Booked a call", short:"booked", c:"--c-book"} ];
+function trendHtml(){
+  const rows = trend(); S.trendRows = rows; const unit = S.view==="week" ? "week" : "month";
+  // draw each chart at its real width so text stays 11px (two side by side when there is room)
+  const bw = ($("wfBody").clientWidth || 800), cols = bw >= 2*420 + 12 ? 2 : 1;
+  S.chartW = Math.max(300, Math.round((bw - (cols-1)*12) / cols - 30));
+  const legend = L => '<div class="wf-legend">'+L.map(s=>'<span><i style="background:var('+s.c+')"></i>'+h(s.name)+'</span>').join("")+'</div>';
+  const tbl = '<details class="wf-data"><summary>Show the numbers</summary><div class="table-wrap"><table class="wf-tbl small"><thead><tr><th>'+(unit==="week"?"Week of":"Month")+'</th><th>MSPs</th><th>Reached</th><th>Reached %</th><th>Worked %</th><th>≤1 business day %</th><th>Booked %</th></tr></thead><tbody>'+
+    rows.slice().reverse().map(r=>'<tr><td>'+h(r.label)+(r.so?" (so far)":"")+(r.fix?" · fixes live":"")+'</td><td>'+r.msp+'</td><td>'+r.reached+'</td><td>'+(r.reachPct??"–")+(r.reachPct!=null?"%":"")+'</td><td>'+(r.workPct??"–")+(r.workPct!=null?"%":"")+'</td><td>'+(r.fastPct??"–")+(r.fastPct!=null?"%":"")+'</td><td>'+(r.bookPct??"–")+(r.bookPct!=null?"%":"")+'</td></tr>').join("")+'</tbody></table></div></details>';
+  return '<div class="wf-trends">'+
+    '<div class="wf-chart" data-chart="cnt"><h4>MSPs identified vs reached our engine</h4><p>Companies per '+unit+', JF site</p>'+legend(TREND_COUNT)+chartSvg("cnt", rows, TREND_COUNT, false)+'<div class="wf-tip" role="status"></div></div>'+
+    '<div class="wf-chart" data-chart="rate"><h4>Where the rate drops</h4><p>% of the step before, per '+unit+'</p>'+legend(TREND_RATE)+chartSvg("rate", rows, TREND_RATE, true)+'<div class="wf-tip" role="status"></div></div>'+
+    '</div>'+tbl;
+}
+function trendHover(e){
+  const t = e.target.closest && e.target.closest("rect.hit"); const card = e.target.closest && e.target.closest(".wf-chart");
+  document.querySelectorAll("#wfSec .wf-chart").forEach(c=>{ if(c!==card){ const tp = c.querySelector(".wf-tip"); if(tp) tp.style.display = "none"; const xh = c.querySelector(".xh"); if(xh) xh.style.opacity = 0; } });
+  if(!t || !card) return;
+  const r = (S.trendRows||[])[+t.dataset.i]; if(!r) return;
+  const L = t.dataset.c==="cnt" ? TREND_COUNT : TREND_RATE, pct = t.dataset.c!=="cnt";
+  const tip = card.querySelector(".wf-tip"), svg = card.querySelector("svg"), xh = card.querySelector(".xh");
+  const cx = +t.getAttribute("x") + (+t.getAttribute("width"))/2; xh.setAttribute("x1", cx); xh.setAttribute("x2", cx); xh.style.opacity = .5;
+  tip.innerHTML = '<b>'+h((S.view==="week"?"Week of ":"")+r.label+(r.so?" (so far)":""))+(r.fix||r.after?' · <span style="display:inline;color:var(--ahead)">after fixes</span>':'')+'</b>'+
+    L.map(s=>'<span><span style="display:inline"><i style="display:inline-block;width:10px;height:3px;border-radius:2px;background:var('+s.c+');vertical-align:middle;margin-right:5px"></i>'+h(s.name)+'</span><em>'+(r[s.k]==null?"–":r[s.k]+(pct?"%":""))+'</em></span>').join("");
+  const box = svg.getBoundingClientRect(), cb = card.getBoundingClientRect(), sx = box.width/(S.chartW || 560);
+  tip.style.display = "block";
+  let left = box.left - cb.left + cx*sx + 12; if(left + tip.offsetWidth > cb.width - 4) left = box.left - cb.left + cx*sx - tip.offsetWidth - 12;
+  tip.style.left = Math.max(4, left)+"px"; tip.style.top = (box.top - cb.top + 8)+"px";
+}
 function visitors(p){
   const G = S.data.ga, k = p.start+"|all", y = add(torNow(),-1), end = p.end > y ? y : p.end;
   const st = s2d(p.start), whole = S.view==="week" ? (st.getUTCDay()===1 && p.end <= y) : (p.start.slice(8)==="01" && p.end <= y);
@@ -247,14 +335,17 @@ function render(){
       ["call","email","meeting"].map(t=>{ const n = L.filter(c=>c.ttype===t).length; return n ? n+" "+t+(n>1?"s":"") : ""; }).filter(Boolean).join(", ")+'</td></tr>'; }).join("");
   body.innerHTML =
     '<div class="wf-tiles">'+tiles.map(t=>'<div class="wf-tile"><div class="wf-tn '+(t.tone||"")+'">'+h(t.n)+'</div><div class="wf-tl">'+h(t.l)+'</div><div class="wf-ts">'+h(t.s)+'</div></div>').join("")+'</div>'+
+    (jf ? (p.end < FIX_DAY ? '<div class="wf-mark before"><b>Before the Nov 24 fixes.</b> Repeat visitors, company-only hits and direct bridge posts were not reaching our engine in this period.</div>'
+      : '<div class="wf-mark"><b>'+(p.start <= FIX_DAY ? "Fixes went live Nov 24, in this period." : "After the Nov 24 fixes.")+'</b> Repeat visitors, company-only MSP hits and bridge posts now reach our engine; emails count as touches.</div>') : '')+
     '<div class="wf-card"><ol class="wf-steps">'+steps.map(s=>stepRow(s)).join("")+'</ol></div>'+
+    (jf ? '<h3 class="wf-h3">Trend: is the drop-off shrinking?</h3>'+trendHtml() : '')+
     '<h3 class="wf-h3">By source: where each feed drops off before our engine</h3>'+
     '<div class="table-wrap"><table class="wf-tbl"><thead><tr><th>Source</th><th>Companies identified</th><th>Visited before</th><th>Scored MSP</th><th>MSP: already a lead</th><th>MSP: no contact email</th><th>MSP: with email</th><th>MSPs that reached us</th></tr></thead><tbody>'+
       (srcRows || '<tr><td colspan="8">No identified companies in this period.</td></tr>')+'</tbody></table></div>'+
     (jf ? '<h3 class="wf-h3">Where the MSPs stood, and what happened next</h3>'+
     '<div class="table-wrap"><table class="wf-tbl"><thead><tr><th>HubSpot on the hit day</th><th>MSPs</th><th>Handed to a rep</th><th>Worked</th><th>Within 1 business day</th><th>Median to first touch</th><th>Booked</th></tr></thead><tbody>'+rows+'</tbody></table></div>'+
     (whoRows ? '<h3 class="wf-h3">Who made the first touch</h3><div class="table-wrap"><table class="wf-tbl"><thead><tr><th>Rep</th><th>First touches</th><th>Within 1 business day</th><th>Median time</th><th>How</th></tr></thead><tbody>'+whoRows+'</tbody></table></div>' : "") : "")+
-    '<p class="wf-foot">Before our engine: every company the product team identified on the '+(jf?"JF":"CST")+' site in the period (their hits database, copied daily at 7:30). '+
+    '<p class="wf-foot">'+(jf ? 'Trend: one point per '+(S.view==="week"?"week":"month")+' (* = still in progress). Each rate is % of the step before it, so the latest points read low until they mature: worked needs a business day, booked up to 90 days. ' : '')+'Before our engine: every company the product team identified on the '+(jf?"JF":"CST")+' site in the period (their hits database, copied daily at 7:30). '+
     'A company counts once per period; a company seen by two feeds counts under each source in the source table. '+
     '"Already a lead" = the company was in the product leads table before its first hit in the period: the bridge workflow (n8n tchdb48F6TpJ4081) did not forward it until Nov 24, so repeat visitors were lost. '+
     '"No contact email" = until Nov 24 the bridge sent it to Clay only, and it reached us only if Clay sent it back. '+
@@ -302,6 +393,11 @@ async function load(){
   }catch(e){ S.err = e.message; }
   render();
 }
+$("wfBody").addEventListener("mousemove", trendHover);
+// charts are sized to their real width, so redraw when the RTB tab is opened (it may have rendered while hidden)
+const rtbTab = document.getElementById("tab-rtb"); if(rtbTab) rtbTab.addEventListener("click", ()=>setTimeout(()=>{ if(S.data) render(); }, 0));
+let rsz = null; window.addEventListener("resize", ()=>{ clearTimeout(rsz); rsz = setTimeout(()=>{ if(S.data && !$("wfSec").hidden) render(); }, 200); });
+$("wfBody").addEventListener("mouseleave", ()=>trendHover({target:document.body}));
 $("wfSite").addEventListener("click", e=>{ const b = e.target.closest("button[data-s]"); if(!b) return;
   S.site = b.dataset.s; S.open = null;
   $("wfSite").querySelectorAll("button").forEach(x=>x.setAttribute("aria-pressed", String(x===b))); render(); });

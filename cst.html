@@ -132,6 +132,20 @@
   .grid .nd { color: var(--bad); font-weight: 700; }
   .ls-sum { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 14px; }
   .ls-sum .stat { min-width: 150px; flex: 0 1 200px; }
+  .od-bar { display: flex; gap: 10px 14px; flex-wrap: wrap; align-items: center; margin-bottom: 14px; }
+  .od-bar .seg { flex-wrap: wrap; }
+  #od-range { border-radius: 14px; }
+  .od-lbl { font-size: 12px; text-transform: uppercase; letter-spacing: 0.07em; color: var(--muted); font-weight: 600; }
+  .od-dates { display: flex; gap: 10px; flex-wrap: wrap; }
+  .od-dates label { display: flex; align-items: center; gap: 6px; font-size: 13px; color: var(--muted); }
+  .od-tog { display: flex; align-items: center; gap: 6px; font-size: 13.5px; color: var(--muted); cursor: pointer; }
+  .od-in { display: flex; gap: 14px; flex-wrap: wrap; margin-bottom: 14px; }
+  .od-in label { display: flex; flex-direction: column; gap: 4px; font-size: 12px; text-transform: uppercase; letter-spacing: 0.07em; color: var(--muted); font-weight: 600; }
+  .od-in input { width: 130px; font-size: 18px; font-weight: 600; }
+  .od-res { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 12px; }
+  .od-res .stat { min-width: 150px; flex: 0 1 210px; }
+  .od-chance { font-size: 15px; padding: 10px 14px; border-radius: 10px; background: var(--accent-soft); }
+  .od-div { height: 1px; background: var(--line); margin: 22px 0 18px; }
   .pctu { display: block; font-size: 11.5px; color: var(--muted); font-weight: 400; line-height: 1.3; }
 </style>
 </head>
@@ -1091,13 +1105,183 @@
     });
   }
 
+  // ---------- Dial planner (CST) ----------
+  // Same layout as the BDR tracker's Dial planner, built on the data CST has (Vianney 11-24: "just use the data we have"):
+  // - funnel + goal = the rep's own daily log (dials, connects, discos = Discovery Booked + Analysis Booked). Nooks only captures
+  //   part of Ali's dialing (11-24: ~280 of 1,488 logged dials in the week of Nov 15), so rates from Nooks dials would be far too good.
+  // - "Which list pays off?" = the CST Nooks upload (dials + connects per list). CST has no list-level booking data, so there is no
+  //   discos column; the page says how much of the logged dialing Nooks covers.
+  // One date range drives all three parts. A Nooks week that straddles the range edge counts by its share of weekdays (Mon-Fri).
+  var OD_KEY = 'cst-dial-planner';
+  var OD_RANGES = [['4w', 'Last 4 weeks'], ['8w', 'Last 8 weeks'], ['12w', 'Last 12 weeks'], ['month', 'This month'], ['quarter', 'This quarter'], ['ytd', 'Year to date'], ['custom', 'Custom']];
+  var od = { range: 'ytd', from: '', to: '', partial: false, scope: 'month', who: null, want: null };
+  try {
+    var odSaved = JSON.parse(localStorage.getItem(OD_KEY) || 'null');
+    if (odSaved) ['range', 'from', 'to', 'partial', 'scope'].forEach(function (k) { if (odSaved[k] != null) od[k] = odSaved[k]; });
+  } catch (err) {}
+  if (!OD_RANGES.some(function (r) { return r[0] === od.range; })) od.range = 'ytd';
+  function odSave() {
+    try { localStorage.setItem(OD_KEY, JSON.stringify({ range: od.range, from: od.from, to: od.to, partial: od.partial, scope: od.scope })); } catch (err) {}
+  }
+  function todayD() { var t = new Date(); t.setHours(0, 0, 0, 0); return t; }
+  function addD(d, n) { return new Date(d.getFullYear(), d.getMonth(), d.getDate() + n); }
+  function mondayOfDate(d) { return addD(d, -((d.getDay() + 6) % 7)); }
+  function weekShare(we, start, end) {   // share of a Nooks week's Mon-Fri inside [start, end]
+    var m = mondayOf(we), n = 0;
+    for (var i = 0; i < 5; i++) { var d = addD(m, i); if (d >= start && d <= end) n++; }
+    return n / 5;
+  }
+  function odRange() {   // the calendar range the viewer picked; "complete weeks" stops at last Sunday unless this week is included
+    var t = todayD(), mon = mondayOfDate(t), cap = od.partial ? t : addD(mon, -1), start, end;
+    if (/w$/.test(od.range)) { start = addD(mon, -7 * parseInt(od.range, 10)); end = cap; if (od.partial) start = addD(start, 7); }
+    else if (od.range === 'month') { start = new Date(t.getFullYear(), t.getMonth(), 1); end = cap; }
+    else if (od.range === 'quarter') { start = new Date(t.getFullYear(), Math.floor(t.getMonth() / 3) * 3, 1); end = cap; }
+    else if (od.range === 'custom') {
+      start = od.from ? parse(od.from) : new Date(t.getFullYear(), 0, 1); end = od.to ? parse(od.to) : t;
+      if (start > end) { var x = start; start = end; end = x; }
+    } else { start = new Date(t.getFullYear(), 0, 1); end = cap; }
+    return end >= start ? { start: start, end: end } : null;
+  }
+  function logIn(ws, start, end) {   // the rep's own daily log inside [start, end]
+    var o = { d: 0, c: 0, b: 0, days: 0, first: null };
+    state.entries.forEach(function (e) {
+      if (ws.indexOf(e.rep) === -1) return;
+      var dt = parse(e.entry_date);
+      if (dt < start || dt > end) return;
+      var d = Number(e.dials || 0);
+      o.d += d; o.c += Number(e.connects || 0); o.b += Number(e.booked || 0) + Number(e.analysis_booked || 0);
+      if (d > 0 && dt.getDay() !== 0 && dt.getDay() !== 6) o.days++;
+      if (d > 0 && (!o.first || dt < o.first)) o.first = dt;
+    });
+    return o;
+  }
+
+  function renderOdds(host, mode, who) {
+    var v = document.createElement('div');
+    v.style.marginTop = '20px';
+    host.appendChild(v);
+    var reps = state.settings.map(function (s) { return s.rep; });
+    var ws = mode === 'rep' ? [who] : reps;
+    var key = mode === 'rep' ? who : '*';
+    if (od.who !== key) { od.who = key; od.want = null; }
+    var plural = function (n) { return n === 1 ? '' : 's'; };
+    var trim = function (n) { return f1(n).replace(/\.0$/, ''); };
+    var R = odRange();
+    var T = R ? logIn(ws, R.start, R.end) : { d: 0, c: 0, b: 0, days: 0 };
+
+    // Nooks per list for the same range
+    var L = state.lists, lists = {}, nD = 0, nC = 0;
+    if (L && R) L.rows.forEach(function (r) {
+      if (ws.indexOf(r.bdr) === -1) return;
+      var s = weekShare(r.week_ending, R.start, R.end);
+      if (!s) return;
+      var k = r.tier + '|' + r.list_name, o = lists[k] || (lists[k] = { tier: r.tier, name: r.list_name, d: 0, c: 0 });
+      o.d += Number(r.dials || 0) * s; o.c += Number(r.connects || 0) * s;
+      nD += Number(r.dials || 0) * s; nC += Number(r.connects || 0) * s;
+    });
+
+    var title = '<h2 style="font-family:var(--display);font-size:26px;margin:0 0 10px">Dial planner</h2>';
+    var bar = '<div class="od-bar"><div class="seg" id="od-range">' + OD_RANGES.map(function (k) {
+      return "<button data-r='" + k[0] + "' class='" + (od.range === k[0] ? 'on' : '') + "'>" + k[1] + '</button>';
+    }).join('') + '</div>'
+      + (od.range === 'custom' ? '<div class="od-dates"><label>From <input type="date" id="od-from" value="' + esc(od.from) + '"></label><label>To <input type="date" id="od-to" value="' + esc(od.to) + '"></label></div>' : '')
+      + (od.range !== 'custom' ? '<label class="od-tog"><input type="checkbox" id="od-partial"' + (od.partial ? ' checked' : '') + '> Include this week so far</label>' : '')
+      + '</div>';
+    var from = R && T.first && T.first > R.start ? T.first : R && R.start;   // start the label at the first logged day in the range
+    var span = R ? shortDate(from) + ' &ndash; ' + shortDate(R.end) + ', ' + R.end.getFullYear() : '';
+    var cov = T.d ? Math.round(nD / T.d * 100) : 0;
+    var notes = '<p class="hint" style="margin:0 0 14px">'
+      + (R ? 'Rates from <b>' + span + '</b>. Dials, connects and discos come from your own daily log (discos = Discovery + Analysis Booked).' : 'This week has only just started. Tick &ldquo;Include this week so far&rdquo; or pick another range.')
+      + (R && !od.partial && od.range !== 'custom' ? ' This week is left out until it is over.' : '')
+      + (R && T.d ? ' <b>Nooks covers ' + f0(nD) + ' of your ' + f0(T.d) + ' logged dials (' + cov + '%)</b>, so the list table below only shows that part.' : '')
+      + '</p>';
+
+    function wire() {
+      v.querySelectorAll('#od-range button').forEach(function (b) { b.onclick = function () { od.range = b.dataset.r; odSave(); render(); }; });
+      var fr = document.getElementById('od-from'), to = document.getElementById('od-to'), pt = document.getElementById('od-partial');
+      if (fr) fr.onchange = function () { od.from = fr.value; odSave(); render(); };
+      if (to) to.onchange = function () { od.to = to.value; odSave(); render(); };
+      if (pt) pt.onchange = function () { od.partial = pt.checked; odSave(); render(); };
+    }
+    if (!R || !T.d) {
+      v.innerHTML = title + bar + notes + '<div class="card"><p class="hint">No logged dials in this range. Pick a longer range.</p></div>';
+      wire();
+      return;
+    }
+
+    var month = od.scope === 'month', day = od.scope === 'day';
+    var tgt = ws.reduce(function (a, r) { return a + (settingsFor(r).monthly_target || 25); }, 0);
+    if (od.want == null) od.want = Math.max(1, Math.round(month ? tgt : day ? tgt / 21.7 : tgt / (52 / 12)));
+    var perDisco = T.b ? T.d / T.b : 0;
+    var usual = T.days ? T.d / T.days : 0;   // dials on a day you dialed
+
+    var funnel = '<div class="ls-sum">'
+      + '<div class="stat"><div class="k">Dials</div><div class="v">' + f0(T.d) + '</div><div class="sub">' + f0(usual) + ' on a dialing day (' + T.days + ' day' + plural(T.days) + ')</div></div>'
+      + '<div class="stat"><div class="k">Connects</div><div class="v">' + f0(T.c) + '</div><div class="sub">' + pct(T.c, T.d) + ' of dials</div></div>'
+      + '<div class="stat"><div class="k">Discos booked</div><div class="v">' + trim(T.b) + '</div><div class="sub">' + pct(T.b, T.c) + ' of connects</div></div>'
+      + '<div class="stat"><div class="k">Dials per disco</div><div class="v">' + (T.b ? f0(perDisco) : '&mdash;') + '</div><div class="sub">' + (T.b ? 'one disco every ' + f0(perDisco) + ' dials' : 'no discos in this range') + '</div></div></div>';
+
+    var calc = '<div class="card"><h2>How many dials for my goal?</h2>'
+      + '<div class="od-bar"><span class="od-lbl">Goal for</span><div class="seg" id="od-scope">' + [['day', 'Today'], ['week', 'This week'], ['month', 'This month']].map(function (k) { return "<button data-s='" + k[0] + "' class='" + (od.scope === k[0] ? 'on' : '') + "'>" + k[1] + '</button>'; }).join('') + '</div></div>'
+      + '<div class="od-in"><label>Discos I want<input type="number" id="od-want" min="0" step="1" value="' + od.want + '"></label></div>'
+      + '<div id="od-out"></div>'
+      + '<p class="hint">It takes about ' + (T.b ? f0(perDisco) : '?') + ' dials to book one disco, based on the date range above. Everything here comes from your daily log, so log every day for it to stay right.</p>';
+
+    // Which list pays off: Nooks only (dials, connects); grouped in the tier order of the CST scheme
+    var order = {};
+    (L ? L.tierLists : []).forEach(function (t, i) { if (order[t.tier] == null) order[t.tier] = i; });
+    var rows = Object.keys(lists).map(function (k) { return lists[k]; }).filter(function (o) { return o.d >= 0.5; });
+    rows.sort(function (a, b) { return (order[a.tier] == null ? 99 : order[a.tier]) - (order[b.tier] == null ? 99 : order[b.tier]) || (b.c / b.d) - (a.c / a.d) || b.d - a.d; });
+    var rank = '<div class="od-div"></div><h2>Which list pays off?</h2>'
+      + (!L ? '<p class="hint">Could not load the Nooks list data. Refresh to retry.</p>'
+        : !rows.length ? '<p class="hint">No Nooks dials in this range.</p>'
+        : '<div class="tablewrap"><table><thead><tr><th>List</th><th>Dials</th><th>Connects</th><th>Connect rate</th><th>Share of Nooks dials</th></tr></thead><tbody>'
+          + rows.map(function (o, i) {
+            var head = (i === 0 || rows[i - 1].tier !== o.tier) ? '<tr><td class="tierhead" colspan="5">' + esc(o.tier) + '</td></tr>' : '';
+            return head + '<tr><td>' + esc(o.name) + (o.d < 100 ? '<span class="pctu">small sample</span>' : '') + '</td><td>' + f0(o.d) + '</td><td>' + f0(o.c) + '</td><td><b>' + pct(o.c, o.d) + '</b></td><td>' + pct(o.d, nD) + '</td></tr>';
+          }).join('') + '</tbody></table></div>')
+      + '<p class="hint">Same date range as above, from the CST Nooks upload. Grouped by tier, best connect rate first inside each tier; small sample = under 100 dials. CST has no booking data per list, so this table shows dials and connects only. It covers ' + f0(nD) + ' of your ' + f0(T.d) + ' logged dials; Nooks lists that are not in the CST tier scheme are not counted.</p></div>';
+
+    v.innerHTML = title + bar + notes + funnel + calc + rank;
+    wire();
+
+    function upd() {
+      var N = Number(document.getElementById('od-want').value) || 0, o = document.getElementById('od-out');
+      od.want = N;
+      if (!T.b) { o.innerHTML = '<p class="hint">No discos in this date range, so there is nothing to work from. Pick a longer range.</p>'; return; }
+      if (!(N > 0)) { o.innerHTML = '<p class="hint">Type how many discos you want.</p>'; return; }
+      var t0 = todayD(), start, end, per;
+      if (month) { var mw = monthWindow(); start = mw.start; end = mw.end; per = 'month'; }
+      else if (day) { start = t0; end = t0; per = 'day'; }
+      else { start = mondayOfDate(t0); end = addD(start, 4); per = 'week'; }
+      var remDays = day ? (t0.getDay() === 0 || t0.getDay() === 6 ? 0 : 1) : workdays(t0 > start ? t0 : start, end);
+      var done = logIn(ws, start, end);
+      var left = Math.max(0, N - done.b), need = Math.ceil(left * perDisco);
+      var perDay = remDays ? need / remDays : 0;
+      var when = day ? 'today' : 'this ' + per, msg;
+      if (left <= 0) msg = 'Goal hit: <b>' + trim(done.b) + '</b> disco' + plural(done.b) + ' booked ' + when + ' already. Anything more is a bonus.';
+      else if (!remDays) msg = (day ? 'Today is not a dialing day.' : 'No weekdays left this ' + per + '.') + ' You logged <b>' + f0(done.d) + '</b> dials and <b>' + trim(done.b) + '</b> disco' + plural(done.b) + '.';
+      else if (day) msg = 'To book <b>' + trim(left) + '</b> more disco' + plural(left) + ' today you need about <b>' + f0(need) + '</b> dials. Your usual dialing day is ' + f0(usual) + (usual ? ' (' + f1(need / usual) + 'x).' : '.');
+      else msg = 'For the <b>' + remDays + '</b> weekday' + plural(remDays) + ' left, that is about <b>' + f0(perDay) + ' dials a day</b>. Your usual dialing day is ' + f0(usual) + (perDay > usual * 1.05 ? (usual ? ' (' + f1(perDay / usual) + 'x)' : '') + ', so it needs a bigger push.' : ', so you are on pace.');
+      o.innerHTML = '<div class="od-res">'
+        + '<div class="stat"><div class="k">Dials still needed</div><div class="v">' + f0(need) + '</div><div class="sub">' + (left > 0 ? 'to book ' + trim(left) + ' more ' + when : 'goal already hit') + '</div></div>'
+        + '<div class="stat"><div class="k">' + (day ? 'Logged today' : 'Per day, ' + remDays + ' day' + plural(remDays) + ' left') + '</div><div class="v">' + (day ? f0(done.d) : remDays ? f0(perDay) : '&mdash;') + '</div><div class="sub">' + (day ? 'dials so far' : 'dials a weekday, starting today') + '</div></div>'
+        + '<div class="stat"><div class="k">Done so far</div><div class="v">' + f0(done.d) + '</div><div class="sub">dials &middot; <b>' + trim(done.b) + '</b> disco' + plural(done.b) + ' booked ' + when + ' (your log)</div></div></div>'
+        + '<div class="od-chance">' + msg + '</div>';
+    }
+    document.getElementById('od-want').oninput = upd;
+    upd();
+    var sc = document.getElementById('od-scope');
+    if (sc) sc.querySelectorAll('button').forEach(function (b) { b.onclick = function () { od.scope = b.dataset.s; od.want = null; odSave(); render(); }; });
+  }
+
   function render() {
     renderTabs();
     var v = document.getElementById('view');
     if (active !== 'summary' && active !== 'history' && !state.settings.some(function (s) { return s.rep === active; })) active = 'summary';
-    if (active === 'summary') { renderSummary(v); renderLists(v, 'team'); }
+    if (active === 'summary') { renderSummary(v); renderOdds(v, 'team'); renderLists(v, 'team'); }
     else if (active === 'history') renderHistory(v);
-    else { renderRep(v, active); renderLists(v, 'rep', active); }
+    else { renderRep(v, active); renderOdds(v, 'rep', active); renderLists(v, 'rep', active); }
   }
 
   load();

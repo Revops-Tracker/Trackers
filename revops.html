@@ -273,6 +273,58 @@ html.view-reporting .lb-only{display:none!important}
 .rp-tabs button{border:0;background:transparent;padding:8px 18px;border-radius:7px;cursor:pointer;font-weight:600;color:var(--muted)}
 section[hidden]{display:none}
 
+/* RevOps L10 tabs */
+.ro-tabs{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 22px;border-bottom:1px solid var(--line)}
+.ro-tabs button{border:0;background:transparent;padding:10px 14px;font-weight:600;color:var(--muted);cursor:pointer;border-bottom:3px solid transparent;margin-bottom:-1px;font-size:15px;display:inline-flex;align-items:center;gap:8px}
+.ro-tabs button:hover{color:var(--ink)}
+.ro-tabs button[aria-selected="true"]{color:var(--ink);border-bottom-color:var(--fill)}
+.ro-badge{display:inline-flex;align-items:center;justify-content:center;min-width:20px;height:20px;padding:0 6px;border-radius:999px;font-size:12px;font-weight:700;background:color-mix(in srgb,var(--gold) 24%,var(--panel));color:var(--ink);font-variant-numeric:tabular-nums}
+section[data-tab][hidden],.ro-badge[hidden]{display:none!important}
+@media (max-width:640px){.ro-tabs{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none}.ro-tabs button{white-space:nowrap;padding:10px 10px;font-size:14px}}
+
+/* RTB waterfall (revops-rtb.js) */
+#wfSec .wf-tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px;margin-bottom:14px}
+#wfSec .wf-tile{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:14px 16px}
+#wfSec .wf-tn{font-family:var(--display);font-weight:700;font-size:34px;line-height:1;font-variant-numeric:tabular-nums}
+#wfSec .wf-tn.ahead{color:var(--ahead)} #wfSec .wf-tn.behind{color:var(--behind)}
+#wfSec .wf-tl{font-weight:600;font-size:14px;margin-top:6px}
+#wfSec .wf-ts{color:var(--muted);font-size:12px;margin-top:2px}
+#wfSec .wf-card{background:var(--panel);border:1px solid var(--line);border-radius:14px;overflow:hidden}
+#wfSec .wf-steps{list-style:none;margin:0;padding:0}
+#wfSec .wf-step{border-top:1px solid var(--line)} #wfSec .wf-step:first-child{border-top:0}
+#wfSec .wf-stepbtn{display:grid;grid-template-columns:minmax(180px,300px) 1fr 96px;gap:16px;align-items:center;width:100%;padding:12px 18px;border:0;background:transparent;text-align:left;cursor:pointer}
+#wfSec .wf-stepbtn:hover:not(:disabled){background:color-mix(in srgb,var(--fill) 5%,var(--panel))}
+#wfSec .wf-stepbtn:disabled{cursor:default}
+#wfSec .wf-l{font-weight:600;font-size:15px}
+#wfSec .wf-l small{display:block;font-weight:500;font-size:12px;color:var(--muted);margin-top:2px}
+#wfSec small.warn,#wfSec .warn{color:var(--behind)}
+#wfSec .wf-bar{height:12px;background:var(--track);border-radius:6px;overflow:hidden}
+#wfSec .wf-bar span{display:block;height:100%;background:var(--fill);border-radius:6px}
+#wfSec .wf-step.vis .wf-bar span{background:var(--fill-soft)}
+#wfSec .wf-n{font-family:var(--display);font-weight:700;font-size:26px;text-align:right;font-variant-numeric:tabular-nums;line-height:1}
+#wfSec .wf-n small{display:block;font-family:var(--body);font-weight:500;font-size:12px;color:var(--muted);margin-top:3px}
+#wfSec .wf-list{padding:0 18px 14px;overflow-x:auto}
+#wfSec .wf-none{color:var(--muted);margin:0}
+#wfSec .wf-h3{font-family:var(--display);font-weight:600;font-size:20px;margin:22px 0 8px}
+#wfSec .wf-tbl{width:100%;border-collapse:collapse;background:var(--panel);border:1px solid var(--line);border-radius:12px;font-size:14px;font-variant-numeric:tabular-nums}
+#wfSec .wf-tbl th,#wfSec .wf-tbl td{padding:9px 12px;border-top:1px solid var(--line);text-align:right;vertical-align:top}
+#wfSec .wf-tbl thead th{border-top:0;font-size:12px;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.03em}
+#wfSec .wf-tbl th:first-child,#wfSec .wf-tbl td:first-child{text-align:left}
+#wfSec .wf-tbl tbody th{font-weight:600}
+#wfSec .wf-tbl small{color:var(--muted);font-weight:500;margin-left:4px}
+#wfSec .wf-tbl tbody th small{display:block;margin:2px 0 0}
+#wfSec .wf-tbl.small{font-size:13px}
+#wfSec .wf-tbl.small td{text-align:left}
+#wfSec .wf-foot{color:var(--muted);font-size:13px;line-height:1.45;margin:12px 0 0}
+#wfSec .wf-empty{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:28px;text-align:center;color:var(--muted)}
+#wfSec .wf-empty b{display:block;color:var(--ink)}
+@media (max-width:640px){
+  #wfSec .wf-stepbtn{grid-template-columns:1fr 72px;gap:8px 12px}
+  #wfSec .wf-bar{grid-column:1 / -1;grid-row:2}
+  #wfSec .sec-head .nav{flex-wrap:wrap}
+  #wfSec .period{min-width:0;font-size:18px}
+}
+
 /* RTB Review Panel */
 #rtbReview{margin-bottom:36px}
 #rtbReview .rtb-count{display:inline-flex;align-items:center;font-size:13px;font-weight:600;letter-spacing:.01em;background:var(--chip);color:var(--muted);border-radius:999px;padding:6px 12px;font-variant-numeric:tabular-nums}
@@ -384,7 +436,26 @@ section[hidden]{display:none}
     </div>
   </header>
 
-  <section id="rtbReview" aria-labelledby="rtbTitle">
+  <nav class="ro-tabs" id="roTabs" role="tablist" aria-label="RevOps L10 views">
+    <button type="button" role="tab" id="tab-cr" aria-controls="crSec" data-t="cr" aria-selected="true">Connect rates &amp; dialing</button>
+    <button type="button" role="tab" id="tab-rtb" aria-controls="wfSec" data-t="rtb" aria-selected="false" tabindex="-1">RTB report</button>
+    <button type="button" role="tab" id="tab-review" aria-controls="rtbReview" data-t="review" aria-selected="false" tabindex="-1">RTB Review Panel <span class="ro-badge" id="roReviewBadge" hidden></span></button>
+  </nav>
+
+  <section id="wfSec" aria-labelledby="wfTitle" role="tabpanel" data-tab="rtb" hidden>
+    <div class="sec-head">
+      <h2 id="wfTitle">RTB waterfall</h2>
+      <div class="nav">
+        <div class="seg" id="wfView" role="group" aria-label="View"><button type="button" data-v="week" aria-pressed="true">Weekly</button><button type="button" data-v="month" aria-pressed="false">Monthly</button></div>
+        <button type="button" id="wfPrev" aria-label="Previous period">‹</button>
+        <div class="period" id="wfPeriod" aria-live="polite"></div>
+        <button type="button" id="wfNext" aria-label="Next period">›</button>
+      </div>
+    </div>
+    <div id="wfBody"></div>
+  </section>
+
+  <section id="rtbReview" aria-labelledby="rtbTitle" role="tabpanel" data-tab="review" hidden>
     <div class="sec-head">
       <h2 id="rtbTitle">RTB Review Panel</h2>
       <div class="nav">
@@ -400,7 +471,7 @@ section[hidden]{display:none}
     </div>
   </section>
 
-  <section class="cr-root" id="crSec">
+  <section class="cr-root" id="crSec" role="tabpanel" data-tab="cr">
     <div class="sec-head">
       <h2 id="crTitle">Connect rate</h2>
       <div class="nav">
@@ -1458,6 +1529,32 @@ function boot(){
 }
 
 try{ boot(); }catch(e){ console.error("RTB Review Panel", e); }
+})();
+</script>
+<script src="revops-rtb.js?v=20261124b"></script>
+<script>
+/* RevOps L10 tabs: one section at a time; the pick is kept in the URL (#rtb, #review) and in this browser */
+(function(){
+  const tabs = [...document.querySelectorAll("#roTabs [role=tab]")], keys = tabs.map(t=>t.dataset.t);
+  function show(k, focus){
+    if(keys.indexOf(k) < 0) k = "cr";
+    tabs.forEach(t=>{ const on = t.dataset.t===k; t.setAttribute("aria-selected", String(on)); t.tabIndex = on ? 0 : -1; if(on && focus) t.focus(); });
+    document.querySelectorAll("section[data-tab]").forEach(s=>{ s.hidden = s.dataset.tab!==k; });
+    try{ localStorage.setItem("revops_tab", k); }catch(e){}
+    if(location.hash.slice(1)!==k) history.replaceState(null, "", k==="cr" ? location.pathname+location.search : "#"+k);
+  }
+  tabs.forEach(t=>t.addEventListener("click", ()=>show(t.dataset.t)));
+  document.getElementById("roTabs").addEventListener("keydown", e=>{
+    const i = keys.indexOf(document.activeElement && document.activeElement.dataset.t); if(i<0) return;
+    if(e.key==="ArrowRight"||e.key==="ArrowLeft"){ e.preventDefault(); show(keys[(i+(e.key==="ArrowRight"?1:keys.length-1))%keys.length], true); }
+  });
+  window.addEventListener("hashchange", ()=>show(location.hash.slice(1)||"cr"));
+  let saved = ""; try{ saved = localStorage.getItem("revops_tab")||""; }catch(e){}
+  show(location.hash.slice(1) || saved || "cr");
+  // the review queue count rides on its tab, so pending rows are visible from the other tabs
+  const src = document.getElementById("rtbCount"), badge = document.getElementById("roReviewBadge");
+  const sync = ()=>{ const n = (String(src.textContent).match(/\d+/g)||[]).reduce((a,x)=>a + +x, 0); badge.hidden = !n; badge.textContent = n ? String(n) : ""; badge.title = src.textContent; };
+  if(src){ new MutationObserver(sync).observe(src, {childList:true, characterData:true, subtree:true}); sync(); }
 })();
 </script>
 </body>

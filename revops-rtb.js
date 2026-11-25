@@ -119,25 +119,30 @@ function cohort(p){
     const fl = D.flags.has(c.dom) ? D.flags.get(c.dom) : null;
     c.otherLine = fl!=null && (fl & HF.FOUND) && !(fl & HF.JFLINE);   // a CST company: not the JF queue's job
     if(c.otherLine) c.how = "out";
+    c.hitMs = Date.parse(c.at || (c.first+"T12:00:00-05:00"));
+    c.touchMs = c.touch ? Date.parse(c.touch) : null;
+    // 11-25: the visit was the booking itself (booked in the 3 days before the hit reached us, or within 2 hours after,
+    // with no rep touch first). That's an inbound booking, not an RTB lead: not routed, not counted as hit -> booked.
+    const bk = D.books.get(c.dom) || [];
+    c.selfBook = bk.some(x=>x.t >= c.hitMs - 3*864e5 && x.t <= c.hitMs + 2*36e5 && !(c.touchMs && c.touchMs < x.t));
+    if(c.selfBook) c.how = "out";
     const tv = ((D.down.get(c.dom)||{}).t||[]).filter(d=>d>=c.first)[0] || null;
     c.tvl = tv;
     c.tvlState = c.how!=="tvl" || tv ? "" : fl==null ? "unk" : !(fl & HF.FOUND) ? "noco" : !(fl & HF.ACTIVE) ? "notq"
       : (fl & HF.TODO) && (fl & HF.INTENT) ? "queue" : (fl & HF.TODO) ? "notq" : "prior";
     c.handed = c.how==="dm" ? c.first : c.how==="tvl" ? (tv || (c.tvlState==="prior" ? c.first : null)) : null;
     c.waitTvl = c.tvlState==="queue" || c.tvlState==="unk";
-    c.hitMs = Date.parse(c.at || (c.first+"T12:00:00-05:00"));
-    c.touchMs = c.touch ? Date.parse(c.touch) : null;
-    c.biz = c.touchMs ? bizMins(c.hitMs, c.touchMs) : null;
+    c.biz =c.touchMs ? bizMins(c.hitMs, c.touchMs) : null;
     // open clock for untouched ones (business time since the hit, up to now)
     c.bizOpen = c.touchMs ? null : bizMins(c.hitMs, Date.now());
     c.fast = c.biz != null && c.biz <= 9*60;
     c.dueYet = c.bizOpen == null || c.bizOpen > 9*60;   // has a full business day passed (or been touched)?
-    c.booked = (D.books.get(c.dom)||[]).some(d=>d>=c.first && days(c.first, d) <= BOOK_DAYS);
+    c.booked = !c.selfBook && bk.some(x=>x.t > c.hitMs && days(c.first, x.d) <= BOOK_DAYS);
   });
-  const act = msp.filter(c=>c.how!=="out"), bookable = msp.filter(c=>!NO_BOOK.has(c.stage||""));
+  const act = msp.filter(c=>c.how!=="out"), bookable = msp.filter(c=>!NO_BOOK.has(c.stage||"") && !c.selfBook);
   const stuck = k => act.filter(c=>c.tvlState===k);
   return { p, today, vis:visitors(p), all, jf, msp, later, non:jf.filter(c=>c.cls==="non"), act,
-    other:msp.filter(c=>c.otherLine), notq:stuck("notq"), noco:stuck("noco"), prior:stuck("prior"),
+    other:msp.filter(c=>c.otherLine && !c.selfBook), self:msp.filter(c=>c.selfBook), notq:stuck("notq"), noco:stuck("noco"), prior:stuck("prior"),
     handed:act.filter(c=>c.handed), waiting:act.filter(c=>c.waitTvl),
     worked:act.filter(c=>c.touchMs), fast:act.filter(c=>c.fast), due:act.filter(c=>c.dueYet),
     bookable, booked:bookable.filter(c=>c.booked) };
@@ -316,7 +321,8 @@ function render(){
       sub:jf ? x.non.length+" not MSPs, "+x.later.length+" flagged not MSP in HubSpot after the hit, "+(x.jf.length-x.msp.length-x.non.length-x.later.length)+" unclear or clients" : "CST cross-seeds are routed by the CST engine"},
   ].concat(jf ? [
     {k:"act", l:"Routable to a rep", n:x.act.length, of:x.msp.length, list:x.act, max:P2,
-      sub:(x.msp.length-x.act.length-x.other.length)+" clients, DQ'd or not checked"+(x.other.length ? " · "+x.other.length+" CST companies" : "")},
+      sub:(x.msp.length-x.act.length-x.other.length-x.self.length)+" clients, DQ'd or not checked"+(x.other.length ? " · "+x.other.length+" CST companies" : "")+
+        (x.self.length ? " · "+x.self.length+" booked a call themselves on the visit" : "")},
     {k:"handed", l:"Handed to a rep", n:x.handed.length, of:x.act.length, list:x.handed, max:P2,
       sub:[x.waiting.length ? x.waiting.length+" in the fishing queue" : "none in the fishing queue",
            x.notq.length ? x.notq.length+" not queued (deal or booked call)" : "",
@@ -325,7 +331,7 @@ function render(){
       warn:x.waiting.length + x.noco.length},
     {k:"worked", l:"Worked (call, email or meeting after the hit)", n:x.worked.length, of:x.act.length, list:x.worked, max:P2, sub:(x.act.length-x.worked.length)+" with no touch yet"},
     {k:"fast", l:"Worked within 1 business day", n:x.fast.length, of:fastBase, list:x.fast, max:P2, sub:"of the "+fastBase+" whose first business day has passed"},
-    {k:"booked", l:"Booked a call (within 90 days)", n:x.booked.length, of:x.bookable.length, list:x.bookable, max:P2, sub:"of "+x.bookable.length+" not already a live deal, client or DQ"},
+    {k:"booked", l:"Booked a call after the hit (within 90 days)", n:x.booked.length, of:x.bookable.length, list:x.bookable, max:P2, sub:"of "+x.bookable.length+" not already a live deal, client, DQ or booked on the visit"},
   ] : []).filter(Boolean);
   const stepRow = s => {
     if(s.div) return '<li class="wf-div" aria-hidden="false">'+h(s.div)+'</li>';
@@ -347,7 +353,7 @@ function render(){
     (srcKeys.length > 1 ? srcRow("All sources", y.all) : "");
   // per-bucket table: where the leaks are
   const rows = BUCKETS.map(b=>{
-    const L = x.msp.filter(c=>(c.stage||"")===b.k || (b.k==="" && c.stage==="error")); if(!L.length) return "";
+    const L = x.msp.filter(c=>!c.selfBook && ((c.stage||"")===b.k || (b.k==="" && c.stage==="error"))); if(!L.length) return "";
     const handed = L.filter(c=>c.handed).length, worked = L.filter(c=>c.touchMs), due = L.filter(c=>c.dueYet), fast = L.filter(c=>c.fast).length;
     const m = median(worked.map(c=>c.biz)), bk = NO_BOOK.has(b.k) ? null : L.filter(c=>c.booked).length;
     const out = b.how==="out";
@@ -356,7 +362,7 @@ function render(){
       '<td>'+(out?"–":worked.length+' <small>'+pct(worked.length, L.length)+'</small>')+'</td>'+
       '<td>'+(out?"–":due.length?fast+' <small>'+pct(fast, due.length)+'</small>':"–")+'</td>'+
       '<td>'+(out?"–":m==null?"–":fmtBiz(m))+'</td><td>'+(bk==null?"–":bk+' <small>'+pct(bk, L.length)+'</small>')+'</td></tr>';
-  }).join("");
+  }).join("") + (x.self.length ? '<tr><th scope="row" title="The visit was the booking itself: they booked in the 3 days before the hit reached us, or within 2 hours after with no rep touch first. Inbound, not an RTB lead.">Booked a call themselves on the visit<small>inbound, not routed</small></th><td>'+x.self.length+'</td><td>–</td><td>–</td><td>–</td><td>–</td><td>–</td></tr>' : "");
   // who did the first touch
   const who = {}; x.worked.forEach(c=>{ const k = c.tby || "Unknown owner"; (who[k] = who[k] || []).push(c); });
   const whoRows = Object.keys(who).sort((a,b)=>who[b].length-who[a].length).map(k=>{ const L = who[k];
@@ -383,6 +389,7 @@ function render(){
     (jf ? 'Inside our engine: '+'Cohort: companies hit in the period, followed to today, one line per company (its first hit in the period decides the stage). ' : '')+
     'Worked = the first call (any attempt), outgoing email or meeting logged on the company in HubSpot after the hit, by anyone. Times are business time: 9am to 6pm Toronto, Monday to Friday (1 day = 9 hours). '+
     'Owned deals (missed, stalled, re-engage, live) are DMed to the rep at the hit; everything else is handed over only after TVL. '+
+    'Booked = a new call booked after the hit reached us. A company that booked in the 3 days before, or within 2 hours after with no rep touch first, booked on the visit itself: it counts as inbound, not as an RTB lead or an RTB booking. '+
     (jf ? 'HubSpot flags are read as they are today (daily 7:40): MSPs later flagged not-MSP or permanently excluded leave the MSP count, CST companies are not routable here, and "in the fishing queue" uses the JF RTB Fishing Queue rules (To Do, RTB active, standard or high intent). The queue can also hold MSPs that came in as CST cross-seeds, which this JF view does not count. ' : '')+
     'Data from Aug 17, refreshed daily at 7:45am.</p>';
 }
@@ -401,7 +408,7 @@ function listHtml(list, k){
   const L = list.slice().sort((a,b)=>a.first<b.first?1:-1);
   return '<div class="wf-list"><table class="wf-tbl small"><thead><tr><th>Company</th><th>Hit</th><th>HubSpot</th><th>Handed</th><th>First touch</th>'+(k==="booked"?"<th>Booked</th>":"")+'</tr></thead><tbody>'+
     L.map(c=>{ const b = BK[c.stage||""] || BK[""];
-      const handed = c.cls!=="msp" ? "–" : c.otherLine ? "CST company" : c.how==="dm" ? "DM at the hit" : c.how==="tvl" ? (c.tvl ? "TVL "+lbl(c.tvl)
+      const handed = c.cls!=="msp" ? "–" : c.selfBook ? "booked a call themselves on the visit" : c.otherLine ? "CST company" : c.how==="dm" ? "DM at the hit" : c.how==="tvl" ? (c.tvl ? "TVL "+lbl(c.tvl)
         : (c.tvlState==="queue" || c.tvlState==="noco" || c.tvlState==="unk" ? '<span class="warn">'+h(TVL_STATE[c.tvlState])+'</span>' : h(TVL_STATE[c.tvlState]||""))) : "not routed";
       const t = c.touchMs ? h(c.ttype)+" by "+h(c.tby||"?")+" · "+fmtBiz(c.biz) : (c.cls==="msp" && c.how!=="out" ? '<span class="warn">none yet'+(c.bizOpen!=null?" ("+fmtBiz(c.bizOpen)+" open)":"")+'</span>' : "–");
       return '<tr><td><b>'+h(c.dom)+'</b></td><td>'+lbl(c.first)+'</td><td>'+(c.cls==="msp"?h(b.label):c.cls==="later"?"flagged not MSP later":h(c.cls||"not classified"))+'</td><td>'+handed+'</td><td>'+t+'</td>'+
@@ -419,7 +426,8 @@ async function load(){
     (j.ga||[]).forEach(([g, start, grp, s, u])=>{ if(g==="d") ga.d.push({start, grp, s, u}); else ga.agg.set(g+"|"+start+"|"+grp, {s, u}); });
     const hits = (j.hits||[]).map(([d, dom, seg, cst, cls, stage, routed, at, touch, ttype, tby])=>({d, dom, seg, cst, cls, stage, routed, at, touch, ttype, tby}));
     const down = new Map(); (j.down||[]).forEach(([d, dom, k])=>{ const x = down.get(dom) || {t:[], c:[]}; x[k].push(d); down.set(dom, x); });
-    const books = new Map(); (j.books||[]).forEach(([d, dom])=>{ (books.get(dom) || books.set(dom, []).get(dom)).push(d); });
+    // books: [day, domain, booked_at] (booked_at since 11-25; older payloads fall back to noon that day)
+    const books = new Map(); (j.books||[]).forEach(([d, dom, at])=>{ (books.get(dom) || books.set(dom, []).get(dom)).push({d, t:Date.parse(at || (d+"T12:00:00-05:00"))}); });
     const src = (j.src||[]).map(([d, site, dom, s, f])=>({d, site, dom, srcs:String(s||"").split(",").filter(Boolean), f:+f||0}));
     const flags = new Map((j.flags||[]).map(([dom, b])=>[dom, +b||0]));
     S.data = {ga, hits, down, books, src, flags};

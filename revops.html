@@ -373,6 +373,8 @@ section[data-tab][hidden],.ro-badge[hidden]{display:none!important}
 #rtbReview .rtb-row.is-bad{box-shadow:inset 3px 0 0 color-mix(in srgb,var(--behind) 72%,var(--line))}
 #rtbReview .rtb-row.is-med{box-shadow:inset 3px 0 0 var(--gold)}
 #rtbReview .rtb-row.is-med:hover{background:color-mix(in srgb,var(--gold) 8%,var(--panel))}
+#rtbReview .rtb-row.is-rule{box-shadow:inset 3px 0 0 var(--fill)}
+#rtbReview .rtb-row.is-rule:hover{background:color-mix(in srgb,var(--fill) 7%,var(--panel))}
 #rtbReview .rtb-row.is-busy,#rtbReview .rtb-row.is-busy:hover{background:var(--paper)}
 #rtbReview .rtb-row > *{min-width:0}
 #rtbReview .rtb-name{font-weight:600;font-size:16px;line-height:1.3;overflow-wrap:anywhere}
@@ -389,6 +391,7 @@ section[data-tab][hidden],.ro-badge[hidden]{display:none!important}
 #rtbReview .pill.type-bad{background:color-mix(in srgb,var(--behind) 18%,transparent);color:var(--behind)}
 #rtbReview .pill.type-med{background:color-mix(in srgb,var(--gold) 24%,transparent);color:var(--ink);box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--gold) 62%,transparent)}
 #rtbReview .pill.type-rej{background:var(--chip);color:var(--ink)}
+#rtbReview .pill.type-rule{background:color-mix(in srgb,var(--fill) 16%,transparent);color:var(--ink);box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--fill) 45%,transparent)}
 #rtbReview .rtb-filters{display:flex;flex-wrap:wrap;gap:6px;align-items:center;padding:10px 18px;border-bottom:1px solid var(--line)}
 #rtbReview .rtb-filters button{border:1px solid var(--line);background:var(--panel);color:var(--muted);border-radius:999px;padding:4px 12px;font-size:13px;font-weight:600;line-height:1.3;cursor:pointer}
 #rtbReview .rtb-filters button[aria-pressed="true"]{background:var(--ink);color:var(--paper);border-color:var(--ink)}
@@ -408,6 +411,20 @@ section[data-tab][hidden],.ro-badge[hidden]{display:none!important}
 #rtbReview .rtb-note::placeholder{color:var(--muted)}
 #rtbReview .rtb-note:focus{outline:none}
 #rtbReview .rtb-note:focus-visible{border-color:var(--fill);box-shadow:0 0 0 3px color-mix(in srgb,var(--fill) 22%,transparent)}
+#rtbReview textarea.rtb-answer{width:100%;min-height:108px;max-height:240px;resize:vertical;border:1px solid var(--line);background:var(--paper);color:var(--ink);border-radius:8px;padding:8px 10px;font:inherit;font-size:14px;line-height:1.4}
+#rtbReview textarea.rtb-answer::placeholder{color:var(--muted)}
+#rtbReview textarea.rtb-answer:focus{outline:none}
+#rtbReview textarea.rtb-answer:focus-visible{border-color:var(--fill);box-shadow:0 0 0 3px color-mix(in srgb,var(--fill) 22%,transparent)}
+#rtbReview .rtb-hint{margin:0;font-size:12px;line-height:1.35;color:var(--muted)}
+#rtbReview .rtb-btn.answer{flex:none;width:100%;color:var(--paper);background:var(--ink);border-color:var(--ink)}
+#rtbReview .rtb-btn.answer:hover:not(:disabled){background:color-mix(in srgb,var(--ink) 88%,var(--fill));border-color:color-mix(in srgb,var(--ink) 88%,var(--fill))}
+#rtbReview .rtb-slug{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:12px;line-height:1.35;color:var(--muted);overflow-wrap:anywhere}
+#rtbReview .rtb-id .rtb-slug{display:block;max-width:100%;margin-top:2px}
+#rtbReview .rtb-done-top .rtb-slug{margin-left:6px}
+#rtbReview .rtb-question{white-space:pre-wrap}
+#rtbReview .rtb-context{margin-top:8px;padding-top:8px;border-top:1px solid var(--line);font-size:13px;line-height:1.45;color:var(--muted);white-space:pre-wrap;overflow-wrap:anywhere}
+#rtbReview .rtb-context b,#rtbReview .rtb-answered b{color:var(--ink);font-weight:600}
+#rtbReview .rtb-answered{margin-top:6px;font-size:14px;line-height:1.45;white-space:pre-wrap;overflow-wrap:anywhere}
 #rtbReview .rtb-actions{display:flex;gap:8px}
 #rtbReview .rtb-btn{flex:1;display:inline-flex;align-items:center;justify-content:center;gap:6px;height:40px;padding:0 10px;border-radius:10px;border:1px solid var(--line);background:var(--panel);font-weight:700;font-size:14px;line-height:1;white-space:nowrap;cursor:pointer;transition:background .15s,border-color .15s,color .15s,transform .12s}
 #rtbReview .rtb-btn svg{display:block}
@@ -498,7 +515,7 @@ section[data-tab][hidden],.ro-badge[hidden]{display:none!important}
       </div>
     </div>
     <div class="rtb-card">
-      <p class="rtb-lead">Bad data: tick a row if it looks fine, or cross it to set Contact.RTB Bad Contact to True in HubSpot. Medium confidence: confirm a good fit and it is enriched on the next run, or reject it. A reject does not write to HubSpot.</p>
+      <p class="rtb-lead">Bad data: tick a row if it looks fine, or cross it to set Contact.RTB Bad Contact to True in HubSpot. Medium confidence: confirm a good fit and it is enriched on the next run, or reject it. A reject does not write to HubSpot. Rule questions: write an answer and submit it. An answer is final, and nothing is written to HubSpot.</p>
       <div id="rtbBody">
         <div class="rtb-empty"><b>Loading the review queue…</b></div>
       </div>
@@ -1119,11 +1136,14 @@ load().then(()=>{ render(); }).catch(e=>{
 })();
 </script>
 <script>
-/* RTB Review Panel. Two kinds of rows share this queue.
+/* RTB Review Panel. Three kinds of rows share this queue.
    bad_data: tick (fine, no HubSpot write) or cross (bad data). A cross is applied by
    bad-data-review, which sets Contact.RTB Bad Contact = True.
    medium_confidence: confirm (good fit, enriched on the next run) or reject (not a fit,
-   no HubSpot write). Same jf_token as the rest of the page.
+   no HubSpot write). A confirmed row stays status ticked, which the fishing bot reads as yes.
+   rule_question: not a lead. A required free-text answer is submitted once and is final.
+   Answering does not write to HubSpot or enrich anything.
+   Same jf_token as the rest of the page.
    This function's base URL is not /api or /auth, so the Bearer header is added here.
    sso.js still sends the user to the login page on any 401. */
 (function(){
@@ -1136,7 +1156,7 @@ const token = () => { try{ return localStorage.getItem("jf_token"); }catch(e){ r
 const say = m => { if(typeof toast === "function") toast(m); };
 const ICON_TICK = '<svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>';
 const ICON_CROSS = '<svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>';
-const S = { pending:[], recent:[], canReview:true, loaded:false, sawList:false, loadError:"", notes:{}, errors:{}, busy:null, confirm:null, recentOpen:false, focusCancel:false, filter:"all" };
+const S = { pending:[], recent:[], canReview:true, loaded:false, sawList:false, loadError:"", notes:{}, answers:{}, errors:{}, busy:null, confirm:null, recentOpen:false, focusCancel:false, focusAnswer:null, filter:"all" };
 
 function mayReview(){
   if(window.JF_USER && window.JF_USER.role === "view") return false;
@@ -1201,6 +1221,13 @@ function queueHTML(q){
 function isMedium(it){
   return !!(it && it.item_type === "medium_confidence");
 }
+function isRule(it){
+  return !!(it && it.item_type === "rule_question");
+}
+function ruleSlug(it){
+  const k = cleanText(it && it.lead_key);
+  return k.indexOf("rule:") === 0 ? k.slice(5) : k;
+}
 function contactIsSet(it){
   return cleanText(it && it.contact_id) !== "";
 }
@@ -1252,17 +1279,19 @@ function linkedinHTML(it, prominent){
   return '<a class="'+cls+'" href="'+h(href)+'" target="_blank" rel="noopener">LinkedIn ↗</a>';
 }
 function typeBadge(it){
+  if(isRule(it)) return '<span class="pill type-rule">Rule question</span>';
   if(isMedium(it)) return '<span class="pill type-med">Medium confidence · judge fit</span>';
   return '<span class="pill type-bad">Bad data</span>';
 }
 function pendingCounts(){
-  let bad = 0, med = 0;
-  S.pending.forEach(it => { if(isMedium(it)) med++; else bad++; });
-  return { bad:bad, med:med };
+  let bad = 0, med = 0, rules = 0;
+  S.pending.forEach(it => { if(isRule(it)) rules++; else if(isMedium(it)) med++; else bad++; });
+  return { bad:bad, med:med, rules:rules };
 }
 function visiblePending(){
-  if(S.filter === "bad_data") return S.pending.filter(it => !isMedium(it));
+  if(S.filter === "bad_data") return S.pending.filter(it => !isMedium(it) && !isRule(it));
   if(S.filter === "medium_confidence") return S.pending.filter(isMedium);
+  if(S.filter === "rule_question") return S.pending.filter(isRule);
   return S.pending.slice();
 }
 
@@ -1275,11 +1304,49 @@ function setCount(){
   const parts = [];
   if(n.bad) parts.push(n.bad + " bad data");
   if(n.med) parts.push(n.med + " medium");
+  if(n.rules) parts.push(n.rules + (n.rules === 1 ? " rule question" : " rule questions"));
   c.textContent = parts.join(" · ");
   c.classList.add("has");
 }
 
+function ruleRowHTML(it){
+  const id = sid(it.id);
+  const busy = S.busy === id;
+  const err = S.errors[id] || "";
+  const answer = S.answers[id] || "";
+  const review = mayReview();
+  const day = fmtDay(it.run_date);
+  const q = queueHTML(it.source_queue);
+  const question = displayReason(it);
+  const context = cleanText(it.note);
+  const slug = ruleSlug(it);
+  const label = question ? question.slice(0, 120) : "this rule question";
+  const meta = [q, typeBadge(it), day ? '<span>Run '+h(day)+'</span>' : ""].filter(Boolean).join("");
+  let acts;
+  if(!review){
+    acts = '<div class="rtb-viewtag">View only</div>';
+  }else if(busy){
+    acts = '<textarea class="rtb-answer" disabled aria-label="Answer">'+h(answer)+'</textarea>' +
+      '<div class="rtb-saving" role="status"><span class="rtb-spin" aria-hidden="true"></span> Saving…</div>';
+  }else{
+    acts = '<textarea class="rtb-answer" maxlength="4000" aria-required="true" aria-label="Answer for '+h(label)+'">'+h(answer)+'</textarea>' +
+      '<p class="rtb-hint">Required. Submitting is final, and nothing is written to HubSpot.</p>' +
+      '<button class="rtb-btn answer" type="button" data-answer>Submit answer</button>';
+  }
+  const errHTML = err ? '<div class="rtb-err" role="alert">'+h(err)+'</div>' : "";
+  const contextHTML = context
+    ? '<div class="rtb-context"><b>Context. </b>'+h(context)+'</div>'
+    : '<div class="rtb-context rtb-soft">No extra context.</div>';
+  return '<article class="rtb-row is-rule'+(busy?" is-busy":"")+'" data-id="'+h(id)+'" aria-busy="'+(busy?"true":"false")+'">' +
+    '<div class="rtb-id"><div class="rtb-name">Rule question</div>' +
+    (slug ? '<span class="rtb-slug">'+h(slug)+'</span>' : "") +
+    (meta ? '<div class="rtb-meta">'+meta+'</div>' : "") +
+    '</div>' +
+    '<div><div class="rtb-reason rtb-question'+(question?"":" rtb-soft")+'">'+(question ? h(question) : "No question given")+'</div>'+contextHTML+'</div>' +
+    '<div class="rtb-acts">'+acts+'</div>'+errHTML+'</article>';
+}
 function rowHTML(it){
+  if(isRule(it)) return ruleRowHTML(it);
   const id = sid(it.id);
   const busy = S.busy === id;
   const med = isMedium(it);
@@ -1343,6 +1410,11 @@ function recentHTML(){
     '<div class="rtb-done-wrap">'+rows+'</div></details>';
 }
 function outcomeOf(it){
+  if(isRule(it)){
+    if(it.status === "answered") return { pill:'<span class="pill type-rule">Answered</span>', verb:"Answered" };
+    const label = cleanText(it.status) || "Decided";
+    return { pill:'<span class="pill type-rule">'+h(label)+'</span>', verb:"Decided" };
+  }
   const med = isMedium(it);
   if(med && it.status === "ticked") return { pill:'<span class="pill good">Confirmed</span>', verb:"Confirmed" };
   if(med && it.status === "crossed") return { pill:'<span class="pill type-rej">Rejected</span>', verb:"Rejected" };
@@ -1354,7 +1426,26 @@ function outcomeOf(it){
   if(it.status === "ticked") return { pill:'<span class="pill good">Looks fine</span>', verb:"Ticked" };
   return { pill:'<span class="pill">'+h(cleanText(it.status) || "Decided")+'</span>', verb:"Ticked" };
 }
+function ruleDoneHTML(it){
+  const out = outcomeOf(it);
+  const who = cleanText(it.reviewed_by) || "unknown";
+  const when = fmtWhen(it.reviewed_at);
+  const question = displayReason(it);
+  const context = cleanText(it.note);
+  const answer = cleanText(it.answer);
+  const slug = ruleSlug(it);
+  const meta = [typeBadge(it), queueHTML(it.source_queue)].filter(Boolean).join("");
+  return '<div class="rtb-done">'+out.pill+'<div>' +
+    '<div class="rtb-done-top">Rule question'+(slug ? ' <span class="rtb-slug">'+h(slug)+'</span>' : "")+'</div>' +
+    '<div class="rtb-who">'+out.verb+' by '+h(who)+(when ? " · "+h(when) : "")+'</div>' +
+    (meta ? '<div class="rtb-meta">'+meta+'</div>' : "") +
+    (question ? '<div class="rtb-sub rtb-question">'+h(question)+'</div>' : "") +
+    (context ? '<div class="rtb-sub rtb-question">Context: '+h(context)+'</div>' : "") +
+    (answer ? '<div class="rtb-answered"><b>Answer. </b>'+h(answer)+'</div>' : "") +
+    '</div></div>';
+}
 function doneHTML(it){
+  if(isRule(it)) return ruleDoneHTML(it);
   const out = outcomeOf(it);
   const who = cleanText(it.reviewed_by) || "unknown";
   const when = fmtWhen(it.reviewed_at);
@@ -1375,11 +1466,12 @@ function doneHTML(it){
 function filtersHTML(){
   const opt = (id, label) => '<button type="button" data-filter="'+id+'" aria-pressed="'+(S.filter===id?"true":"false")+'">'+label+'</button>';
   return '<div class="rtb-filters" role="group" aria-label="Filter pending rows">' +
-    opt("all", "All") + opt("bad_data", "Bad data") + opt("medium_confidence", "Medium") + "</div>";
+    opt("all", "All") + opt("bad_data", "Bad data") + opt("medium_confidence", "Medium") + opt("rule_question", "Rules") + "</div>";
 }
 function filterEmptyHTML(){
-  if(S.filter === "bad_data") return '<div class="rtb-empty"><b>No bad data pending</b><span>Medium-confidence rows are still in the queue.</span></div>';
-  if(S.filter === "medium_confidence") return '<div class="rtb-empty"><b>No medium-confidence rows pending</b><span>Bad data rows are still in the queue.</span></div>';
+  if(S.filter === "bad_data") return '<div class="rtb-empty"><b>No bad data pending</b><span>Other rows may still be in the queue.</span></div>';
+  if(S.filter === "medium_confidence") return '<div class="rtb-empty"><b>No medium-confidence rows pending</b><span>Other rows may still be in the queue.</span></div>';
+  if(S.filter === "rule_question") return '<div class="rtb-empty"><b>No rule questions pending</b><span>Lead rows may still be in the queue.</span></div>';
   return emptyHTML();
 }
 function emptyHTML(){
@@ -1393,7 +1485,7 @@ function render(){
     setCount();
     const showQueue = token() && S.loaded && (S.sawList || !S.loadError);
     const banner = (S.loaded && !mayReview())
-      ? '<div class="rtb-banner" role="note">View-only account. You can see the queue, but you can\'t tick, cross, confirm, or reject.</div>'
+      ? '<div class="rtb-banner" role="note">View-only account. You can see the queue, but you can\'t tick, cross, confirm, reject, or answer.</div>'
       : "";
     let main;
     if(!token()){
@@ -1406,9 +1498,12 @@ function render(){
       main = emptyHTML();
     }else{
       const rows = visiblePending();
+      const rulesOnly = S.filter === "rule_question" || (rows.length > 0 && rows.every(isRule));
+      const cols = rulesOnly
+        ? '<div class="rtb-cols" aria-hidden="true"><span>Rule</span><span>Question</span><span>Answer</span></div>'
+        : '<div class="rtb-cols" aria-hidden="true"><span>Lead</span><span>Why it was flagged</span><span>Decision</span></div>';
       main = rows.length
-        ? '<div class="rtb-cols" aria-hidden="true"><span>Lead</span><span>Why it was flagged</span><span>Decision</span></div>' +
-          '<div class="rtb-list">'+rows.map(rowHTML).join("")+'</div>'
+        ? cols + '<div class="rtb-list">'+rows.map(rowHTML).join("")+'</div>'
         : filterEmptyHTML();
     }
     body.innerHTML = banner + (showQueue ? filtersHTML() : "") + main + (showQueue ? recentHTML() : "");
@@ -1418,6 +1513,12 @@ function render(){
       S.focusCancel = false;
       const b = body.querySelector("[data-cancel]");
       if(b) b.focus();
+    }
+    if(S.focusAnswer){
+      const focusId = S.focusAnswer;
+      S.focusAnswer = null;
+      const area = body.querySelector('.rtb-row[data-id="'+CSS.escape(focusId)+'"] textarea');
+      if(area) area.focus();
     }
   }catch(e){
     console.error("RTB Review Panel", e);
@@ -1433,11 +1534,13 @@ function takeDecided(item, id){
   }
   delete S.errors[key];
   delete S.notes[key];
+  delete S.answers[key];
   if(S.confirm === key) S.confirm = null;
 }
 function successMessage(which, j, it){
   if(j && j.unchanged) return "Already decided. Nothing changed.";
   const typeSource = it || (j && j.item) || {};
+  if(isRule(typeSource)) return "Answer saved. Nothing was written to HubSpot.";
   if(isMedium(typeSource)){
     return which === "tick"
       ? "Confirmed: it will be enriched on the next run"
@@ -1454,13 +1557,20 @@ async function verdict(id, which){
   const it = S.pending.find(x => sid(x.id) === key);
   const sentId = it ? it.id : (/^\d+$/.test(key) ? Number(key) : id);
   const note = (S.notes[key] || "").trim();
+  const answer = (S.answers[key] || "").trim();
+  if(which === "answer" && !answer){
+    S.errors[key] = "Write an answer before submitting.";
+    S.focusAnswer = key;
+    render();
+    return;
+  }
   S.busy = key;
   S.confirm = null;
   S.errors[key] = "";
   render();
   try{
-    const body = { id: sentId, verdict: which };
-    if(note) body.note = note;
+    const body = which === "answer" ? { id: sentId, verdict: "answer", answer: answer } : { id: sentId, verdict: which };
+    if(which !== "answer" && note) body.note = note;
     const j = await call("/verdict", { method:"POST", headers:{ "Content-Type":"application/json" }, body: JSON.stringify(body) });
     if(!j) return;
     takeDecided(j.item, key);
@@ -1469,8 +1579,8 @@ async function verdict(id, which){
     const item = e.body && e.body.item;
     if(e.status === 409){
       if(item) takeDecided(item, key);
-      else S.errors[key] = e.message || "That contact was already decided.";
-      say(e.message || "That contact was already decided.");
+      else S.errors[key] = e.message || (it && isRule(it) ? "That question was already answered." : "That contact was already decided.");
+      say(e.message || (it && isRule(it) ? "That question was already answered." : "That contact was already decided."));
     }else if(e.status === 403){
       S.canReview = false;
       S.errors[key] = e.message || "View-only account";
@@ -1513,16 +1623,28 @@ function boot(){
   if(!body) return;
   if(btn) btn.addEventListener("click", () => { if(token() && !S.busy) load(true); });
   body.addEventListener("input", e => {
-    const input = e.target.closest(".rtb-note");
     const row = e.target.closest(".rtb-row");
-    if(input && row) S.notes[row.dataset.id] = input.value;
+    if(!row) return;
+    const input = e.target.closest(".rtb-note");
+    if(input) S.notes[row.dataset.id] = input.value;
+    const area = e.target.closest(".rtb-answer");
+    if(area) S.answers[row.dataset.id] = area.value;
+  });
+  body.addEventListener("keydown", e => {
+    if(e.key !== "Enter" || (!e.metaKey && !e.ctrlKey)) return;
+    const area = e.target.closest(".rtb-answer");
+    const row = e.target.closest(".rtb-row");
+    if(!area || !row || S.busy) return;
+    e.preventDefault();
+    S.answers[row.dataset.id] = area.value;
+    verdict(row.dataset.id, "answer");
   });
   body.addEventListener("click", e => {
     if(e.target.closest("#rtbRetry")){ load(false); return; }
     const filterBtn = e.target.closest("[data-filter]");
     if(filterBtn){
       const next = filterBtn.getAttribute("data-filter");
-      if(next === "all" || next === "bad_data" || next === "medium_confidence"){
+      if(next === "all" || next === "bad_data" || next === "medium_confidence" || next === "rule_question"){
         S.filter = next;
         render();
       }
@@ -1533,7 +1655,10 @@ function boot(){
     const id = row.dataset.id;
     const input = row.querySelector(".rtb-note");
     if(input) S.notes[id] = input.value;
+    const area = row.querySelector(".rtb-answer");
+    if(area) S.answers[id] = area.value;
     if(e.target.closest("[data-cancel]")){ S.confirm = null; S.errors[id] = ""; render(); return; }
+    if(e.target.closest("[data-answer]")){ verdict(id, "answer"); return; }
     if(e.target.closest("[data-docross]")){ verdict(id, "cross"); return; }
     if(e.target.closest("[data-tick]")){ S.confirm = null; verdict(id, "tick"); return; }
     if(e.target.closest("[data-cross]")){

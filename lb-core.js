@@ -9,9 +9,18 @@ document.currentScript.insertAdjacentHTML("beforebegin", `
     <div>
       <h1 id="pageTitle">Sales floor leaderboard <span class="auto-tag">Auto</span></h1>
       <div class="live"><span class="dot" id="liveDot"></span><span id="liveText">Loading</span></div>
+      <div class="team-sw lb-team" id="lbTeam" role="group" aria-label="Team"><button type="button" data-t="jf" aria-pressed="true">JF</button><button type="button" data-t="cst" aria-pressed="false">CST</button></div>
     </div>
     <button class="btn ghost" type="button" id="refreshBtn" hidden title="Pull the latest numbers from HubSpot now (Vianney / Max only)">Refresh now</button>
   </header>
+
+  <section class="cst-only" id="cstPanel">
+    <div class="sec-head"><h2>CST</h2></div>
+    <div class="cst-empty">
+      <b>CST leaderboard</b>
+      <p>CST numbers are not connected to this board yet. Ali is the only CST rep so far, so there is nothing to rank until the data is wired up.</p>
+    </div>
+  </section>
 
   <div class="banner lb-only" id="banner">Every number here comes straight from HubSpot and refreshes at 8 AM each day, covering everything up to the end of yesterday. Click any underlined number to see the deals behind it. Reps: each morning, go through your new deals and mark each one <b>True</b> or <b>False</b> (Oct 1 to 8 is already confirmed). A "False" needs a short note and goes to Vianney or Max to approve before the numbers change.</div>
   <div id="reviewBar" class="lb-only"></div>
@@ -121,6 +130,17 @@ document.currentScript.insertAdjacentHTML("beforebegin", `
 const API = "https://ottvswkgqohurzilfafu.supabase.co/functions/v1/lb-auto";
 const REPORTING = document.documentElement.classList.contains("view-reporting");
 if(REPORTING) document.getElementById("pageTitle").innerHTML = 'Sales L10 <span class="auto-tag">Admins</span>';
+// JF / CST switch (leaderboard page only; hidden on Sales L10). The CST view is a placeholder until CST data is wired in.
+(function(){
+  const btns = document.querySelectorAll("#lbTeam button");
+  function setTeam(t, save){
+    document.documentElement.classList.toggle("team-cst", t==="cst");
+    btns.forEach(b=>b.setAttribute("aria-pressed", String(b.dataset.t===t)));
+    if(save){ try{ localStorage.setItem("lb_team", t); }catch(e){} }
+  }
+  btns.forEach(b=>b.onclick=()=>setTeam(b.dataset.t, true));
+  if(!REPORTING){ let t = "jf"; try{ t = localStorage.getItem("lb_team")==="cst" ? "cst" : "jf"; }catch(e){} setTeam(t, false); }
+})();
 const PORTAL = "1905790";
 const TZ = "America/Toronto";
 

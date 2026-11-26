@@ -33,7 +33,6 @@ document.currentScript.insertAdjacentHTML("beforebegin", `
   </div>
 
   <section class="cst-only" id="cstPanel">
-    <div class="sec-head"><h2>CST &middot; Ali</h2></div>
     <div id="cstBody"><div class="cst-empty"><p>Loading CST bookings&hellip;</p></div></div>
   </section>
 
@@ -129,7 +128,9 @@ const REPORTING = document.documentElement.classList.contains("view-reporting");
 if(REPORTING) document.getElementById("pageTitle").innerHTML = 'Sales L10 <span class="auto-tag">Admins</span>';
 // ---- CST view: Ali's bookings from the CST Service Pipeline deals (edge function cst-board) ----
 // Client meeting = cst_client_booked_date in the period (the headline vs the 25 a month target). Soft FTA = cst_call_type intro, by cst_booked_date.
-var CST = null, CST_ERR = null;
+var CST = null, CST_ERR = null, cstMetric = "client", cstTblOpen = false;
+const CST_SRC = [["rtb","RTB","var(--s1)"],["tofu","TOFU","var(--s2)"],["bofu","BOFU","var(--s3)"],["cold","Cold call","var(--s4)"],["other","Other / unknown","var(--s8)"]];
+const CST_METRICS = [["client","Client meetings"],["intro","Soft FTAs"],["total","Total booked"]];
 async function loadCst(){
   if(CST || window.JF_DEMO){ renderCst(); return; }
   const host = document.getElementById("cstBody");
@@ -144,32 +145,85 @@ async function loadCst(){
   }catch(e){ CST_ERR = String((e&&e.message)||e); }
   renderCst();
 }
+function cstPeriod(offset){ return periodFor(state.kind, state.offset + (offset||0)); }
+function cstSets(p){
+  const inP = d => !!d && d>=p.start && d<=p.end;
+  return {clients: CST.deals.filter(d=>inP(d.client)), intros: CST.deals.filter(d=>d.type==="intro" && inP(d.booked))};
+}
+const cstVal = (st, m) => m==="client" ? st.clients.length : m==="intro" ? st.intros.length : st.clients.length + st.intros.length;
+function cstGoal(){ return Math.max(1, Math.round(CST.target * ({week:12/52, month:1, quarter:3}[state.kind]))); }
+function cstTrend(m, goal){
+  const n = state.kind==="week" ? 12 : state.kind==="month" ? 6 : 4;
+  const cols = [];
+  for(let k=n-1; k>=0; k--){
+    const p = cstPeriod(-k), st = cstSets(p);
+    const arr = m==="client" ? st.clients : m==="intro" ? st.intros : st.clients.concat(st.intros);
+    const short = state.kind==="week" ? MON[p.s.getMonth()]+" "+p.s.getDate() : state.kind==="month" ? MON[p.s.getMonth()] : p.label;
+    cols.push({short, label:p.label, cur:k===0, by:CST_SRC.map(x=>arr.filter(d=>d.source===x[0]).length)});
+  }
+  const tops = cols.map(c=>c.by.reduce((a,b)=>a+b,0));
+  const useGoal = m==="client" ? goal : 0;
+  const mx = Math.max(3, useGoal, ...tops), step = mx<=10 ? 2 : mx<=30 ? 5 : mx<=60 ? 10 : 20, top = Math.ceil(mx/step)*step;
+  const W = 960, H = 260, L = 36, R = 8, T = 22, B = 32, pw = W-L-R, ph = H-T-B, bw = pw/cols.length*0.6;
+  const y = v => T + ph - v/top*ph;
+  let svg = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Bookings by source over time">`;
+  for(let v=0; v<=top; v+=step) svg += `<line class="grid" x1="${L}" x2="${W-R}" y1="${y(v)}" y2="${y(v)}"/><text x="${L-8}" y="${y(v)+4}" text-anchor="end">${v}</text>`;
+  cols.forEach((c,i)=>{
+    const cx = L + pw/cols.length*(i+0.5); let acc = 0, tot = tops[i];
+    svg += `<g class="col">`;
+    c.by.forEach((v,si)=>{ if(!v) return; const y1 = y(acc+v), h = y(acc)-y1; svg += `<rect x="${cx-bw/2}" y="${y1}" width="${bw}" height="${Math.max(0,h-1)}" rx="3" fill="${CST_SRC[si][2]}"><title>${CST_SRC[si][1]}: ${v} (${esc(c.label)})</title></rect>`; acc += v; });
+    if(tot) svg += `<text class="tot" x="${cx}" y="${y(tot)-6}" text-anchor="middle">${tot}</text>`;
+    svg += `<text x="${cx}" y="${H-10}" text-anchor="middle"${c.cur?' class="tot"':''}>${esc(c.short)}</text></g>`;
+  });
+  if(useGoal) svg += `<line x1="${L}" x2="${W-R}" y1="${y(useGoal)}" y2="${y(useGoal)}" stroke="var(--gold)" stroke-width="2" stroke-dasharray="6 5"/><text x="${W-R}" y="${y(useGoal)-6}" text-anchor="end" style="fill:var(--gold);font-weight:600">Goal ${useGoal}</text>`;
+  return svg + `</svg>`;
+}
 function renderCst(){
   const host = document.getElementById("cstBody"); if(!host) return;
   if(CST_ERR){ host.innerHTML = '<div class="cst-empty"><p>Could not load CST bookings ('+esc(CST_ERR)+'). Refresh to try again.</p></div>'; return; }
   if(!CST){ host.innerHTML = '<div class="cst-empty"><p>'+(window.JF_DEMO ? "CST bookings are not available in demo mode." : "Loading CST bookings&hellip;")+'</p></div>'; return; }
-  const p = periodFor(state.kind, state.offset), inP = d => !!d && d>=p.start && d<=p.end;
-  const goal = Math.max(1, Math.round(CST.target * ({week:12/52, month:1, quarter:3}[state.kind])));
-  const per = state.kind==="week" ? "week" : state.kind==="month" ? "month" : "quarter";
-  const clients = CST.deals.filter(d=>inP(d.client)), intros = CST.deals.filter(d=>d.type==="intro" && inP(d.booked));
-  const SRC = [["rtb","RTB"],["tofu","TOFU"],["bofu","BOFU"],["cold","Cold call"],["other","Other / unknown"]];
+  const p = cstPeriod(0), pace = paceFraction(p), st = cstSets(p), prev = cstSets(cstPeriod(-1)), goal = cstGoal();
+  const per = state.kind, mlabel = CST_METRICS.find(x=>x[0]===cstMetric)[1];
+  const v = cstVal(st, cstMetric), pv = cstVal(prev, cstMetric), useGoal = cstMetric==="client" ? goal : null;
   const cnt = (arr,k) => arr.filter(d=>d.source===k).length;
-  const pct = Math.min(100, Math.round(clients.length/goal*100));
-  const rows = [...clients.map(d=>({d:d.client, n:d.name, t:"Client meeting", s:d.source})), ...intros.map(d=>({d:d.booked, n:d.name, t:"Soft FTA", s:d.source}))].sort((a,b)=>a.d<b.d?1:a.d>b.d?-1:0);
-  const lbl = k => (SRC.find(x=>x[0]===k)||[0,"Other / unknown"])[1];
+  const lbl = k => (CST_SRC.find(x=>x[0]===k)||[0,"Other / unknown"])[1];
+  const rows = [...st.clients.map(d=>({d:d.client, n:d.name, t:"Client meeting", s:d.source})), ...st.intros.map(d=>({d:d.booked, n:d.name, t:"Soft FTA", s:d.source}))].sort((a,b)=>a.d<b.d?1:a.d>b.d?-1:0);
+  const diff = v - pv, vs = `${diff>0?"+":""}${diff} vs last ${per}`;
+  const lane = `<div class="lane${v>0 ? " lead" : ""}">
+      <div class="rank">1</div>
+      <div class="who"><div class="name">Ali Mahmood</div><div class="sub">CST &middot; ${esc(p.label)}</div></div>
+      <div class="track">${barHTML(v, useGoal, pace, Math.max(v,1))}
+        <div class="bar-meta">${useGoal ? paceText(v, useGoal, pace)+`<span>Goal ${useGoal} a ${per}${per==='month' ? '' : ' ('+CST.target+' a month)'}</span>` : `<span>No goal set for ${mlabel.toLowerCase()}</span>`}</div>
+        <div class="stats"><span>Client meetings <b>${st.clients.length}</b></span><span>Soft FTAs <b>${st.intros.length}</b></span><span>Total <b>${st.clients.length+st.intros.length}</b></span><span>${esc(vs)}</span></div>
+      </div>
+      <div class="score">${v}<small>${mlabel.toLowerCase()}</small></div>
+    </div>`;
+  const tr = (label, a, b, g) => `<tr><td style="text-align:left">${label}</td><td>${a}</td><td>${b}</td><td class="goal">${g==null?"":g}</td></tr>`;
+  const table = `<table><thead><tr><th style="text-align:left">Metric</th><th>This ${per}</th><th>Last ${per}</th><th>Goal</th></tr></thead><tbody>`
+    + tr("Client meetings booked", st.clients.length, prev.clients.length, goal)
+    + tr("Soft FTAs (intro calls)", st.intros.length, prev.intros.length, "")
+    + tr("Total booked", st.clients.length+st.intros.length, prev.clients.length+prev.intros.length, "")
+    + `<tr class="group"><td colspan="4" style="text-align:left">Client meetings by source</td></tr>`
+    + CST_SRC.map(([k,l])=>tr(l, cnt(st.clients,k), cnt(prev.clients,k), "")).join("")
+    + `<tr class="group"><td colspan="4" style="text-align:left">Soft FTAs by source</td></tr>`
+    + CST_SRC.map(([k,l])=>tr(l, cnt(st.intros,k), cnt(prev.intros,k), "")).join("")
+    + `</tbody></table>`;
   host.innerHTML =
-    '<div class="cst-tiles">'
-    + '<div class="cst-tile"><div class="k">Client meetings booked</div><div class="v">'+clients.length+'<span> of '+goal+'</span></div><div class="bar"><div class="bar-fill" style="width:'+pct+'%"></div></div><div class="sub">Goal '+goal+' a '+per+' ('+CST.target+' a month)</div></div>'
-    + '<div class="cst-tile"><div class="k">Soft FTAs (intro calls)</div><div class="v">'+intros.length+'</div><div class="sub">Not counted toward the goal</div></div>'
-    + '<div class="cst-tile"><div class="k">Total booked</div><div class="v">'+(clients.length+intros.length)+'</div><div class="sub">Client meetings plus soft FTAs</div></div>'
-    + '</div>'
-    + '<div class="table-wrap"><table><thead><tr><th style="text-align:left">Source</th><th>Client meetings</th><th>Soft FTAs</th></tr></thead><tbody>'
-    + SRC.map(([k,l])=>'<tr><td style="text-align:left">'+l+'</td><td>'+cnt(clients,k)+'</td><td>'+cnt(intros,k)+'</td></tr>').join("")
-    + '<tr class="group"><td style="text-align:left">Total</td><td>'+clients.length+'</td><td>'+intros.length+'</td></tr></tbody></table></div>'
-    + '<div class="table-wrap"><table><thead><tr><th style="text-align:left">Booked</th><th style="text-align:left">Deal</th><th style="text-align:left">Type</th><th style="text-align:left">Source</th></tr></thead><tbody>'
-    + (rows.length ? rows.map(r=>'<tr><td style="text-align:left">'+esc(r.d)+'</td><td style="text-align:left">'+esc(r.n)+'</td><td style="text-align:left">'+r.t+'</td><td style="text-align:left">'+lbl(r.s)+'</td></tr>').join("") : '<tr><td colspan="4" style="text-align:left;color:var(--muted)">Nothing booked in this period.</td></tr>')
-    + '</tbody></table></div>'
-    + '<div class="legend"><b>Client meeting</b>: a meeting booked with the client MSP, counted on the day Ali reported or logged it. <b>Soft FTA</b>: a first intro call booked with us. A deal that goes from intro to client counts once in each. Source is worked out each morning from form fills, website hits and the Nooks list Ali dialed from. Deals appear once Ali approves their booking card. Data as of '+esc(nice(CST.asOf))+'.</div>';
+    `<div class="sec-head"><h2>CST</h2><div class="chips" id="cstChips" role="group" aria-label="Show">${CST_METRICS.map(([id,l])=>`<button data-m="${id}" aria-pressed="${id===cstMetric}">${l}</button>`).join("")}</div></div>`
+    + `<div class="lanes">${lane}</div>`
+    + `<div class="tbl-toggle"><button class="btn ghost" type="button" id="cstTableBtn" aria-expanded="${cstTblOpen}">${cstTblOpen ? "Hide" : "Show"} metrics table</button></div>`
+    + `<div id="cstMetrics"${cstTblOpen ? "" : " hidden"}><div class="table-wrap">${table}</div>`
+    + `<div class="legend"><b>Client meeting</b>: a meeting booked with the client MSP, counted on the day Ali reported or logged it (this is the number against the goal). <b>Soft FTA</b>: a first intro call booked with us, not counted toward the goal. A deal that goes from intro to client counts once in each. Source is worked out each morning from form fills, website hits and the Nooks list Ali dialed from. Deals appear once Ali approves their booking card.</div></div>`
+    + `<div class="sec-head" style="margin-top:34px"><h2>Trends</h2></div>`
+    + `<div class="tr-card"><div class="tr-sub">${mlabel} by lead source, ${state.kind==="week" ? "last 12 weeks" : state.kind==="month" ? "last 6 months" : "last 4 quarters"}${useGoal ? ", dashed line = goal" : ""}</div>`
+    + `<div class="tr-legend">${CST_SRC.map(x=>`<span><i style="background:${x[2]}"></i>${x[1]}</span>`).join("")}</div><div class="tr-plot">${cstTrend(cstMetric, goal)}</div></div>`
+    + `<div class="sec-head" style="margin-top:34px"><h2>Deals behind these numbers</h2></div>`
+    + `<div class="table-wrap"><table><thead><tr><th style="text-align:left">Booked</th><th style="text-align:left">Deal</th><th style="text-align:left">Type</th><th style="text-align:left">Source</th></tr></thead><tbody>`
+    + (rows.length ? rows.map(r=>`<tr><td style="text-align:left">${esc(r.d)}</td><td style="text-align:left">${esc(r.n)}</td><td style="text-align:left">${r.t}</td><td style="text-align:left">${lbl(r.s)}</td></tr>`).join("") : `<tr><td colspan="4" style="text-align:left;color:var(--muted)">Nothing booked in this period.</td></tr>`)
+    + `</tbody></table></div>`
+    + `<div class="legend">Data as of ${esc(nice(CST.asOf))}.</div>`;
+  host.querySelectorAll("#cstChips button").forEach(b=>b.onclick=()=>{ cstMetric = b.dataset.m; renderCst(); });
+  const tb = document.getElementById("cstTableBtn"); if(tb) tb.onclick = () => { cstTblOpen = !cstTblOpen; renderCst(); };
 }
 // JF / CST switch (leaderboard page only; hidden on Sales L10). The CST view shows Ali's bookings (renderCst above).
 (function(){

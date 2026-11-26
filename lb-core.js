@@ -130,7 +130,21 @@ if(REPORTING) document.getElementById("pageTitle").innerHTML = 'Sales L10 <span 
 // Client meeting = cst_client_booked_date in the period (the headline vs the 25 a month target). Soft FTA = cst_call_type intro, by cst_booked_date.
 var CST = null, CST_ERR = null, cstMetric = "client", cstTblOpen = false;
 const CST_SRC = [["rtb","RTB","var(--s1)"],["tofu","TOFU","var(--s2)"],["bofu","BOFU","var(--s3)"],["cold","Cold call","var(--s4)"],["other","Other / unknown","var(--s8)"]];
-const CST_METRICS = [["client","Client meetings"],["intro","Soft FTAs"],["total","Total booked"]];
+const CST_METRICS = [["client","Client meetings"],["intro","Soft FTAs"],["total","Total booked"],["dials","Dials"],["connects","Connects"],["convos","Conversations"]];
+const CST_ACT = {dials:["Dials","var(--s1)"], connects:["Connects","var(--s3)"], convos:["Conversations","var(--s2)"]};
+// Nooks weekly totals are keyed by the Saturday that ends a Sun-Sat week. A week is spread over its Mon-Fri days, so week / month / quarter views all line up.
+function cstAct(p){
+  const o = {dials:0, connects:0, convos:0, has:false};
+  (CST.weeks||[]).forEach(w=>{
+    const sat = new Date(w.week_ending+"T12:00:00"); let n = 0;
+    for(let k=1; k<=5; k++){ const d = new Date(sat); d.setDate(d.getDate()-k); const iso = d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0"); if(iso>=p.start && iso<=p.end) n++; }
+    if(!n) return;
+    o.has = true; o.dials += w.dials*n/5; o.connects += w.connects*n/5; o.convos += w.convos*n/5;
+  });
+  o.dials = Math.round(o.dials); o.connects = Math.round(o.connects); o.convos = Math.round(o.convos);
+  return o;
+}
+const cstN = n => Number(n).toLocaleString("en-US");
 async function loadCst(){
   if(CST || window.JF_DEMO){ renderCst(); return; }
   const host = document.getElementById("cstBody");
@@ -148,31 +162,33 @@ async function loadCst(){
 function cstPeriod(offset){ return periodFor(state.kind, state.offset + (offset||0)); }
 function cstSets(p){
   const inP = d => !!d && d>=p.start && d<=p.end;
-  return {clients: CST.deals.filter(d=>inP(d.client)), intros: CST.deals.filter(d=>d.type==="intro" && inP(d.booked))};
+  return {clients: CST.deals.filter(d=>inP(d.client)), intros: CST.deals.filter(d=>d.type==="intro" && inP(d.booked)), act: cstAct(p)};
 }
-const cstVal = (st, m) => m==="client" ? st.clients.length : m==="intro" ? st.intros.length : st.clients.length + st.intros.length;
+const cstVal = (st, m) => CST_ACT[m] ? st.act[m] : m==="client" ? st.clients.length : m==="intro" ? st.intros.length : st.clients.length + st.intros.length;
 function cstGoal(){ return Math.max(1, Math.round(CST.target * ({week:12/52, month:1, quarter:3}[state.kind]))); }
 function cstTrend(m, goal){
   const n = state.kind==="week" ? 12 : state.kind==="month" ? 6 : 4;
+  const isAct = !!CST_ACT[m], SER = isAct ? [[m, CST_ACT[m][0], CST_ACT[m][1]]] : CST_SRC;
   const cols = [];
   for(let k=n-1; k>=0; k--){
     const p = cstPeriod(-k), st = cstSets(p);
-    const arr = m==="client" ? st.clients : m==="intro" ? st.intros : st.clients.concat(st.intros);
+    const arr = isAct ? [] : m==="client" ? st.clients : m==="intro" ? st.intros : st.clients.concat(st.intros);
     const short = state.kind==="week" ? MON[p.s.getMonth()]+" "+p.s.getDate() : state.kind==="month" ? MON[p.s.getMonth()] : p.label;
-    cols.push({short, label:p.label, cur:k===0, by:CST_SRC.map(x=>arr.filter(d=>d.source===x[0]).length)});
+    cols.push({short, label:p.label, cur:k===0, by:isAct ? [cstVal(st,m)] : CST_SRC.map(x=>arr.filter(d=>d.source===x[0]).length)});
   }
   const tops = cols.map(c=>c.by.reduce((a,b)=>a+b,0));
   const useGoal = m==="client" ? goal : 0;
-  const mx = Math.max(3, useGoal, ...tops), step = mx<=10 ? 2 : mx<=30 ? 5 : mx<=60 ? 10 : 20, top = Math.ceil(mx/step)*step;
-  const W = 960, H = 260, L = 36, R = 8, T = 22, B = 32, pw = W-L-R, ph = H-T-B, bw = pw/cols.length*0.6;
+  const mx = Math.max(3, useGoal, ...tops);
+  const step = isAct ? niceStep(mx/4) : mx<=10 ? 2 : mx<=30 ? 5 : mx<=60 ? 10 : 20, top = Math.ceil(mx/step)*step;
+  const W = 960, H = 260, L = isAct ? 52 : 36, R = 8, T = 22, B = 32, pw = W-L-R, ph = H-T-B, bw = pw/cols.length*0.6;
   const y = v => T + ph - v/top*ph;
   let svg = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Bookings by source over time">`;
-  for(let v=0; v<=top; v+=step) svg += `<line class="grid" x1="${L}" x2="${W-R}" y1="${y(v)}" y2="${y(v)}"/><text x="${L-8}" y="${y(v)+4}" text-anchor="end">${v}</text>`;
+  for(let v=0; v<=top; v+=step) svg += `<line class="grid" x1="${L}" x2="${W-R}" y1="${y(v)}" y2="${y(v)}"/><text x="${L-8}" y="${y(v)+4}" text-anchor="end">${cstN(v)}</text>`;
   cols.forEach((c,i)=>{
     const cx = L + pw/cols.length*(i+0.5); let acc = 0, tot = tops[i];
     svg += `<g class="col">`;
-    c.by.forEach((v,si)=>{ if(!v) return; const y1 = y(acc+v), h = y(acc)-y1; svg += `<rect x="${cx-bw/2}" y="${y1}" width="${bw}" height="${Math.max(0,h-1)}" rx="3" fill="${CST_SRC[si][2]}"><title>${CST_SRC[si][1]}: ${v} (${esc(c.label)})</title></rect>`; acc += v; });
-    if(tot) svg += `<text class="tot" x="${cx}" y="${y(tot)-6}" text-anchor="middle">${tot}</text>`;
+    c.by.forEach((v,si)=>{ if(!v) return; const y1 = y(acc+v), h = y(acc)-y1; svg += `<rect x="${cx-bw/2}" y="${y1}" width="${bw}" height="${Math.max(0,h-1)}" rx="3" fill="${SER[si][2]}"><title>${SER[si][1]}: ${cstN(v)} (${esc(c.label)})</title></rect>`; acc += v; });
+    if(tot) svg += `<text class="tot" x="${cx}" y="${y(tot)-6}" text-anchor="middle">${cstN(tot)}</text>`;
     svg += `<text x="${cx}" y="${H-10}" text-anchor="middle"${c.cur?' class="tot"':''}>${esc(c.short)}</text></g>`;
   });
   if(useGoal) svg += `<line x1="${L}" x2="${W-R}" y1="${y(useGoal)}" y2="${y(useGoal)}" stroke="var(--gold)" stroke-width="2" stroke-dasharray="6 5"/><text x="${W-R}" y="${y(useGoal)-6}" text-anchor="end" style="fill:var(--gold);font-weight:600">Goal ${useGoal}</text>`;
@@ -184,25 +200,32 @@ function renderCst(){
   if(!CST){ host.innerHTML = '<div class="cst-empty"><p>'+(window.JF_DEMO ? "CST bookings are not available in demo mode." : "Loading CST bookings&hellip;")+'</p></div>'; return; }
   const p = cstPeriod(0), pace = paceFraction(p), st = cstSets(p), prev = cstSets(cstPeriod(-1)), goal = cstGoal();
   const per = state.kind, mlabel = CST_METRICS.find(x=>x[0]===cstMetric)[1];
-  const v = cstVal(st, cstMetric), pv = cstVal(prev, cstMetric), useGoal = cstMetric==="client" ? goal : null;
+  const v = cstVal(st, cstMetric), pv = cstVal(prev, cstMetric), useGoal = cstMetric==="client" ? goal : null, isAct = !!CST_ACT[cstMetric];
+  const A = st.act, AP = prev.act, dash = x => A.has ? cstN(x) : "&ndash;";
+  const rate = (a) => a.dials ? Math.round(a.connects/a.dials*1000)/10+"%" : "&ndash;";
   const cnt = (arr,k) => arr.filter(d=>d.source===k).length;
   const lbl = k => (CST_SRC.find(x=>x[0]===k)||[0,"Other / unknown"])[1];
   const rows = [...st.clients.map(d=>({d:d.client, n:d.name, t:"Client meeting", s:d.source})), ...st.intros.map(d=>({d:d.booked, n:d.name, t:"Soft FTA", s:d.source}))].sort((a,b)=>a.d<b.d?1:a.d>b.d?-1:0);
-  const diff = v - pv, vs = `${diff>0?"+":""}${diff} vs last ${per}`;
+  const diff = v - pv, vs = `${diff>0?"+":""}${cstN(diff)} vs last ${per}`;
   const lane = `<div class="lane${v>0 ? " lead" : ""}">
       <div class="rank">1</div>
       <div class="who"><div class="name">Ali Mahmood</div><div class="sub">CST &middot; ${esc(p.label)}</div></div>
-      <div class="track">${barHTML(v, useGoal, pace, Math.max(v,1))}
-        <div class="bar-meta">${useGoal ? paceText(v, useGoal, pace)+`<span>Goal ${useGoal} a ${per}${per==='month' ? '' : ' ('+CST.target+' a month)'}</span>` : `<span>No goal set for ${mlabel.toLowerCase()}</span>`}</div>
-        <div class="stats"><span>Client meetings <b>${st.clients.length}</b></span><span>Soft FTAs <b>${st.intros.length}</b></span><span>Total <b>${st.clients.length+st.intros.length}</b></span><span>${esc(vs)}</span></div>
+      <div class="track">${barHTML(v, useGoal, pace, Math.max(v,pv,1))}
+        <div class="bar-meta">${useGoal ? paceText(v, useGoal, pace)+`<span>Goal ${useGoal} a ${per}${per==='month' ? '' : ' ('+CST.target+' a month)'}</span>` : `<span>${isAct ? "Scaled to the larger of this and last "+per : "No goal set for "+mlabel.toLowerCase()}</span>`}</div>
+        <div class="stats"><span>Client meetings <b>${st.clients.length}</b></span><span>Soft FTAs <b>${st.intros.length}</b></span><span>Total <b>${st.clients.length+st.intros.length}</b></span><span>Dials <b>${dash(A.dials)}</b></span><span>Connects <b>${dash(A.connects)}</b> (${rate(A)})</span><span>Conversations <b>${dash(A.convos)}</b></span><span>${esc(vs)}</span></div>
       </div>
-      <div class="score">${v}<small>${mlabel.toLowerCase()}</small></div>
+      <div class="score">${cstN(v)}<small>${mlabel.toLowerCase()}</small></div>
     </div>`;
   const tr = (label, a, b, g) => `<tr><td style="text-align:left">${label}</td><td>${a}</td><td>${b}</td><td class="goal">${g==null?"":g}</td></tr>`;
   const table = `<table><thead><tr><th style="text-align:left">Metric</th><th>This ${per}</th><th>Last ${per}</th><th>Goal</th></tr></thead><tbody>`
     + tr("Client meetings booked", st.clients.length, prev.clients.length, goal)
     + tr("Soft FTAs (intro calls)", st.intros.length, prev.intros.length, "")
     + tr("Total booked", st.clients.length+st.intros.length, prev.clients.length+prev.intros.length, "")
+    + `<tr class="group"><td colspan="4" style="text-align:left">Nooks activity</td></tr>`
+    + tr("Dials", dash(A.dials), AP.has ? cstN(AP.dials) : "&ndash;", "")
+    + tr("Connects", dash(A.connects), AP.has ? cstN(AP.connects) : "&ndash;", "")
+    + tr("Connect rate", A.has ? rate(A) : "&ndash;", AP.has ? rate(AP) : "&ndash;", "")
+    + tr("Conversations", dash(A.convos), AP.has ? cstN(AP.convos) : "&ndash;", "")
     + `<tr class="group"><td colspan="4" style="text-align:left">Client meetings by source</td></tr>`
     + CST_SRC.map(([k,l])=>tr(l, cnt(st.clients,k), cnt(prev.clients,k), "")).join("")
     + `<tr class="group"><td colspan="4" style="text-align:left">Soft FTAs by source</td></tr>`
@@ -213,10 +236,10 @@ function renderCst(){
     + `<div class="lanes">${lane}</div>`
     + `<div class="tbl-toggle"><button class="btn ghost" type="button" id="cstTableBtn" aria-expanded="${cstTblOpen}">${cstTblOpen ? "Hide" : "Show"} metrics table</button></div>`
     + `<div id="cstMetrics"${cstTblOpen ? "" : " hidden"}><div class="table-wrap">${table}</div>`
-    + `<div class="legend"><b>Client meeting</b>: a meeting booked with the client MSP, counted on the day Ali reported or logged it (this is the number against the goal). <b>Soft FTA</b>: a first intro call booked with us, not counted toward the goal. A deal that goes from intro to client counts once in each. Source is worked out each morning from form fills, website hits and the Nooks list Ali dialed from. Deals appear once Ali approves their booking card.</div></div>`
+    + `<div class="legend"><b>Client meeting</b>: a meeting booked with the client MSP, counted on the day Ali reported or logged it (this is the number against the goal). <b>Soft FTA</b>: a first intro call booked with us, not counted toward the goal. A deal that goes from intro to client counts once in each. Source is worked out each morning from form fills, website hits and the Nooks list Ali dialed from. Deals appear once Ali approves their booking card. <b>Dials, connects and conversations</b> come from the Nooks Sequence Performance uploads and are spread across each week's Monday to Friday.</div></div>`
     + `<div class="sec-head" style="margin-top:34px"><h2>Trends</h2></div>`
-    + `<div class="tr-card"><div class="tr-sub">${mlabel} by lead source, ${state.kind==="week" ? "last 12 weeks" : state.kind==="month" ? "last 6 months" : "last 4 quarters"}${useGoal ? ", dashed line = goal" : ""}</div>`
-    + `<div class="tr-legend">${CST_SRC.map(x=>`<span><i style="background:${x[2]}"></i>${x[1]}</span>`).join("")}</div><div class="tr-plot">${cstTrend(cstMetric, goal)}</div></div>`
+    + `<div class="tr-card"><div class="tr-sub">${mlabel}${isAct ? "" : " by lead source"}, ${state.kind==="week" ? "last 12 weeks" : state.kind==="month" ? "last 6 months" : "last 4 quarters"}${useGoal ? ", dashed line = goal" : ""}</div>`
+    + `<div class="tr-legend">${(isAct ? [[0,CST_ACT[cstMetric][0],CST_ACT[cstMetric][1]]] : CST_SRC).map(x=>`<span><i style="background:${x[2]}"></i>${x[1]}</span>`).join("")}</div><div class="tr-plot">${cstTrend(cstMetric, goal)}</div></div>`
     + `<div class="sec-head" style="margin-top:34px"><h2>Deals behind these numbers</h2></div>`
     + `<div class="table-wrap"><table><thead><tr><th style="text-align:left">Booked</th><th style="text-align:left">Deal</th><th style="text-align:left">Type</th><th style="text-align:left">Source</th></tr></thead><tbody>`
     + (rows.length ? rows.map(r=>`<tr><td style="text-align:left">${esc(r.d)}</td><td style="text-align:left">${esc(r.n)}</td><td style="text-align:left">${r.t}</td><td style="text-align:left">${lbl(r.s)}</td></tr>`).join("") : `<tr><td colspan="4" style="text-align:left;color:var(--muted)">Nothing booked in this period.</td></tr>`)

@@ -224,3 +224,12 @@ html.team-cst .cst-only{display:block}
 html.team-cst .lb-only,html.team-cst .tr-root,html.team-cst .live{display:none!important}
 .cst-empty{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:22px 24px;margin-top:12px}
 .cst-empty p{margin:6px 0 0;color:var(--muted)}
+html.team-cst .controls.lb-only{display:flex!important}
+html.team-cst #paceNote{display:none}
+.cst-tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:14px;margin:12px 0 4px}
+.cst-tile{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:16px 18px}
+.cst-tile .k{font-size:12px;text-transform:uppercase;letter-spacing:.07em;color:var(--muted);font-weight:600}
+.cst-tile .v{font-family:var(--display);font-weight:700;font-size:40px;line-height:1.15;font-variant-numeric:tabular-nums}
+.cst-tile .v span{font-size:20px;color:var(--muted);font-weight:600}
+.cst-tile .bar{height:10px;margin:6px 0 4px}
+.cst-tile .sub{font-size:13px;color:var(--muted)}

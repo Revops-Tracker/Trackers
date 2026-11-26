@@ -14,14 +14,6 @@ document.currentScript.insertAdjacentHTML("beforebegin", `
     <button class="btn ghost" type="button" id="refreshBtn" hidden title="Pull the latest numbers from HubSpot now (Vianney / Max only)">Refresh now</button>
   </header>
 
-  <section class="cst-only" id="cstPanel">
-    <div class="sec-head"><h2>CST</h2></div>
-    <div class="cst-empty">
-      <b>CST leaderboard</b>
-      <p>CST numbers are not connected to this board yet. Ali is the only CST rep so far, so there is nothing to rank until the data is wired up.</p>
-    </div>
-  </section>
-
   <div class="banner lb-only" id="banner">Every number here comes straight from HubSpot and refreshes at 8 AM each day, covering everything up to the end of yesterday. Click any underlined number to see the deals behind it. Reps: each morning, go through your new deals and mark each one <b>True</b> or <b>False</b> (Oct 1 to 8 is already confirmed). A "False" needs a short note and goes to Vianney or Max to approve before the numbers change.</div>
   <div id="reviewBar" class="lb-only"></div>
 
@@ -39,6 +31,11 @@ document.currentScript.insertAdjacentHTML("beforebegin", `
     </div>
     <div class="pace-note" id="paceNote"></div>
   </div>
+
+  <section class="cst-only" id="cstPanel">
+    <div class="sec-head"><h2>CST &middot; Ali</h2></div>
+    <div id="cstBody"><div class="cst-empty"><p>Loading CST bookings&hellip;</p></div></div>
+  </section>
 
   <section class="lb-only">
     <div class="sec-head">
@@ -130,12 +127,57 @@ document.currentScript.insertAdjacentHTML("beforebegin", `
 const API = "https://ottvswkgqohurzilfafu.supabase.co/functions/v1/lb-auto";
 const REPORTING = document.documentElement.classList.contains("view-reporting");
 if(REPORTING) document.getElementById("pageTitle").innerHTML = 'Sales L10 <span class="auto-tag">Admins</span>';
-// JF / CST switch (leaderboard page only; hidden on Sales L10). The CST view is a placeholder until CST data is wired in.
+// ---- CST view: Ali's bookings from the CST Service Pipeline deals (edge function cst-board) ----
+// Client meeting = cst_client_booked_date in the period (the headline vs the 25 a month target). Soft FTA = cst_call_type intro, by cst_booked_date.
+var CST = null, CST_ERR = null;
+async function loadCst(){
+  if(CST || window.JF_DEMO){ renderCst(); return; }
+  const host = document.getElementById("cstBody");
+  if(host) host.innerHTML = '<div class="cst-empty"><p>Loading CST bookings&hellip;</p></div>';
+  try{
+    const base = ((window.JF_CONFIG||{}).API_BASE||"").replace(/\/jf-sso$/, "/cst-board");
+    const res = await fetch(base, {headers:{Authorization:"Bearer "+token()}, cache:"no-store"});
+    if(res.status===401){ location.replace("index.html"); return; }
+    const j = await res.json().catch(()=>({}));
+    if(!res.ok || j.ok===false) throw new Error(j.error||res.status);
+    CST = j; CST_ERR = null;
+  }catch(e){ CST_ERR = String((e&&e.message)||e); }
+  renderCst();
+}
+function renderCst(){
+  const host = document.getElementById("cstBody"); if(!host) return;
+  if(CST_ERR){ host.innerHTML = '<div class="cst-empty"><p>Could not load CST bookings ('+esc(CST_ERR)+'). Refresh to try again.</p></div>'; return; }
+  if(!CST){ host.innerHTML = '<div class="cst-empty"><p>'+(window.JF_DEMO ? "CST bookings are not available in demo mode." : "Loading CST bookings&hellip;")+'</p></div>'; return; }
+  const p = periodFor(state.kind, state.offset), inP = d => !!d && d>=p.start && d<=p.end;
+  const goal = Math.max(1, Math.round(CST.target * ({week:12/52, month:1, quarter:3}[state.kind])));
+  const per = state.kind==="week" ? "week" : state.kind==="month" ? "month" : "quarter";
+  const clients = CST.deals.filter(d=>inP(d.client)), intros = CST.deals.filter(d=>d.type==="intro" && inP(d.booked));
+  const SRC = [["rtb","RTB"],["tofu","TOFU"],["bofu","BOFU"],["cold","Cold call"],["other","Other / unknown"]];
+  const cnt = (arr,k) => arr.filter(d=>d.source===k).length;
+  const pct = Math.min(100, Math.round(clients.length/goal*100));
+  const rows = [...clients.map(d=>({d:d.client, n:d.name, t:"Client meeting", s:d.source})), ...intros.map(d=>({d:d.booked, n:d.name, t:"Soft FTA", s:d.source}))].sort((a,b)=>a.d<b.d?1:a.d>b.d?-1:0);
+  const lbl = k => (SRC.find(x=>x[0]===k)||[0,"Other / unknown"])[1];
+  host.innerHTML =
+    '<div class="cst-tiles">'
+    + '<div class="cst-tile"><div class="k">Client meetings booked</div><div class="v">'+clients.length+'<span> of '+goal+'</span></div><div class="bar"><div class="bar-fill" style="width:'+pct+'%"></div></div><div class="sub">Goal '+goal+' a '+per+' ('+CST.target+' a month)</div></div>'
+    + '<div class="cst-tile"><div class="k">Soft FTAs (intro calls)</div><div class="v">'+intros.length+'</div><div class="sub">Not counted toward the goal</div></div>'
+    + '<div class="cst-tile"><div class="k">Total booked</div><div class="v">'+(clients.length+intros.length)+'</div><div class="sub">Client meetings plus soft FTAs</div></div>'
+    + '</div>'
+    + '<div class="table-wrap"><table><thead><tr><th style="text-align:left">Source</th><th>Client meetings</th><th>Soft FTAs</th></tr></thead><tbody>'
+    + SRC.map(([k,l])=>'<tr><td style="text-align:left">'+l+'</td><td>'+cnt(clients,k)+'</td><td>'+cnt(intros,k)+'</td></tr>').join("")
+    + '<tr class="group"><td style="text-align:left">Total</td><td>'+clients.length+'</td><td>'+intros.length+'</td></tr></tbody></table></div>'
+    + '<div class="table-wrap"><table><thead><tr><th style="text-align:left">Booked</th><th style="text-align:left">Deal</th><th style="text-align:left">Type</th><th style="text-align:left">Source</th></tr></thead><tbody>'
+    + (rows.length ? rows.map(r=>'<tr><td style="text-align:left">'+esc(r.d)+'</td><td style="text-align:left">'+esc(r.n)+'</td><td style="text-align:left">'+r.t+'</td><td style="text-align:left">'+lbl(r.s)+'</td></tr>').join("") : '<tr><td colspan="4" style="text-align:left;color:var(--muted)">Nothing booked in this period.</td></tr>')
+    + '</tbody></table></div>'
+    + '<div class="legend"><b>Client meeting</b>: a meeting booked with the client MSP, counted on the day Ali reported or logged it. <b>Soft FTA</b>: a first intro call booked with us. A deal that goes from intro to client counts once in each. Source is worked out each morning from form fills, website hits and the Nooks list Ali dialed from. Deals appear once Ali approves their booking card. Data as of '+esc(nice(CST.asOf))+'.</div>';
+}
+// JF / CST switch (leaderboard page only; hidden on Sales L10). The CST view shows Ali's bookings (renderCst above).
 (function(){
   const btns = document.querySelectorAll("#lbTeam button");
   function setTeam(t, save){
     document.documentElement.classList.toggle("team-cst", t==="cst");
     btns.forEach(b=>b.setAttribute("aria-pressed", String(b.dataset.t===t)));
+    if(t==="cst") loadCst();
     if(save){ try{ localStorage.setItem("lb_team", t); }catch(e){} }
   }
   btns.forEach(b=>b.onclick=()=>setTeam(b.dataset.t, true));
@@ -598,6 +640,7 @@ function render(){
   document.getElementById("refreshBtn").hidden = !(state.me && state.me.approver);
   renderTrends();
   if(REPORTING) renderL10();
+  if(document.documentElement.classList.contains("team-cst")) renderCst();
 }
 
 function renderReviewBar(){

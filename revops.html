@@ -571,7 +571,7 @@ section[data-tab][hidden],.ro-badge[hidden]{display:none!important}
           <input type="date" id="crSunday">
           <span class="wk" id="crWeekLbl"></span>
         </div>
-        <div class="cr-drop dx-drop" id="dxDrop" tabindex="0" role="button" title="Use the Calls Library export from Nooks (one row per call). It adds the call outcomes by list to the BDR tracker. The week comes from each call's date.">
+        <div class="cr-drop dx-drop" id="dxDrop" tabindex="0" role="button" title="Use the Calls Library export from Nooks (one row per call). It adds the call outcomes by list to the BDR tracker (or the CST tracker when the CST tab is selected). The week comes from each call's date.">
           <b>Drop Calls Library CSV</b>
           <div class="hint">call outcomes by list &middot; click to choose</div>
           <input type="file" id="dxFile" accept=".csv,text/csv" hidden>
@@ -1063,7 +1063,6 @@ async function saveD(){
 }
 function onFileD(f){
   if(!f) return;
-  if(cst()){ say("Call outcomes are tracked for the JF team only. Switch to JF first."); return; }
   if(!/\.csv$/i.test(f.name) && !/csv/i.test(f.type)){ say("Choose the Calls Library CSV from Nooks"); return; }
   if(f.size > 12_000_000){ say("That file is too big to be the Calls Library export"); return; }
   if(!S.data){ say("Still loading, try again in a second"); return; }

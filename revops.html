@@ -129,6 +129,21 @@ dialog::backdrop{background:rgba(10,18,35,.45)}
   .period{min-width:0;font-size:19px}
   .dlg-body{grid-template-columns:1fr}
 }
+/* Review Panel: Trigger Engine group sits under the RTB rows in the same card */
+#rtbReview #rtbBody .rtb-filters{display:none}
+#rtbReview .rev-lead2{border-top:1px solid var(--line)}
+#rtbReview #revTop{border-top:0}
+#rtbReview .rev-group{border-top:1px solid var(--line)}
+#rtbReview #rtbBody[hidden] + .rev-group{border-top:0}
+#rtbReview .rev-group-head{display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 12px;padding:14px 18px 6px;font-size:15px}
+#rtbReview .rev-group-head span{color:var(--muted);font-size:13px}
+#rtbReview .trg-opts{display:flex;flex-direction:column;gap:6px}
+#rtbReview .trg-opt{display:block;width:100%;text-align:left;border:1px solid var(--line);background:var(--panel);color:var(--ink);border-radius:10px;padding:9px 12px;font:inherit;font-size:14px;font-weight:600;line-height:1.3;cursor:pointer;transition:background .15s,border-color .15s}
+#rtbReview .trg-opt:hover:not(:disabled){border-color:color-mix(in srgb,var(--ink) 28%,var(--line))}
+#rtbReview .trg-opt[aria-pressed="true"]{background:color-mix(in srgb,var(--fill) 14%,var(--panel));border-color:var(--fill);box-shadow:inset 0 0 0 1px var(--fill)}
+#rtbReview .trg-opt:disabled{opacity:.5;cursor:not-allowed}
+#rtbReview textarea.trg-note{min-height:72px;resize:vertical}
+@media (max-width:680px){#rtbReview .trg-opt{padding:12px}#rtbReview .rev-group-head{padding-left:14px;padding-right:14px}}
 </style>
 </head>
 <body>
@@ -359,133 +374,138 @@ section[data-tab][hidden],.ro-badge[hidden]{display:none!important}
 }
 
 /* RTB Review Panel */
-:is(#rtbReview,#trgReview){margin-bottom:36px}
-:is(#rtbReview,#trgReview) .rtb-count{display:inline-flex;align-items:center;font-size:13px;font-weight:600;letter-spacing:.01em;background:var(--chip);color:var(--muted);border-radius:999px;padding:6px 12px;font-variant-numeric:tabular-nums}
-:is(#rtbReview,#trgReview) .rtb-count.has{background:color-mix(in srgb,var(--gold) 18%,var(--panel));color:var(--ink);box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--gold) 55%,var(--line))}
-:is(#rtbReview,#trgReview) .rtb-card{background:var(--panel);border:1px solid var(--line);border-radius:14px;overflow:hidden}
-:is(#rtbReview,#trgReview) .rtb-lead{margin:0;padding:14px 18px;color:var(--muted);font-size:14px;line-height:1.45;border-bottom:1px solid var(--line)}
-:is(#rtbReview,#trgReview) .rtb-banner{padding:10px 18px;font-size:13px;line-height:1.4;color:var(--ink);background:color-mix(in srgb,var(--gold) 12%,var(--panel));border-bottom:1px solid color-mix(in srgb,var(--gold) 35%,var(--line))}
-:is(#rtbReview,#trgReview) .rtb-cols{display:grid;grid-template-columns:minmax(228px,300px) minmax(0,1fr) minmax(248px,280px);gap:8px 20px;padding:10px 18px 8px;font-size:12px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;color:var(--muted);border-bottom:1px solid var(--line)}
-:is(#rtbReview,#trgReview) .rtb-list{max-height:min(640px,68vh);overflow:auto}
-:is(#rtbReview,#trgReview) .rtb-row{display:grid;grid-template-columns:minmax(228px,300px) minmax(0,1fr) minmax(248px,280px);gap:10px 20px;align-items:start;padding:16px 18px;border-top:1px solid var(--line);transition:background .15s}
-:is(#rtbReview,#trgReview) .rtb-list .rtb-row:first-child{border-top:0}
-:is(#rtbReview,#trgReview) .rtb-row:hover{background:color-mix(in srgb,var(--fill) 5%,var(--panel))}
-:is(#rtbReview,#trgReview) .rtb-row.is-bad{box-shadow:inset 3px 0 0 color-mix(in srgb,var(--behind) 72%,var(--line))}
-:is(#rtbReview,#trgReview) .rtb-row.is-med{box-shadow:inset 3px 0 0 var(--gold)}
-:is(#rtbReview,#trgReview) .rtb-row.is-med:hover{background:color-mix(in srgb,var(--gold) 8%,var(--panel))}
-:is(#rtbReview,#trgReview) .rtb-row.is-rule{box-shadow:inset 3px 0 0 var(--fill)}
-:is(#rtbReview,#trgReview) .rtb-row.is-rule:hover{background:color-mix(in srgb,var(--fill) 7%,var(--panel))}
-:is(#rtbReview,#trgReview) .rtb-row.is-busy,:is(#rtbReview,#trgReview) .rtb-row.is-busy:hover{background:var(--paper)}
-:is(#rtbReview,#trgReview) .rtb-row > *{min-width:0}
-:is(#rtbReview,#trgReview) .rtb-name{font-weight:600;font-size:16px;line-height:1.3;overflow-wrap:anywhere}
-:is(#rtbReview,#trgReview) .rtb-name a{color:var(--ink);text-decoration:underline dotted;text-underline-offset:3px}
-:is(#rtbReview,#trgReview) .rtb-name a:hover{color:var(--fill)}
-:is(#rtbReview,#trgReview) .rtb-title{display:block;color:var(--muted);font-size:13px;margin-top:2px}
-:is(#rtbReview,#trgReview) .rtb-co{margin-top:4px;font-size:14px;line-height:1.35;overflow-wrap:anywhere}
-:is(#rtbReview,#trgReview) .rtb-co a{color:var(--fill);font-weight:600;text-decoration:none}
-:is(#rtbReview,#trgReview) .rtb-co a:hover{text-decoration:underline}
-:is(#rtbReview,#trgReview) .rtb-sep{margin:0 6px;color:var(--muted)}
-:is(#rtbReview,#trgReview) .rtb-meta{display:flex;flex-wrap:wrap;gap:6px 8px;align-items:center;margin-top:8px;color:var(--muted);font-size:13px}
-:is(#rtbReview,#trgReview) .pill.q-jf{background:color-mix(in srgb,var(--gold) 20%,transparent);color:var(--ink)}
-:is(#rtbReview,#trgReview) .pill.q-cst{background:color-mix(in srgb,var(--fill) 16%,transparent);color:var(--ink)}
-:is(#rtbReview,#trgReview) .pill.type-bad{background:color-mix(in srgb,var(--behind) 18%,transparent);color:var(--behind)}
-:is(#rtbReview,#trgReview) .pill.type-med{background:color-mix(in srgb,var(--gold) 24%,transparent);color:var(--ink);box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--gold) 62%,transparent)}
-:is(#rtbReview,#trgReview) .pill.type-rej{background:var(--chip);color:var(--ink)}
-:is(#rtbReview,#trgReview) .pill.type-rule{background:color-mix(in srgb,var(--fill) 16%,transparent);color:var(--ink);box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--fill) 45%,transparent)}
-:is(#rtbReview,#trgReview) .rtb-filters{display:flex;flex-wrap:wrap;gap:6px;align-items:center;padding:10px 18px;border-bottom:1px solid var(--line)}
-:is(#rtbReview,#trgReview) .rtb-filters button{border:1px solid var(--line);background:var(--panel);color:var(--muted);border-radius:999px;padding:4px 12px;font-size:13px;font-weight:600;line-height:1.3;cursor:pointer}
-:is(#rtbReview,#trgReview) .rtb-filters button[aria-pressed="true"]{background:var(--ink);color:var(--paper);border-color:var(--ink)}
-:is(#rtbReview,#trgReview) .rtb-filters button:hover:not([aria-pressed="true"]){color:var(--ink);border-color:color-mix(in srgb,var(--ink) 28%,var(--line))}
-:is(#rtbReview,#trgReview) .rtb-nocontact{display:inline-flex;align-items:center;font-size:12px;font-weight:600;color:var(--muted);background:var(--chip);border-radius:999px;padding:2px 8px}
-:is(#rtbReview,#trgReview) .rtb-name + .rtb-nocontact{margin-top:4px}
-:is(#rtbReview,#trgReview) .rtb-done-top .rtb-nocontact{margin-left:6px}
-:is(#rtbReview,#trgReview) .rtb-li{font-size:13px;font-weight:600;color:var(--fill);text-decoration:none;white-space:nowrap}
-:is(#rtbReview,#trgReview) .rtb-li:hover{text-decoration:underline}
-:is(#rtbReview,#trgReview) a.rtb-li.strong{display:inline-flex;align-items:center;margin-top:8px;padding:6px 12px;border-radius:999px;background:color-mix(in srgb,var(--gold) 22%,var(--panel));color:var(--ink);font-weight:700;text-decoration:none;box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--gold) 58%,var(--line))}
-:is(#rtbReview,#trgReview) a.rtb-li.strong:hover{text-decoration:none;background:color-mix(in srgb,var(--gold) 34%,var(--panel))}
-:is(#rtbReview,#trgReview) .rtb-reason{font-size:15px;line-height:1.45;overflow-wrap:anywhere}
-:is(#rtbReview,#trgReview) .rtb-soft{color:var(--muted)}
-:is(#rtbReview,#trgReview) .rtb-warn{margin-top:8px;font-size:13px;line-height:1.4;color:var(--behind);background:color-mix(in srgb,var(--behind) 10%,var(--panel));border-radius:8px;padding:8px 10px}
-:is(#rtbReview,#trgReview) .rtb-acts{display:flex;flex-direction:column;gap:8px;align-items:stretch}
-:is(#rtbReview,#trgReview) .rtb-note{width:100%;border:1px solid var(--line);background:var(--paper);color:var(--ink);border-radius:8px;padding:8px 10px;font:inherit;font-size:13px}
-:is(#rtbReview,#trgReview) .rtb-note::placeholder{color:var(--muted)}
-:is(#rtbReview,#trgReview) .rtb-note:focus{outline:none}
-:is(#rtbReview,#trgReview) .rtb-note:focus-visible{border-color:var(--fill);box-shadow:0 0 0 3px color-mix(in srgb,var(--fill) 22%,transparent)}
-:is(#rtbReview,#trgReview) textarea.rtb-answer{width:100%;min-height:108px;max-height:240px;resize:vertical;border:1px solid var(--line);background:var(--paper);color:var(--ink);border-radius:8px;padding:8px 10px;font:inherit;font-size:14px;line-height:1.4}
-:is(#rtbReview,#trgReview) textarea.rtb-answer::placeholder{color:var(--muted)}
-:is(#rtbReview,#trgReview) textarea.rtb-answer:focus{outline:none}
-:is(#rtbReview,#trgReview) textarea.rtb-answer:focus-visible{border-color:var(--fill);box-shadow:0 0 0 3px color-mix(in srgb,var(--fill) 22%,transparent)}
-:is(#rtbReview,#trgReview) .rtb-hint{margin:0;font-size:12px;line-height:1.35;color:var(--muted)}
-:is(#rtbReview,#trgReview) .rtb-btn.answer{flex:none;width:100%;color:var(--paper);background:var(--ink);border-color:var(--ink)}
-:is(#rtbReview,#trgReview) .rtb-btn.answer:hover:not(:disabled){background:color-mix(in srgb,var(--ink) 88%,var(--fill));border-color:color-mix(in srgb,var(--ink) 88%,var(--fill))}
-:is(#rtbReview,#trgReview) .rtb-slug{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:12px;line-height:1.35;color:var(--muted);overflow-wrap:anywhere}
-:is(#rtbReview,#trgReview) .rtb-id .rtb-slug{display:block;max-width:100%;margin-top:2px}
-:is(#rtbReview,#trgReview) .rtb-done-top .rtb-slug{margin-left:6px}
-:is(#rtbReview,#trgReview) .rtb-question{white-space:pre-wrap}
-:is(#rtbReview,#trgReview) .rtb-context{margin-top:8px;padding-top:8px;border-top:1px solid var(--line);font-size:13px;line-height:1.45;color:var(--muted);white-space:pre-wrap;overflow-wrap:anywhere}
-:is(#rtbReview,#trgReview) .rtb-context b,:is(#rtbReview,#trgReview) .rtb-answered b{color:var(--ink);font-weight:600}
-:is(#rtbReview,#trgReview) .rtb-answered{margin-top:6px;font-size:14px;line-height:1.45;white-space:pre-wrap;overflow-wrap:anywhere}
-:is(#rtbReview,#trgReview) .rtb-actions{display:flex;gap:8px}
-:is(#rtbReview,#trgReview) .rtb-btn{flex:1;display:inline-flex;align-items:center;justify-content:center;gap:6px;height:40px;padding:0 10px;border-radius:10px;border:1px solid var(--line);background:var(--panel);font-weight:700;font-size:14px;line-height:1;white-space:nowrap;cursor:pointer;transition:background .15s,border-color .15s,color .15s,transform .12s}
-:is(#rtbReview,#trgReview) .rtb-btn svg{display:block}
-:is(#rtbReview,#trgReview) .rtb-btn.tick{color:var(--ahead);border-color:color-mix(in srgb,var(--ahead) 45%,var(--line))}
-:is(#rtbReview,#trgReview) .rtb-btn.tick:hover:not(:disabled){background:color-mix(in srgb,var(--ahead) 16%,var(--panel));border-color:var(--ahead)}
-:is(#rtbReview,#trgReview) .rtb-btn.cross{color:var(--behind);border-color:color-mix(in srgb,var(--behind) 45%,var(--line))}
-:is(#rtbReview,#trgReview) .rtb-btn.cross:hover:not(:disabled){background:color-mix(in srgb,var(--behind) 14%,var(--panel));border-color:var(--behind)}
-:is(#rtbReview,#trgReview) .rtb-btn:disabled{opacity:.45;cursor:not-allowed}
-:is(#rtbReview,#trgReview) .rtb-btn:active:not(:disabled){transform:translateY(1px)}
-:is(#rtbReview,#trgReview) .rtb-saving{display:flex;align-items:center;justify-content:center;gap:8px;height:40px;border-radius:10px;background:var(--chip);color:var(--ink);font-weight:600;font-size:14px}
-:is(#rtbReview,#trgReview) .rtb-spin{width:14px;height:14px;border-radius:50%;border:2px solid color-mix(in srgb,var(--ink) 22%,transparent);border-top-color:var(--ink);display:inline-block;flex:none;animation:rtb-spin .7s linear infinite}
+#rtbReview{margin-bottom:36px}
+#rtbReview .rtb-count{display:inline-flex;align-items:center;font-size:13px;font-weight:600;letter-spacing:.01em;background:var(--chip);color:var(--muted);border-radius:999px;padding:6px 12px;font-variant-numeric:tabular-nums}
+#rtbReview .rtb-count.has{background:color-mix(in srgb,var(--gold) 18%,var(--panel));color:var(--ink);box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--gold) 55%,var(--line))}
+#rtbReview .rtb-card{background:var(--panel);border:1px solid var(--line);border-radius:14px;overflow:hidden}
+#rtbReview .rtb-lead{margin:0;padding:14px 18px;color:var(--muted);font-size:14px;line-height:1.45;border-bottom:1px solid var(--line)}
+#rtbReview .rtb-banner{padding:10px 18px;font-size:13px;line-height:1.4;color:var(--ink);background:color-mix(in srgb,var(--gold) 12%,var(--panel));border-bottom:1px solid color-mix(in srgb,var(--gold) 35%,var(--line))}
+#rtbReview .rtb-cols{display:grid;grid-template-columns:minmax(228px,300px) minmax(0,1fr) minmax(248px,280px);gap:8px 20px;padding:10px 18px 8px;font-size:12px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;color:var(--muted);border-bottom:1px solid var(--line)}
+#rtbReview .rtb-list{max-height:min(640px,68vh);overflow:auto}
+#rtbReview .rtb-row{display:grid;grid-template-columns:minmax(228px,300px) minmax(0,1fr) minmax(248px,280px);gap:10px 20px;align-items:start;padding:16px 18px;border-top:1px solid var(--line);transition:background .15s}
+#rtbReview .rtb-list .rtb-row:first-child{border-top:0}
+#rtbReview .rtb-row:hover{background:color-mix(in srgb,var(--fill) 5%,var(--panel))}
+#rtbReview .rtb-row.is-bad{box-shadow:inset 3px 0 0 color-mix(in srgb,var(--behind) 72%,var(--line))}
+#rtbReview .rtb-row.is-med{box-shadow:inset 3px 0 0 var(--gold)}
+#rtbReview .rtb-row.is-med:hover{background:color-mix(in srgb,var(--gold) 8%,var(--panel))}
+#rtbReview .rtb-row.is-rule{box-shadow:inset 3px 0 0 var(--fill)}
+#rtbReview .rtb-row.is-rule:hover{background:color-mix(in srgb,var(--fill) 7%,var(--panel))}
+#rtbReview .rtb-row.is-busy,#rtbReview .rtb-row.is-busy:hover{background:var(--paper)}
+#rtbReview .rtb-row > *{min-width:0}
+#rtbReview .rtb-name{font-weight:600;font-size:16px;line-height:1.3;overflow-wrap:anywhere}
+#rtbReview .rtb-name a{color:var(--ink);text-decoration:underline dotted;text-underline-offset:3px}
+#rtbReview .rtb-name a:hover{color:var(--fill)}
+#rtbReview .rtb-title{display:block;color:var(--muted);font-size:13px;margin-top:2px}
+#rtbReview .rtb-co{margin-top:4px;font-size:14px;line-height:1.35;overflow-wrap:anywhere}
+#rtbReview .rtb-co a{color:var(--fill);font-weight:600;text-decoration:none}
+#rtbReview .rtb-co a:hover{text-decoration:underline}
+#rtbReview .rtb-sep{margin:0 6px;color:var(--muted)}
+#rtbReview .rtb-meta{display:flex;flex-wrap:wrap;gap:6px 8px;align-items:center;margin-top:8px;color:var(--muted);font-size:13px}
+#rtbReview .pill.q-jf{background:color-mix(in srgb,var(--gold) 20%,transparent);color:var(--ink)}
+#rtbReview .pill.q-cst{background:color-mix(in srgb,var(--fill) 16%,transparent);color:var(--ink)}
+#rtbReview .pill.type-bad{background:color-mix(in srgb,var(--behind) 18%,transparent);color:var(--behind)}
+#rtbReview .pill.type-med{background:color-mix(in srgb,var(--gold) 24%,transparent);color:var(--ink);box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--gold) 62%,transparent)}
+#rtbReview .pill.type-rej{background:var(--chip);color:var(--ink)}
+#rtbReview .pill.type-rule{background:color-mix(in srgb,var(--fill) 16%,transparent);color:var(--ink);box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--fill) 45%,transparent)}
+#rtbReview .rtb-filters{display:flex;flex-wrap:wrap;gap:6px;align-items:center;padding:10px 18px;border-bottom:1px solid var(--line)}
+#rtbReview .rtb-filters button{border:1px solid var(--line);background:var(--panel);color:var(--muted);border-radius:999px;padding:4px 12px;font-size:13px;font-weight:600;line-height:1.3;cursor:pointer}
+#rtbReview .rtb-filters button[aria-pressed="true"]{background:var(--ink);color:var(--paper);border-color:var(--ink)}
+#rtbReview .rtb-filters button:hover:not([aria-pressed="true"]){color:var(--ink);border-color:color-mix(in srgb,var(--ink) 28%,var(--line))}
+#rtbReview .rtb-nocontact{display:inline-flex;align-items:center;font-size:12px;font-weight:600;color:var(--muted);background:var(--chip);border-radius:999px;padding:2px 8px}
+#rtbReview .rtb-name + .rtb-nocontact{margin-top:4px}
+#rtbReview .rtb-done-top .rtb-nocontact{margin-left:6px}
+#rtbReview .rtb-li{font-size:13px;font-weight:600;color:var(--fill);text-decoration:none;white-space:nowrap}
+#rtbReview .rtb-li:hover{text-decoration:underline}
+#rtbReview a.rtb-li.strong{display:inline-flex;align-items:center;margin-top:8px;padding:6px 12px;border-radius:999px;background:color-mix(in srgb,var(--gold) 22%,var(--panel));color:var(--ink);font-weight:700;text-decoration:none;box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--gold) 58%,var(--line))}
+#rtbReview a.rtb-li.strong:hover{text-decoration:none;background:color-mix(in srgb,var(--gold) 34%,var(--panel))}
+#rtbReview .rtb-reason{font-size:15px;line-height:1.45;overflow-wrap:anywhere}
+#rtbReview .rtb-soft{color:var(--muted)}
+#rtbReview .rtb-warn{margin-top:8px;font-size:13px;line-height:1.4;color:var(--behind);background:color-mix(in srgb,var(--behind) 10%,var(--panel));border-radius:8px;padding:8px 10px}
+#rtbReview .rtb-acts{display:flex;flex-direction:column;gap:8px;align-items:stretch}
+#rtbReview .rtb-note{width:100%;border:1px solid var(--line);background:var(--paper);color:var(--ink);border-radius:8px;padding:8px 10px;font:inherit;font-size:13px}
+#rtbReview .rtb-note::placeholder{color:var(--muted)}
+#rtbReview .rtb-note:focus{outline:none}
+#rtbReview .rtb-note:focus-visible{border-color:var(--fill);box-shadow:0 0 0 3px color-mix(in srgb,var(--fill) 22%,transparent)}
+#rtbReview textarea.rtb-answer{width:100%;min-height:108px;max-height:240px;resize:vertical;border:1px solid var(--line);background:var(--paper);color:var(--ink);border-radius:8px;padding:8px 10px;font:inherit;font-size:14px;line-height:1.4}
+#rtbReview textarea.rtb-answer::placeholder{color:var(--muted)}
+#rtbReview textarea.rtb-answer:focus{outline:none}
+#rtbReview textarea.rtb-answer:focus-visible{border-color:var(--fill);box-shadow:0 0 0 3px color-mix(in srgb,var(--fill) 22%,transparent)}
+#rtbReview .rtb-hint{margin:0;font-size:12px;line-height:1.35;color:var(--muted)}
+#rtbReview .rtb-btn.answer{flex:none;width:100%;color:var(--paper);background:var(--ink);border-color:var(--ink)}
+#rtbReview .rtb-btn.answer:hover:not(:disabled){background:color-mix(in srgb,var(--ink) 88%,var(--fill));border-color:color-mix(in srgb,var(--ink) 88%,var(--fill))}
+#rtbReview .rtb-slug{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:12px;line-height:1.35;color:var(--muted);overflow-wrap:anywhere}
+#rtbReview .rtb-id .rtb-slug{display:block;max-width:100%;margin-top:2px}
+#rtbReview .rtb-done-top .rtb-slug{margin-left:6px}
+#rtbReview .rtb-question{white-space:pre-wrap}
+#rtbReview .rtb-context{margin-top:8px;padding-top:8px;border-top:1px solid var(--line);font-size:13px;line-height:1.45;color:var(--muted);white-space:pre-wrap;overflow-wrap:anywhere}
+#rtbReview .rtb-context b,#rtbReview .rtb-answered b{color:var(--ink);font-weight:600}
+#rtbReview .rtb-answered{margin-top:6px;font-size:14px;line-height:1.45;white-space:pre-wrap;overflow-wrap:anywhere}
+#rtbReview .rtb-actions{display:flex;gap:8px}
+#rtbReview .rtb-btn{flex:1;display:inline-flex;align-items:center;justify-content:center;gap:6px;height:40px;padding:0 10px;border-radius:10px;border:1px solid var(--line);background:var(--panel);font-weight:700;font-size:14px;line-height:1;white-space:nowrap;cursor:pointer;transition:background .15s,border-color .15s,color .15s,transform .12s}
+#rtbReview .rtb-btn svg{display:block}
+#rtbReview .rtb-btn.tick{color:var(--ahead);border-color:color-mix(in srgb,var(--ahead) 45%,var(--line))}
+#rtbReview .rtb-btn.tick:hover:not(:disabled){background:color-mix(in srgb,var(--ahead) 16%,var(--panel));border-color:var(--ahead)}
+#rtbReview .rtb-btn.cross{color:var(--behind);border-color:color-mix(in srgb,var(--behind) 45%,var(--line))}
+#rtbReview .rtb-btn.cross:hover:not(:disabled){background:color-mix(in srgb,var(--behind) 14%,var(--panel));border-color:var(--behind)}
+#rtbReview .rtb-btn:disabled{opacity:.45;cursor:not-allowed}
+#rtbReview .rtb-btn:active:not(:disabled){transform:translateY(1px)}
+#rtbReview .rtb-saving{display:flex;align-items:center;justify-content:center;gap:8px;height:40px;border-radius:10px;background:var(--chip);color:var(--ink);font-weight:600;font-size:14px}
+#rtbReview .rtb-spin{width:14px;height:14px;border-radius:50%;border:2px solid color-mix(in srgb,var(--ink) 22%,transparent);border-top-color:var(--ink);display:inline-block;flex:none;animation:rtb-spin .7s linear infinite}
 @keyframes rtb-spin{to{transform:rotate(360deg)}}
-:is(#rtbReview,#trgReview) .rtb-confirm{background:color-mix(in srgb,var(--behind) 8%,var(--panel));border:1px solid color-mix(in srgb,var(--behind) 35%,var(--line));border-radius:10px;padding:10px;font-size:13px;line-height:1.4}
-:is(#rtbReview,#trgReview) .rtb-confirm p{margin:0 0 8px}
-:is(#rtbReview,#trgReview) .rtb-confirm .rtb-actions{flex-direction:column}
-:is(#rtbReview,#trgReview) .rtb-confirm .btn,:is(#rtbReview,#trgReview) .rtb-confirm .rtb-btn{flex:none;width:100%;height:38px;padding:0 10px;border-radius:8px}
-:is(#rtbReview,#trgReview) .rtb-err{grid-column:1 / -1;font-size:13px;line-height:1.4;color:var(--behind);background:color-mix(in srgb,var(--behind) 8%,var(--panel));border-radius:8px;padding:8px 10px}
-:is(#rtbReview,#trgReview) .rtb-viewtag{align-self:center;color:var(--muted);font-size:13px;font-weight:600}
-:is(#rtbReview,#trgReview) .rtb-empty{display:flex;flex-direction:column;align-items:center;gap:4px;padding:36px 20px 32px;text-align:center;color:var(--muted);font-size:14px}
-:is(#rtbReview,#trgReview) .rtb-empty b{color:var(--ink);font-size:16px;font-weight:600}
-:is(#rtbReview,#trgReview) .rtb-mark{width:42px;height:42px;border-radius:50%;display:flex;align-items:center;justify-content:center;background:color-mix(in srgb,var(--ahead) 14%,var(--panel));color:var(--ahead);margin-bottom:6px}
-:is(#rtbReview,#trgReview) .rtb-mark svg{width:20px;height:20px}
-:is(#rtbReview,#trgReview) .rtb-empty .btn{margin-top:10px}
-:is(#rtbReview,#trgReview) .rtb-recent{border-top:1px solid var(--line)}
-:is(#rtbReview,#trgReview) .rtb-recent summary{margin:0;padding:12px 18px;cursor:pointer;color:var(--ink);font-size:14px;font-weight:600;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;list-style:none}
-:is(#rtbReview,#trgReview) .rtb-recent summary::-webkit-details-marker{display:none}
-:is(#rtbReview,#trgReview) .rtb-recent summary:hover{background:color-mix(in srgb,var(--fill) 5%,var(--panel))}
-:is(#rtbReview,#trgReview) .rtb-sum-l{display:inline-flex;align-items:center;gap:8px}
-:is(#rtbReview,#trgReview) .rtb-caret{display:inline-block;width:12px;color:var(--muted);transition:transform .15s;font-style:normal}
-:is(#rtbReview,#trgReview) .rtb-recent[open] .rtb-caret{transform:rotate(90deg)}
-:is(#rtbReview,#trgReview) .rtb-sum-r{color:var(--muted);font-weight:500;font-size:13px}
-:is(#rtbReview,#trgReview) .rtb-done-wrap{max-height:320px;overflow:auto;border-top:1px solid var(--line)}
-:is(#rtbReview,#trgReview) .rtb-none{padding:14px 18px 16px;color:var(--muted);font-size:14px}
-:is(#rtbReview,#trgReview) .rtb-done{display:grid;grid-template-columns:auto minmax(0,1fr);gap:2px 12px;align-items:start;padding:12px 18px;border-top:1px solid var(--line)}
-:is(#rtbReview,#trgReview) .rtb-done:first-child{border-top:0}
-:is(#rtbReview,#trgReview) .rtb-done .pill{margin-top:2px}
-:is(#rtbReview,#trgReview) .rtb-done-top{font-weight:600;font-size:14px;overflow-wrap:anywhere}
-:is(#rtbReview,#trgReview) .rtb-done-top a{color:var(--ink);text-decoration:underline dotted;text-underline-offset:3px}
-:is(#rtbReview,#trgReview) .rtb-done-top a:hover{color:var(--fill)}
-:is(#rtbReview,#trgReview) .rtb-who{color:var(--muted);font-size:13px;margin-top:2px;overflow-wrap:anywhere}
-:is(#rtbReview,#trgReview) .rtb-sub{color:var(--muted);font-size:13px;margin-top:3px;overflow-wrap:anywhere}
+#rtbReview .rtb-confirm{background:color-mix(in srgb,var(--behind) 8%,var(--panel));border:1px solid color-mix(in srgb,var(--behind) 35%,var(--line));border-radius:10px;padding:10px;font-size:13px;line-height:1.4}
+#rtbReview .rtb-confirm p{margin:0 0 8px}
+#rtbReview .rtb-confirm .rtb-actions{flex-direction:column}
+#rtbReview .rtb-confirm .btn,#rtbReview .rtb-confirm .rtb-btn{flex:none;width:100%;height:38px;padding:0 10px;border-radius:8px}
+#rtbReview .rtb-err{grid-column:1 / -1;font-size:13px;line-height:1.4;color:var(--behind);background:color-mix(in srgb,var(--behind) 8%,var(--panel));border-radius:8px;padding:8px 10px}
+#rtbReview .rtb-viewtag{align-self:center;color:var(--muted);font-size:13px;font-weight:600}
+#rtbReview .rtb-empty{display:flex;flex-direction:column;align-items:center;gap:4px;padding:36px 20px 32px;text-align:center;color:var(--muted);font-size:14px}
+#rtbReview .rtb-empty b{color:var(--ink);font-size:16px;font-weight:600}
+#rtbReview .rtb-mark{width:42px;height:42px;border-radius:50%;display:flex;align-items:center;justify-content:center;background:color-mix(in srgb,var(--ahead) 14%,var(--panel));color:var(--ahead);margin-bottom:6px}
+#rtbReview .rtb-mark svg{width:20px;height:20px}
+#rtbReview .rtb-empty .btn{margin-top:10px}
+#rtbReview .rtb-recent{border-top:1px solid var(--line)}
+#rtbReview .rtb-recent summary{margin:0;padding:12px 18px;cursor:pointer;color:var(--ink);font-size:14px;font-weight:600;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;list-style:none}
+#rtbReview .rtb-recent summary::-webkit-details-marker{display:none}
+#rtbReview .rtb-recent summary:hover{background:color-mix(in srgb,var(--fill) 5%,var(--panel))}
+#rtbReview .rtb-sum-l{display:inline-flex;align-items:center;gap:8px}
+#rtbReview .rtb-caret{display:inline-block;width:12px;color:var(--muted);transition:transform .15s;font-style:normal}
+#rtbReview .rtb-recent[open] .rtb-caret{transform:rotate(90deg)}
+#rtbReview .rtb-sum-r{color:var(--muted);font-weight:500;font-size:13px}
+#rtbReview .rtb-done-wrap{max-height:320px;overflow:auto;border-top:1px solid var(--line)}
+#rtbReview .rtb-none{padding:14px 18px 16px;color:var(--muted);font-size:14px}
+#rtbReview .rtb-done{display:grid;grid-template-columns:auto minmax(0,1fr);gap:2px 12px;align-items:start;padding:12px 18px;border-top:1px solid var(--line)}
+#rtbReview .rtb-done:first-child{border-top:0}
+#rtbReview .rtb-done .pill{margin-top:2px}
+#rtbReview .rtb-done-top{font-weight:600;font-size:14px;overflow-wrap:anywhere}
+#rtbReview .rtb-done-top a{color:var(--ink);text-decoration:underline dotted;text-underline-offset:3px}
+#rtbReview .rtb-done-top a:hover{color:var(--fill)}
+#rtbReview .rtb-who{color:var(--muted);font-size:13px;margin-top:2px;overflow-wrap:anywhere}
+#rtbReview .rtb-sub{color:var(--muted);font-size:13px;margin-top:3px;overflow-wrap:anywhere}
 @media (max-width:680px){
-  :is(#rtbReview,#trgReview) .rtb-cols{display:none}
-  :is(#rtbReview,#trgReview) .rtb-row{grid-template-columns:1fr;gap:10px;padding:14px}
-  :is(#rtbReview,#trgReview) .rtb-lead,:is(#rtbReview,#trgReview) .rtb-banner,:is(#rtbReview,#trgReview) .rtb-filters,:is(#rtbReview,#trgReview) .rtb-recent summary,:is(#rtbReview,#trgReview) .rtb-done{padding-left:14px;padding-right:14px}
-  :is(#rtbReview,#trgReview) .rtb-btn{height:44px}
+  #rtbReview .rtb-cols{display:none}
+  #rtbReview .rtb-row{grid-template-columns:1fr;gap:10px;padding:14px}
+  #rtbReview .rtb-lead,#rtbReview .rtb-banner,#rtbReview .rtb-filters,#rtbReview .rtb-recent summary,#rtbReview .rtb-done{padding-left:14px;padding-right:14px}
+  #rtbReview .rtb-btn{height:44px}
 }
 @media (prefers-reduced-motion:reduce){
-  :is(#rtbReview,#trgReview) .rtb-spin{animation:none}
-  :is(#rtbReview,#trgReview) .rtb-caret,:is(#rtbReview,#trgReview) .rtb-row,:is(#rtbReview,#trgReview) .rtb-btn{transition:none}
+  #rtbReview .rtb-spin{animation:none}
+  #rtbReview .rtb-caret,#rtbReview .rtb-row,#rtbReview .rtb-btn{transition:none}
 }
-
-/* Trigger lead review panel: shares the RTB panel styles above; extras for answer choices */
-#trgReview{margin-bottom:36px}
-#trgReview .trg-opts{display:flex;flex-direction:column;gap:6px}
-#trgReview .trg-opt{display:block;width:100%;text-align:left;border:1px solid var(--line);background:var(--panel);color:var(--ink);border-radius:10px;padding:9px 12px;font:inherit;font-size:14px;font-weight:600;line-height:1.3;cursor:pointer;transition:background .15s,border-color .15s}
-#trgReview .trg-opt:hover:not(:disabled){border-color:color-mix(in srgb,var(--ink) 28%,var(--line))}
-#trgReview .trg-opt[aria-pressed="true"]{background:color-mix(in srgb,var(--fill) 14%,var(--panel));border-color:var(--fill);box-shadow:inset 0 0 0 1px var(--fill)}
-#trgReview .trg-opt:disabled{opacity:.5;cursor:not-allowed}
-#trgReview textarea.trg-note{min-height:72px;resize:vertical}
-@media (max-width:680px){#trgReview .trg-opt{padding:12px}}
+/* Review Panel: Trigger Engine group sits under the RTB rows in the same card */
+#rtbReview #rtbBody .rtb-filters{display:none}
+#rtbReview .rev-lead2{border-top:1px solid var(--line)}
+#rtbReview #revTop{border-top:0}
+#rtbReview .rev-group{border-top:1px solid var(--line)}
+#rtbReview #rtbBody[hidden] + .rev-group{border-top:0}
+#rtbReview .rev-group-head{display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 12px;padding:14px 18px 6px;font-size:15px}
+#rtbReview .rev-group-head span{color:var(--muted);font-size:13px}
+#rtbReview .trg-opts{display:flex;flex-direction:column;gap:6px}
+#rtbReview .trg-opt{display:block;width:100%;text-align:left;border:1px solid var(--line);background:var(--panel);color:var(--ink);border-radius:10px;padding:9px 12px;font:inherit;font-size:14px;font-weight:600;line-height:1.3;cursor:pointer;transition:background .15s,border-color .15s}
+#rtbReview .trg-opt:hover:not(:disabled){border-color:color-mix(in srgb,var(--ink) 28%,var(--line))}
+#rtbReview .trg-opt[aria-pressed="true"]{background:color-mix(in srgb,var(--fill) 14%,var(--panel));border-color:var(--fill);box-shadow:inset 0 0 0 1px var(--fill)}
+#rtbReview .trg-opt:disabled{opacity:.5;cursor:not-allowed}
+#rtbReview textarea.trg-note{min-height:72px;resize:vertical}
+@media (max-width:680px){#rtbReview .trg-opt{padding:12px}#rtbReview .rev-group-head{padding-left:14px;padding-right:14px}}
 </style>
 </head>
 <body>
@@ -499,8 +519,7 @@ section[data-tab][hidden],.ro-badge[hidden]{display:none!important}
   <nav class="ro-tabs" id="roTabs" role="tablist" aria-label="RevOps L10 views">
     <button type="button" role="tab" id="tab-cr" aria-controls="crSec" data-t="cr" aria-selected="true">Connect rates &amp; dialing</button>
     <button type="button" role="tab" id="tab-rtb" aria-controls="wfSec" data-t="rtb" aria-selected="false" tabindex="-1">RTB report</button>
-    <button type="button" role="tab" id="tab-review" aria-controls="rtbReview" data-t="review" aria-selected="false" tabindex="-1">RTB Review Panel <span class="ro-badge" id="roReviewBadge" hidden></span></button>
-    <button type="button" role="tab" id="tab-trigger" aria-controls="trgReview" data-t="trigger" aria-selected="false" tabindex="-1">Trigger lead review panel <span class="ro-badge" id="roTrgBadge" hidden></span></button>
+    <button type="button" role="tab" id="tab-review" aria-controls="rtbReview" data-t="review" aria-selected="false" tabindex="-1">Review Panel <span class="ro-badge" id="roReviewBadge" hidden></span></button>
   </nav>
 
   <section id="wfSec" aria-labelledby="wfTitle" role="tabpanel" data-tab="rtb" hidden>
@@ -519,35 +538,27 @@ section[data-tab][hidden],.ro-badge[hidden]{display:none!important}
 
   <section id="rtbReview" aria-labelledby="rtbTitle" role="tabpanel" data-tab="review" hidden>
     <div class="sec-head">
-      <h2 id="rtbTitle">RTB Review Panel</h2>
+      <h2 id="rtbTitle">Review Panel</h2>
       <div class="nav">
         <span class="rtb-count" id="rtbCount" aria-live="polite"></span>
+        <span class="rtb-count" id="trgCount" aria-live="polite"></span>
         <button class="btn ghost" type="button" id="rtbRefresh">Refresh</button>
       </div>
     </div>
     <div class="rtb-card">
       <p class="rtb-lead">Bad data: tick a row if it looks fine, or cross it to set Contact.RTB Bad Contact to True in HubSpot. Medium confidence: confirm a good fit and it is enriched on the next run, or reject it. A reject does not write to HubSpot. Rule questions: write an answer and submit it. An answer is final, and nothing is written to HubSpot.</p>
+      <p class="rtb-lead rev-lead2"><b>Trigger Engine questions</b> sit below the RTB rows: things the engine could not decide alone. Pick a choice or write your own answer. An answer is final, nothing is written to HubSpot, and the engine applies it on its next run.</p>
+      <div class="rtb-filters" id="revTop" role="group" aria-label="Filter the review panel"><button type="button" data-top="all" aria-pressed="true">All</button><button type="button" data-top="bad_data" aria-pressed="false">Bad data</button><button type="button" data-top="medium" aria-pressed="false">Medium</button><button type="button" data-top="rtb_rules" aria-pressed="false">RTB rules</button><button type="button" data-top="trg_leads" aria-pressed="false">Trigger leads</button><button type="button" data-top="trg_rules" aria-pressed="false">Trigger rules</button></div>
       <div id="rtbBody">
         <div class="rtb-empty"><b>Loading the review queue…</b></div>
+      </div>
+      <div class="rev-group" id="trgGroup">
+        <div class="rev-group-head"><b>Trigger Engine questions</b><span>Leads and rules the engine needs you to decide</span></div>
+        <div id="trgBody"><div class="rtb-empty"><b>Loading the review queue…</b></div></div>
       </div>
     </div>
   </section>
 
-  <section id="trgReview" aria-labelledby="trgTitle" role="tabpanel" data-tab="trigger" hidden>
-    <div class="sec-head">
-      <h2 id="trgTitle">Trigger lead review panel</h2>
-      <div class="nav">
-        <span class="rtb-count" id="trgCount" aria-live="polite"></span>
-        <button class="btn ghost" type="button" id="trgRefresh">Refresh</button>
-      </div>
-    </div>
-    <div class="rtb-card">
-      <p class="rtb-lead">Questions the Trigger Engine could not decide on its own: a lead or company it is unsure about, or a rule it needs you to set. Pick a choice, or write your own answer, and submit. An answer is final, and nothing is written to HubSpot: the engine reads your answer and applies it on its next run.</p>
-      <div id="trgBody">
-        <div class="rtb-empty"><b>Loading the review queue…</b></div>
-      </div>
-    </div>
-  </section>
   <section class="cr-root" id="crSec" role="tabpanel" data-tab="cr">
     <div class="sec-head">
       <h2 id="crTitle">Connect rate</h2>
@@ -1716,7 +1727,7 @@ try{ boot(); }catch(e){ console.error("RTB Review Panel", e); }
 })();
 </script>
 <script src="revops-rtb.js?v=20261125a"></script>
-<script src="revops-trigger-review.js?v=20261127a"></script>
+<script src="revops-trigger-review.js?v=20261127b"></script>
 <script>
 /* RevOps L10 tabs: one section at a time; the pick is kept in the URL (#rtb, #review) and in this browser */
 (function(){
@@ -1737,9 +1748,9 @@ try{ boot(); }catch(e){ console.error("RTB Review Panel", e); }
   let saved = ""; try{ saved = localStorage.getItem("revops_tab")||""; }catch(e){}
   show(location.hash.slice(1) || saved || "cr");
   // the review queue count rides on its tab, so pending rows are visible from the other tabs
-  const src = document.getElementById("rtbCount"), badge = document.getElementById("roReviewBadge");
-  const sync = ()=>{ const n = (String(src.textContent).match(/\d+/g)||[]).reduce((a,x)=>a + +x, 0); badge.hidden = !n; badge.textContent = n ? String(n) : ""; badge.title = src.textContent; };
-  if(src){ new MutationObserver(sync).observe(src, {childList:true, characterData:true, subtree:true}); sync(); }
+  const srcs = ["rtbCount","trgCount"].map(id=>document.getElementById(id)).filter(Boolean), badge = document.getElementById("roReviewBadge");
+  const sync = ()=>{ const n = srcs.reduce((a,el)=>a + (String(el.textContent).match(/\d+/g)||[]).reduce((b,x)=>b + +x, 0), 0); badge.hidden = !n; badge.textContent = n ? String(n) : ""; badge.title = srcs.map(el=>el.textContent).filter(Boolean).join(" | "); };
+  srcs.forEach(el=>new MutationObserver(sync).observe(el, {childList:true, characterData:true, subtree:true})); sync();
 })();
 </script>
 </body>

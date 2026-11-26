@@ -1,8 +1,8 @@
-﻿# Trigger lead review panel API (RevOps L10 panel; function `trigger-lead-review`)
+# Trigger lead review panel API (RevOps L10 panel; function `trigger-lead-review`)
 
-Backend for the "Trigger lead review panel" tab on https://revops-tracker.github.io/Trackers/revops.html (next to "RTB Review Panel").
+Backend for the Trigger Engine part of the combined **Review Panel** (formerly "RTB Review Panel") on https://revops-tracker.github.io/Trackers/revops.html. RTB rows and Trigger Engine questions share one tab, one count badge, one Refresh button and one set of filter chips (All / Bad data / Medium / RTB rules / Trigger leads / Trigger rules). The RTB code is unchanged: the page script clicks its hidden filter buttons to match.
 Supabase project `ottvswkgqohurzilfafu`, edge function **`trigger-lead-review`** (verify_jwt=false, own auth like `bad-data-review`).
-Source: `supabase/functions/trigger-lead-review/index.ts`. Page code: `revops-trigger-review.js` (styles reuse the RTB panel's).
+Source: `supabase/functions/trigger-lead-review/index.ts`. Page code: `revops-trigger-review.js` (Trigger group + the filter chips) and a few edits in `revops.html` (tab renamed "Review Panel", chips, trigger group, badge sums both counts).
 
 Purpose: the Trigger Engine (Claude sessions, later n8n) puts anything it cannot decide on its own into `public.trigger_lead_review`. A person answers in the panel. The engine reads the answers and applies them. Nothing here writes to HubSpot or Apollo.
 

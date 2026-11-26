@@ -1,4 +1,4 @@
-/* Trigger lead review panel (RevOps L10).
+/* Trigger Engine part of the Review Panel (RevOps L10): sits under the RTB rows in the same panel/tab.
    The Trigger Engine (Claude sessions / n8n) posts anything it cannot decide on its own to
    public.trigger_lead_review. A person answers here (pick an option and/or write a note).
    Two kinds of rows: lead_question (about one lead or company) and rule_question (about the process).
@@ -124,18 +124,14 @@ function doneHTML(it){
 function visiblePending(){
   return S.pending.filter(it => S.filter === "all" || (S.filter === "rule_question" ? isRule(it) : !isRule(it)));
 }
-function filtersHTML(){
-  const opt = (id, label) => '<button type="button" data-filter="'+id+'" aria-pressed="'+(S.filter===id?"true":"false")+'">'+label+'</button>';
-  return '<div class="rtb-filters" role="group" aria-label="Filter pending rows">'+opt("all","All")+opt("lead_question","Leads")+opt("rule_question","Rules")+'</div>';
-}
 function emptyHTML(){
   return '<div class="rtb-empty"><div class="rtb-mark" aria-hidden="true"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg></div><b>Nothing pending</b><span>The Trigger Engine has no open questions.</span></div>';
 }
 function setCount(){
-  const el = $("trgCount"), badge = $("roTrgBadge");
+  const el = $("trgCount");
   const n = S.pending.length;
-  if(el){ el.textContent = S.loaded && S.sawList ? (n ? n + " waiting for you" : "Nothing waiting") : ""; el.classList.toggle("has", n > 0); }
-  if(badge){ badge.hidden = !n; badge.textContent = n ? String(n) : ""; badge.title = n + " waiting for you"; }
+  if(el){ el.textContent = S.loaded && S.sawList && n ? n + " Trigger " + (n === 1 ? "question" : "questions") : ""; el.classList.toggle("has", n > 0); el.hidden = !el.textContent; }
+
 }
 function render(){
   const body = $("trgBody");
@@ -161,7 +157,7 @@ function render(){
       : "";
     // keep the typed text and the scroll position when re-rendering
     const list = body.querySelector(".rtb-list"); const top = list ? list.scrollTop : 0;
-    body.innerHTML = banner + (showQueue ? filtersHTML() : "") + main + recent;
+    body.innerHTML = banner + main + recent;
     const nl = body.querySelector(".rtb-list"); if(nl) nl.scrollTop = top;
     const det = $("trgRecent");
     if(det) det.addEventListener("toggle", () => { S.recentOpen = det.open; });
@@ -201,8 +197,6 @@ async function submit(id){
 }
 
 async function load(isRefresh){
-  const btn = $("trgRefresh");
-  if(btn){ btn.disabled = true; btn.textContent = "Loading…"; }
   try{
     const j = await call("/list");
     if(!j) return;
@@ -215,15 +209,59 @@ async function load(isRefresh){
     else S.loadError = e.message || "Request failed";
     S.loaded = true;
   }finally{
-    if(btn){ btn.disabled = !token(); btn.textContent = "Refresh"; }
     render();
   }
 }
 
+/* Panel-wide filter chips (All / Bad data / Medium / RTB rules / Trigger leads / Trigger rules).
+   The RTB part keeps its own code: its own (hidden) filter buttons are clicked to match, so nothing in it changes. */
+const TOP = {
+  all:       { rtb:"all",               trg:"all",           showRtb:true,  showTrg:true  },
+  bad_data:  { rtb:"bad_data",          trg:"all",           showRtb:true,  showTrg:false },
+  medium:    { rtb:"medium_confidence", trg:"all",           showRtb:true,  showTrg:false },
+  rtb_rules: { rtb:"rule_question",     trg:"all",           showRtb:true,  showTrg:false },
+  trg_leads: { rtb:"all",               trg:"lead_question", showRtb:false, showTrg:true  },
+  trg_rules: { rtb:"all",               trg:"rule_question", showRtb:false, showTrg:true  }
+};
+let topKey = "all";
+function applyRtbFilter(){
+  const c = TOP[topKey];
+  if(!c.showRtb) return;
+  const b = document.querySelector('#rtbBody [data-filter="'+c.rtb+'"]');
+  if(b && b.getAttribute("aria-pressed") !== "true") b.click();
+}
+function applyTop(){
+  const c = TOP[topKey], rb = $("rtbBody"), tg = $("trgGroup");
+  if(rb) rb.hidden = !c.showRtb;
+  if(tg) tg.hidden = !c.showTrg;
+  document.querySelectorAll("#revTop [data-top]").forEach(b => b.setAttribute("aria-pressed", String(b.getAttribute("data-top") === topKey)));
+  S.filter = c.trg;
+  render();
+  applyRtbFilter();
+  try{ sessionStorage.setItem("rev_top", topKey); }catch(e){}
+}
+function initTop(){
+  const bar = $("revTop"), rb = $("rtbBody");
+  if(!bar) return;
+  bar.addEventListener("click", e => {
+    const b = e.target.closest("[data-top]");
+    if(!b || !TOP[b.getAttribute("data-top")]) return;
+    topKey = b.getAttribute("data-top");
+    applyTop();
+  });
+  // the RTB part re-renders itself after loading: re-apply the chosen filter each time
+  if(rb) new MutationObserver(applyRtbFilter).observe(rb, { childList:true });
+  try{ const k = sessionStorage.getItem("rev_top"); if(k && TOP[k]) topKey = k; }catch(e){}
+  applyTop();
+}
+
 function boot(){
-  const body = $("trgBody"), btn = $("trgRefresh");
+  const body = $("trgBody");
   if(!body) return;
-  if(btn) btn.addEventListener("click", () => { if(token() && !S.busy) load(true); });
+  // one Refresh for the whole panel: the RTB part refreshes itself, this adds the Trigger part
+  const rbtn = $("rtbRefresh");
+  if(rbtn) rbtn.addEventListener("click", () => { if(token() && !S.busy) load(true); });
+  initTop();
   body.addEventListener("input", e => {
     const row = e.target.closest(".rtb-row"); if(!row) return;
     const ta = e.target.closest(".trg-note"); if(ta) S.notes[row.dataset.id] = ta.value;
@@ -236,8 +274,6 @@ function boot(){
   });
   body.addEventListener("click", e => {
     if(e.target.closest("#trgRetry")){ load(false); return; }
-    const fb = e.target.closest("[data-filter]");
-    if(fb){ S.filter = fb.getAttribute("data-filter"); render(); return; }
     const row = e.target.closest(".rtb-row");
     if(!row || S.busy) return;
     const id = row.dataset.id;
@@ -246,7 +282,7 @@ function boot(){
     if(ob){ const v = ob.getAttribute("data-opt"); S.picks[id] = S.picks[id] === v ? "" : v; S.errors[id] = ""; render(); return; }
     if(e.target.closest("[data-submit]")) submit(id);
   });
-  if(!token()){ if(btn) btn.hidden = true; S.loaded = true; render(); return; }
+  if(!token()){ S.loaded = true; render(); return; }
   render(); load(false);
 }
 try{ boot(); }catch(e){ console.error("Trigger lead review panel", e); }

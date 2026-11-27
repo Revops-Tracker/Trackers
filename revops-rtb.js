@@ -445,9 +445,37 @@ async function load(){
     const src = (j.src||[]).map(([d, site, dom, s, f])=>({d, site, dom, srcs:String(s||"").split(",").filter(Boolean), f:+f||0}));
     const flags = new Map((j.flags||[]).map(([dom, b])=>[dom, +b||0]));
     S.data = {ga, hits, down, books, src, flags};
+    S.refreshedAt = j.refreshed_at || null;
   }catch(e){ S.err = e.message; }
-  render();
+  render(); fresh();
 }
+/* ---------- Refresh button (11-27): lb-auto /rtb-refresh re-runs the three feeds in n8n (~1-2 min), then we reload ---------- */
+const etFmt = new Intl.DateTimeFormat("en-US", {timeZone:"America/Toronto", month:"short", day:"numeric", hour:"numeric", minute:"2-digit"});
+function fresh(msg, err){
+  const el = $("wfFresh"); if(!el) return;
+  el.classList.toggle("err", !!err);
+  el.textContent = msg || ("Data updates every morning at 7:45 ET"+(S.refreshedAt ? " · last refreshed "+etFmt.format(new Date(S.refreshedAt))+" ET" : "")+". Refresh pulls the latest now.");
+}
+async function rtbRefresh(){
+  const btn = $("wfRefresh"); btn.disabled = true; btn.textContent = "Refreshing…";
+  const H = {Authorization:"Bearer "+token()};
+  const done = ()=>{ btn.disabled = false; btn.textContent = "Refresh"; };
+  try{
+    const r = await fetch(API+"/rtb-refresh", {method:"POST", headers:H});
+    const j = await r.json().catch(()=>({}));
+    if(!r.ok || j.ok===false) throw new Error(j.error || "Could not start the refresh ("+r.status+")");
+    fresh("Pulling the latest RTB data. This takes about a minute…");
+    const started = Date.parse(j.requested_at) || Date.now();
+    for(let i=0; i<30; i++){                     // poll every 8s, give up after 4 minutes
+      await new Promise(res=>setTimeout(res, 8000));
+      const s = await fetch(API+"/rtb-status", {headers:H, cache:"no-store"}).then(x=>x.json()).catch(()=>({}));
+      if(s.refreshed_at && Date.parse(s.refreshed_at) >= started){ await load(); done(); return; }
+    }
+    fresh("The refresh is taking longer than usual. Reload the page in a few minutes.", true);
+  }catch(e){ fresh(e.message, true); }
+  done();
+}
+$("wfRefresh").addEventListener("click", rtbRefresh);
 $("wfBody").addEventListener("mousemove", trendHover);
 // charts are sized to their real width, so redraw when the RTB tab is opened (it may have rendered while hidden)
 const rtbTab = document.getElementById("tab-rtb"); if(rtbTab) rtbTab.addEventListener("click", ()=>setTimeout(()=>{ if(S.data) render(); }, 0));

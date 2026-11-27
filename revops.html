@@ -314,6 +314,11 @@ section[data-tab][hidden],.ro-badge[hidden]{display:none!important}
 #wfSec .wf-l small{display:block;font-weight:500;font-size:12px;color:var(--muted);margin-top:2px}
 #wfSec small.warn,#wfSec .warn{color:var(--behind)}
 #wfSec .wf-fresh{margin:-4px 0 12px;font-size:13px;color:var(--muted)}
+#wfSec .wf-custom{display:flex;flex-wrap:wrap;align-items:center;gap:10px;margin:0 0 12px;font-size:14px}
+#wfSec .wf-custom[hidden]{display:none}
+#wfSec .wf-custom input{font:inherit;padding:6px 8px;border:1px solid var(--line);border-radius:8px;background:var(--panel);color:var(--ink);margin-left:6px}
+#wfSec .wf-custom .btn{padding:7px 14px}
+#wfSec .wf-custom-note{font-size:13px;color:var(--muted)}
 #wfSec .wf-fresh.err{color:var(--behind)}
 #wfSec .wf-bar{height:12px;background:var(--track);border-radius:6px;overflow:hidden}
 #wfSec .wf-bar span{display:block;height:100%;background:var(--fill);border-radius:6px}
@@ -529,13 +534,14 @@ section[data-tab][hidden],.ro-badge[hidden]{display:none!important}
       <h2 id="wfTitle">RTB waterfall</h2>
       <div class="nav">
         <div class="seg" id="wfSite" role="group" aria-label="Website"><button type="button" data-s="jf" aria-pressed="true">JF site</button><button type="button" data-s="cst" aria-pressed="false">CST site (cross-seeds)</button></div>
-        <div class="seg" id="wfView" role="group" aria-label="View"><button type="button" data-v="week" aria-pressed="true">Weekly</button><button type="button" data-v="month" aria-pressed="false">Monthly</button></div>
+        <div class="seg" id="wfView" role="group" aria-label="View"><button type="button" data-v="week" aria-pressed="true">Weekly</button><button type="button" data-v="month" aria-pressed="false">Monthly</button><button type="button" data-v="quarter" aria-pressed="false">Quarterly</button><button type="button" data-v="ytd" aria-pressed="false">Year to date</button><button type="button" data-v="custom" aria-pressed="false">Custom</button></div>
         <button type="button" id="wfPrev" aria-label="Previous period">‹</button>
         <div class="period" id="wfPeriod" aria-live="polite"></div>
         <button type="button" id="wfNext" aria-label="Next period">›</button>
         <button type="button" class="btn ghost" id="wfRefresh" title="Re-pull the RTB data now: product hits, HubSpot stages and rep touches, company flags. Takes about a minute.">Refresh</button>
       </div>
     </div>
+    <form class="wf-custom" id="wfCustom" hidden><label>From <input type="date" id="wfFrom" min="2026-08-17"></label><label>To <input type="date" id="wfTo" min="2026-08-17"></label><button type="submit" class="btn ghost">Show</button><span class="wf-custom-note">Data starts Aug 17, 2026. Dates are Toronto days.</span></form>
     <p class="wf-fresh" id="wfFresh" aria-live="polite"></p>
     <div id="wfBody"></div>
   </section>
@@ -1730,7 +1736,7 @@ function boot(){
 try{ boot(); }catch(e){ console.error("RTB Review Panel", e); }
 })();
 </script>
-<script src="revops-rtb.js?v=20261127d"></script>
+<script src="revops-rtb.js?v=20261127e"></script>
 <script src="revops-trigger-review.js?v=20261127b"></script>
 <script>
 /* RevOps L10 tabs: one section at a time; the pick is kept in the URL (#rtb, #review) and in this browser */

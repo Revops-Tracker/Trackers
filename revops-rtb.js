@@ -39,7 +39,7 @@ const BUCKETS = [
 const BK = Object.fromEntries(BUCKETS.map(b=>[b.k, b]));
 const NO_BOOK = new Set(["live_deal","client","dq_deal",""]);
 
-const S = { data:null, view:"week", site:"jf", idx:0, open:null, err:"" };
+const S = { data:null, view:"week", site:"jf", idx:0, open:null, err:"", gaR:{}, custom:null };
 const F = { MSP:1, EMAIL:2, SEEN:4, LEAD:8, JF:16, CS:32, NA:64, OTH:128 };   // NA / OTH: visitor in US+Canada / elsewhere (11-27)
 const HF = { FOUND:1, NONMSP:2, EXCL:4, ACTIVE:8, JFLINE:16, TODO:32, INTENT:64 };
 /* where a TVL-bucket MSP with no TVL since the hit stands today (current HubSpot flags) */
@@ -81,8 +81,29 @@ function bizMins(a, b){
 const fmtBiz = m => m==null ? "–" : m < 60 ? Math.round(m)+" min" : m < 9*60 ? (Math.round(m/6)/10)+" h" : (Math.round(m/54)/10)+" days";   // business time
 
 /* ---------- periods ---------- */
+// 11-27: Quarter, Year to date and Custom views. Data starts Aug 17 (FROM); earlier dates are clamped and labelled.
+const UNIT = () => ({week:"week", month:"month", quarter:"quarter", ytd:"year", custom:"range"})[S.view] || "period";
+const fmtD = s => MON[+s.slice(5,7)-1]+" "+(+s.slice(8,10));
 function periods(){
   const today = torNow(), out = [];
+  if(S.view==="quarter"){
+    let y = +today.slice(0,4), q = Math.floor((+today.slice(5,7)-1)/3);
+    while(true){ const start = y+"-"+String(q*3+1).padStart(2,"0")+"-01"; const end = d2s(new Date(Date.UTC(y, q*3+3, 0)));
+      if(end < FROM) break;
+      out.push({start:start<FROM?FROM:start, end, label:"Q"+(q+1)+" "+y+(end>=today?" (so far)":"")+(start<FROM?" (from Aug 17)":"")});
+      q--; if(q<0){ q = 3; y--; } }
+    return out;
+  }
+  if(S.view==="ytd"){
+    const start = today.slice(0,4)+"-01-01";
+    out.push({start:start<FROM?FROM:start, end:today, label:today.slice(0,4)+" to date"+(start<FROM?" (from Aug 17)":"")});
+    return out;
+  }
+  if(S.view==="custom"){
+    const c = S.custom || {}, from = c.from && c.from > FROM ? c.from : FROM, to = c.to && c.to < today ? c.to : today;
+    out.push({start:from, end:to<from?from:to, label:fmtD(from)+" to "+fmtD(to<from?from:to)+", "+to.slice(0,4)+(c.from && c.from < FROM ? " (from Aug 17)" : "")});
+    return out;
+  }
   if(S.view==="week"){
     let mon = add(today, -((s2d(today).getUTCDay()+6)%7));
     while(mon >= add(FROM,-6)){ const end = add(mon,6); out.push({start:mon<FROM?FROM:mon, end, label:"Week of "+lbl(mon)+(end>=today?" (so far)":"")}); mon = add(mon,-7); }
@@ -191,7 +212,7 @@ function trend(){
   const P = periods().slice(0, S.view==="week" ? 12 : 12).reverse();
   const rows = P.map(p=>{ const y = srcCohort(p), x = cohort(p);
     const r = (a,b) => b ? Math.round(100*a/b) : null;
-    return { p, label: S.view==="week" ? lbl(p.start) : MON[+p.start.slice(5,7)-1], so: p.end >= torNow(),
+    return { p, label: S.view==="week" ? lbl(p.start) : S.view==="quarter" ? p.label.slice(0,2) : MON[+p.start.slice(5,7)-1], so: p.end >= torNow(),
       fix: p.start <= FIX_DAY && p.end >= FIX_DAY, after: p.start > FIX_DAY,
       msp: y.msp.length, reached: y.reached.length, reachPct: r(y.reached.length, y.msp.length),
       workPct: r(x.worked.length, x.act.length), fastPct: r(x.fast.length, x.due.length), bookPct: r(x.booked.length, x.bookable.length),
@@ -206,7 +227,7 @@ function chartSvg(id, rows, series, pct){
   if(!pct){ const raw = top/4, m = Math.pow(10, Math.floor(Math.log10(raw))), st = [1,2,2.5,5,10].map(k=>k*m).find(k=>k>=raw); top = st*4; }   // 4 whole-number gridlines
   const iw = W-ml-mr, ih = H-mt-mb, step = n>1 ? iw/(n-1) : 0;
   const X = i => ml + (n>1 ? i*step : iw/2), Y = v => mt + ih - ih*v/top;
-  let s = '<svg viewBox="0 0 '+W+' '+H+'" role="img" aria-label="'+h(series.map(x=>x.name).join(", "))+' by '+(S.view==="week"?"week":"month")+'">';
+  let s = '<svg viewBox="0 0 '+W+' '+H+'" role="img" aria-label="'+h(series.map(x=>x.name).join(", "))+' by '+UNIT()+'">';
   for(let t=0; t<=4; t++){ const v = top*t/4, y = Y(v);
     s += '<line class="grid" x1="'+ml+'" x2="'+(W-mr)+'" y1="'+y+'" y2="'+y+'"/><text x="'+(ml-6)+'" y="'+(y+4)+'" text-anchor="end">'+(pct?Math.round(v)+"%":Math.round(v))+'</text>'; }
   const lw = Math.max(...rows.map(r=>r.label.length+1)) * 6.5 + 12;   // rough label width, so x labels never collide
@@ -245,12 +266,12 @@ const TREND_COUNT = [ {k:"msp", name:"Scored MSP by the product", short:"MSPs", 
 const TREND_RATE = [ {k:"reachPct", name:"Reached our engine", short:"reached", c:"--c-reach"}, {k:"workPct", name:"Worked by a rep", short:"worked", c:"--c-work"},
   {k:"fastPct", name:"Worked within 1 business day", short:"≤1 day", c:"--c-fast"}, {k:"bookPct", name:"Booked a call", short:"booked", c:"--c-book"} ];
 function trendHtml(){
-  const rows = trend(); S.trendRows = rows; const unit = S.view==="week" ? "week" : "month";
+  const rows = trend(); S.trendRows = rows; const unit = UNIT();
   // draw each chart at its real width so text stays 11px (two side by side when there is room)
   const bw = ($("wfBody").clientWidth || 800), cols = bw >= 2*420 + 12 ? 2 : 1;
   S.chartW = Math.max(300, Math.round((bw - (cols-1)*12) / cols - 30));
   const legend = L => '<div class="wf-legend">'+L.map(s=>'<span><i style="background:var('+s.c+')"></i>'+h(s.name)+'</span>').join("")+'</div>';
-  const tbl = '<details class="wf-data"><summary>Show the numbers</summary><div class="table-wrap"><table class="wf-tbl small"><thead><tr><th>'+(unit==="week"?"Week of":"Month")+'</th><th>MSPs</th><th>Reached</th><th>Reached %</th><th>Worked %</th><th>≤1 business day %</th><th>Booked %</th></tr></thead><tbody>'+
+  const tbl = '<details class="wf-data"><summary>Show the numbers</summary><div class="table-wrap"><table class="wf-tbl small"><thead><tr><th>'+(unit==="week"?"Week of":unit==="quarter"?"Quarter":"Month")+'</th><th>MSPs</th><th>Reached</th><th>Reached %</th><th>Worked %</th><th>≤1 business day %</th><th>Booked %</th></tr></thead><tbody>'+
     rows.slice().reverse().map(r=>'<tr><td>'+h(r.label)+(r.so?" (so far)":"")+(r.fix?" · fixes live":"")+'</td><td>'+r.msp+'</td><td>'+r.reached+'</td><td>'+(r.reachPct??"–")+(r.reachPct!=null?"%":"")+'</td><td>'+(r.workPct??"–")+(r.workPct!=null?"%":"")+'</td><td>'+(r.fastPct??"–")+(r.fastPct!=null?"%":"")+'</td><td>'+(r.bookPct??"–")+(r.bookPct!=null?"%":"")+'</td></tr>').join("")+'</tbody></table></div></details>';
   return '<div class="wf-trends">'+
     '<div class="wf-chart" data-chart="cnt"><h4>MSPs identified vs reached our engine</h4><p>Companies per '+unit+', JF site</p>'+legend(TREND_COUNT)+chartSvg("cnt", rows, TREND_COUNT, false)+'<div class="wf-tip" role="status"></div></div>'+
@@ -278,10 +299,23 @@ function visitors(p, grp){
   const G = S.data.ga, k = p.start+"|"+grp, y = add(torNow(),-1), end = p.end > y ? y : p.end;
   // GA's week / month rows cover the period up to yesterday, so they are the de-duplicated count even for the period in
   // progress (11-27: summing daily uniques overcounted Nov by ~9%)
-  const st = s2d(p.start), whole = S.view==="week" ? st.getUTCDay()===1 : p.start.slice(8)==="01";
-  if(whole && G.agg.has((S.view==="week"?"w":"m")+"|"+k)) return {...G.agg.get((S.view==="week"?"w":"m")+"|"+k), exact:true};
+  const st = s2d(p.start), wk = S.view==="week" && st.getUTCDay()===1, mo = S.view==="month" && p.start.slice(8)==="01";
+  if(wk && G.agg.has("w|"+k)) return {...G.agg.get("w|"+k), exact:true};
+  if(mo && G.agg.has("m|"+k)) return {...G.agg.get("m|"+k), exact:true};
+  // 11-27: anything else (quarter, year to date, custom, a part-month) asks GA for that exact Toronto range on demand
+  const rk = p.start+"|"+end, R = S.gaR[rk];
+  if(R && R.ok && R.groups && R.groups[grp]) return {s:R.groups[grp].s, u:R.groups[grp].u, exact:true};
+  if(!R) gaRange(p.start, end);
+  if(!R || R.loading) return {loading:true};
   let s = 0, u = 0, n = 0; G.d.forEach(x=>{ if(x.grp===grp && x.start>=p.start && x.start<=end){ s+=x.s; u+=x.u; n++; } });
   return n ? {s, u, exact:false} : null;
+}
+function gaRange(from, to){
+  const rk = from+"|"+to; if(S.gaR[rk]) return;
+  S.gaR[rk] = {loading:true};
+  fetch(API+"/rtb-ga?from="+from+"&to="+to, {headers:{Authorization:"Bearer "+token()}, cache:"no-store"})
+    .then(r=>r.json().catch(()=>({ok:false}))).then(j=>{ S.gaR[rk] = j && j.ok ? j : {ok:false}; render(); })
+    .catch(()=>{ S.gaR[rk] = {ok:false}; render(); });
 }
 const median = a => { if(!a.length) return null; const s = a.slice().sort((x,y)=>x-y), m = s.length>>1; return s.length%2 ? s[m] : (s[m-1]+s[m])/2; };
 const pct = (a,b) => b ? Math.round(100*a/b)+"%" : "–";
@@ -331,36 +365,56 @@ function render(){
   const P1 = y.all.length, P2 = Math.max(1, eng.length);
   // 11-27: visitors are people and identified companies are companies, so no percentage links the two. We show the
   // visitor counts we care about (US + Canada, bots removed), then the companies identified as a plain count.
-  const visNa = jf ? visitors(p, "na") : null, visH = jf ? visitors(p, "nah") : null;
-  const VW = n => vis && vis.u ? Math.max(2, Math.round(100*n/vis.u)) : 2;
+  const visNa0 = jf ? visitors(p, "na") : null, visH0 = jf ? visitors(p, "nah") : null;
+  // while the on-demand GA range is loading, the visitor rows show "…" instead of numbers
+  const gaWait = !!((vis && vis.loading) || (visNa0 && visNa0.loading) || (visH0 && visH0.loading));
+  const ok = v => v && !v.loading ? v : null, visOk = ok(vis), visNa = ok(visNa0), visH = ok(visH0);
+  const VW = n => visOk && visOk.u ? Math.max(2, Math.round(100*n/visOk.u)) : 2;
   const lost = y.msp.length - y.reached.length;
   const lostWhy = [back(y.lead) < y.lead.length ? (y.lead.length-back(y.lead))+" already a lead in the product DB" : "",
     back(y.noemail) < y.noemail.length ? (y.noemail.length-back(y.noemail))+" with no contact email (sent to Clay only)" : "",
     back(y.email) < y.email.length ? (y.email.length-back(y.email))+" with an email but dropped by Step 1" : ""].filter(Boolean).join(", ");
+  // 11-27: who found each company, and why a company-only MSP has no contact yet (lost before the engine, already known in
+  // HubSpot, not a target after all, or genuinely still waiting)
+  const srcOf = L => { const m = {}; L.forEach(c=>c.srcs.forEach(s=>m[s]=(m[s]||0)+1)); const k = Object.keys(m).sort();
+    return k.length ? " · By source: "+k.map(s=>s.replace(/^SRC-/,"")+" "+m[s]).join(" · ") : ""; };
+  const engBy = new Map(x.jf.map(c=>[c.dom, c])), noC = {lost:[], known:[], not:[], wait:[]};
+  y.none.forEach(c=>{ const e = engBy.get(c.dom);
+    if(!c.reached) noC.lost.push(c);
+    else if(e && (e.cls==="later" || e.cls==="non" || e.cls==="unclear")) noC.not.push(c);
+    else if(e && (e.cls==="client" || e.how==="dm" || e.how==="out" || e.tvlState==="prior")) noC.known.push(c);
+    else noC.wait.push(c); });
   const steps = [
     jf ? {div:"Website traffic · Google Analytics"} : {div:"Before our engine · identified by the product team"},
-    jf ? {k:"vis", l:"Website visitors (unique)", n:vis ? vis.u : null, sub:vis ? "All countries · "+vis.s.toLocaleString("en-US")+" sessions"+(vis.exact?"":" · sum of daily uniques") : "GA not loaded", noList:true, cls:"vis", w:100} : null,
+    jf ? {k:"vis", l:"Website visitors (unique)", n:visOk ? visOk.u : null, sub:gaWait ? "Asking Google Analytics for this exact range…" : visOk ? "All countries · "+visOk.s.toLocaleString("en-US")+" sessions"+(visOk.exact?"":" · sum of daily uniques (GA range lookup failed)") : "GA not loaded", noList:true, cls:"vis", w:100} : null,
     jf && visNa ? {k:"visna", l:"From the US and Canada", n:visNa.u, noList:true, cls:"vis", w:VW(visNa.u),
-      sub:vis ? (vis.u-visNa.u).toLocaleString("en-US")+" from other countries left out" : ""} : null,
+      sub:visOk ? (visOk.u-visNa.u).toLocaleString("en-US")+" from other countries left out" : ""} : null,
     jf && visH ? {k:"vish", l:"US and Canada, bots removed", n:visH.u, noList:true, cls:"vis", w:VW(visH.u),
       sub:(visNa ? (visNa.u-visH.u).toLocaleString("en-US")+" likely bots left out: " : "Left out: ")+"all visits from Meta's data-centre towns (ad review systems), direct and paid-social visits from Google, Amazon and Microsoft server towns (search and referral visits there are kept), Linux desktops and unknown browsers. These are the visitors we can sell to."} : null,
     jf ? {div:"Companies the product team identified · a separate count from visitors (one company can be many visitors)"} : null,
     {k:"id", l:"Companies identified", n:y.all.length, list:y.all, src:true, max:P1,
       sub:[y.na.length ? y.na.length.toLocaleString("en-US")+" visited from the US or Canada" : "", y.noCtry.length ? y.noCtry.length.toLocaleString("en-US")+" with no country recorded" : "",
            y.abroad.length ? y.abroad.length.toLocaleString("en-US")+" from elsewhere" : ""].filter(Boolean).join(", ")+(srcLine ? " · By source: "+srcLine : "")},
-    {k:"seen", l:"Visited on an earlier day", n:y.seen.length, of:y.all.length, list:y.seen, src:true, max:P1, cls:"sub info", sub:"Their first visit this "+(S.view==="week"?"week":"month")+" wasn't their first ever: an earlier day, any time in the product's history"},
-    {k:"back", l:"Came back on another day this "+(S.view==="week"?"week":"month"), n:y.back.length, of:y.all.length, list:y.back, src:true, max:P1, cls:"sub info",
-      sub:"Identified on 2 or more different days within this "+(S.view==="week"?"week":"month")+" (same-day visits count once)"},
+    {k:"seen", l:"Visited on an earlier day", n:y.seen.length, of:y.all.length, list:y.seen, src:true, max:P1, cls:"sub info", sub:"Their first visit this "+UNIT()+" wasn't their first ever: an earlier day, any time in the product's history"},
+    {k:"back", l:"Came back on another day this "+UNIT(), n:y.back.length, of:y.all.length, list:y.back, src:true, max:P1, cls:"sub info",
+      sub:"Identified on 2 or more different days within this "+UNIT()+" (same-day visits count once)"},
     {k:"pmsp", l:"Scored MSP by the product", n:y.msp.length, of:y.all.length, list:y.msp, src:true, max:P1,
       sub:y.non.length.toLocaleString("en-US")+" scored not MSP: the bridge doesn't send those"+(jf ? " (JF directory-page visitors still reach our engine, see below)" : "")+
         " · across all "+y.all.length.toLocaleString("en-US")+" companies, the visitor was named for "+y.personAll.length.toLocaleString("en-US")},
     jf ? {div:"How well we know each of the "+y.msp.length+" MSPs"} : null,
     jf && {k:"person", l:"Person identified", n:y.person.length, of:y.msp.length, list:y.person, src:true, max:P1, cls:"sub",
-      sub:"The product named the visitor (person email)"},
+      sub:"The product named the visitor (person email)"+srcOf(y.person)},
     jf && {k:"found", l:"Company only, contact found afterwards", n:y.found.length, of:y.msp.length, list:y.found, src:true, max:P1, cls:"sub",
-      sub:"No person from the product; we found a contact through Clay enrichment or TVL"},
-    jf && {k:"none", l:"Company only, still no contact", n:y.none.length, of:y.msp.length, list:y.none, src:true, max:P1, cls:"sub leak",
-      sub:"We know the company but have nobody to call yet", warn:y.none.length},
+      sub:"No person from the product; we found a contact through Clay enrichment or TVL"+srcOf(y.found)},
+    jf && {k:"known", l:"Company only, contacts already in HubSpot", n:noC.known.length, of:y.msp.length, list:noC.known, src:true, max:P1, cls:"sub",
+      sub:"Live or missed deal, client, closed deal or verified before this visit: the rep already has people to call"+srcOf(noC.known)},
+    jf && {k:"lost", l:"Company only, never reached our engine", n:noC.lost.length, of:y.msp.length, list:noC.lost, src:true, max:P1, cls:"sub leak",
+      sub:noC.lost.length ? [noC.lost.filter(c=>c.lead).length+" already a lead in the product DB", noC.lost.filter(c=>!c.lead).length+" with no contact email (sent to Clay only)"].join(", ")+
+        ". Nobody looked for contacts: the bridge dropped them until the Nov 24 fix"+srcOf(noC.lost) : "None: every company-only MSP reached our engine", warn:noC.lost.length},
+    jf && {k:"nottarget", l:"Company only, not a target after all", n:noC.not.length, of:y.msp.length, list:noC.not, src:true, max:P1, cls:"sub info",
+      sub:"Flagged not-MSP in HubSpot after the hit, or our own check said not MSP or unclear"+srcOf(noC.not)},
+    jf && {k:"none", l:"Company only, still no contact", n:noC.wait.length, of:y.msp.length, list:noC.wait, src:true, max:P1, cls:"sub leak",
+      sub:"Reached us but nobody to call yet: waiting in the fishing queue, or not queued"+srcOf(noC.wait), warn:noC.wait.length},
     jf && {k:"tvl", l:"Contacts verified (TVL) and handed to a rep", n:y.tvl.length, of:y.msp.length, list:y.tvl, src:true, max:P1,
       sub:"Triple-verified contacts, rep told by the BDR digest · MSPs with a live deal or a booked call go to their rep without TVL (see Handed to a rep below)"},
     {k:"reached", l:jf ? "Reached our engine" : "Reached us as cross-seeds", n:y.reached.length, of:y.msp.length, list:y.reached, src:true, max:P1,
@@ -424,14 +478,14 @@ function render(){
     (jf ? (p.end < FIX_DAY ? '<div class="wf-mark before"><b>Before the Nov 24 fixes.</b> Repeat visitors, company-only hits and direct bridge posts were not reaching our engine in this period.</div>'
       : '<div class="wf-mark"><b>'+(p.start <= FIX_DAY ? "Fixes went live Nov 24, in this period." : "After the Nov 24 fixes.")+'</b> Repeat visitors, company-only MSP hits and bridge posts now reach our engine; emails count as touches.</div>') : '')+
     '<div class="wf-card"><ol class="wf-steps">'+steps.map(s=>stepRow(s)).join("")+'</ol></div>'+
-    (jf ? '<h3 class="wf-h3">Trend: is the drop-off shrinking?</h3>'+trendHtml() : '')+
+    (jf && (S.view==="week" || S.view==="month" || S.view==="quarter") ? '<h3 class="wf-h3">Trend: is the drop-off shrinking?</h3>'+trendHtml() : '')+
     '<h3 class="wf-h3">By source: where each feed drops off before our engine</h3>'+
     '<div class="table-wrap"><table class="wf-tbl"><thead><tr><th>Source</th><th>Companies identified</th><th>Visited before</th><th>Scored MSP</th><th>MSP: already a lead</th><th>MSP: no contact email</th><th>MSP: with email</th><th>MSPs that reached us</th></tr></thead><tbody>'+
       (srcRows || '<tr><td colspan="8">No identified companies in this period.</td></tr>')+'</tbody></table></div>'+
     (jf ? '<h3 class="wf-h3">Where the MSPs stood, and what happened next</h3>'+
     '<div class="table-wrap"><table class="wf-tbl"><thead><tr><th>HubSpot on the hit day</th><th>MSPs</th><th>Handed to a rep</th><th>Worked</th><th>Within 1 business day</th><th>Median to first touch</th><th>Booked</th></tr></thead><tbody>'+rows+'</tbody></table></div>'+
     (whoRows ? '<h3 class="wf-h3">Who made the first touch</h3><div class="table-wrap"><table class="wf-tbl"><thead><tr><th>Rep</th><th>First touches</th><th>Within 1 business day</th><th>Median time</th><th>How</th></tr></thead><tbody>'+whoRows+'</tbody></table></div>' : "") : "")+
-    '<p class="wf-foot">'+(jf ? 'Trend: one point per '+(S.view==="week"?"week":"month")+' (* = still in progress). Each rate is % of the step before it, so the latest points read low until they mature: worked needs a business day, booked up to 90 days. ' : '')+'Before our engine: every company the product team identified on the '+(jf?"JF":"CST")+' site in the period (their hits database, copied daily at 7:30). '+
+    '<p class="wf-foot">'+(jf ? 'Trend: one point per '+UNIT()+' (* = still in progress). Each rate is % of the step before it, so the latest points read low until they mature: worked needs a business day, booked up to 90 days. ' : '')+'Before our engine: every company the product team identified on the '+(jf?"JF":"CST")+' site in the period (their hits database, copied daily at 7:30). '+
     'A company counts once per period; a company seen by two feeds counts under each source in the source table. '+
     '"Already a lead" = the company was in the product leads table before its first hit in the period: the bridge workflow (n8n tchdb48F6TpJ4081) did not forward it until Nov 24, so repeat visitors were lost. '+
     '"No contact email" = until Nov 24 the bridge sent it to Clay only, and it reached us only if Clay sent it back. '+
@@ -523,7 +577,16 @@ $("wfSite").addEventListener("click", e=>{ const b = e.target.closest("button[da
   $("wfSite").querySelectorAll("button").forEach(x=>x.setAttribute("aria-pressed", String(x===b))); render(); });
 $("wfView").addEventListener("click", e=>{ const b = e.target.closest("button[data-v]"); if(!b) return;
   S.view = b.dataset.v; S.idx = 0; S.open = null;
-  $("wfView").querySelectorAll("button").forEach(x=>x.setAttribute("aria-pressed", String(x===b))); render(); });
+  $("wfView").querySelectorAll("button").forEach(x=>x.setAttribute("aria-pressed", String(x===b)));
+  // Custom: show the date pickers, defaulting to the last 30 days
+  const cf = $("wfCustom"); cf.hidden = S.view!=="custom";
+  if(S.view==="custom" && !S.custom){ const t = torNow(); S.custom = {from:add(t,-29) < FROM ? FROM : add(t,-29), to:t}; }
+  if(S.view==="custom"){ $("wfFrom").value = S.custom.from; $("wfTo").value = S.custom.to; $("wfFrom").max = $("wfTo").max = torNow(); }
+  render(); });
+$("wfCustom").addEventListener("submit", e=>{ e.preventDefault();
+  let f = $("wfFrom").value, t = $("wfTo").value; if(!f || !t) return;
+  if(f > t){ const z = f; f = t; t = z; }
+  S.custom = {from:f, to:t}; S.idx = 0; S.open = null; render(); });
 $("wfPrev").addEventListener("click", ()=>{ S.idx++; S.open = null; render(); });
 $("wfNext").addEventListener("click", ()=>{ S.idx--; S.open = null; render(); });
 $("wfBody").addEventListener("click", e=>{ const b = e.target.closest("button[data-step]"); if(!b || b.disabled) return;

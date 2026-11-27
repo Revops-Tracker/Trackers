@@ -176,7 +176,8 @@ function srcCohort(p){
     c.res = c.email ? "person" : (c.tvlDone || dn.c.some(d=>d>=c.first)) ? "found" : "none";
   });
   const msp = all.filter(c=>c.msp);
-  return { all, seen:all.filter(c=>c.seen), msp, non:all.filter(c=>!c.msp),
+  // 11-27: came back within the period = hits on 2+ different (Toronto) days in it, whatever happened before the period
+  return { all, seen:all.filter(c=>c.seen), back:all.filter(c=>c.days>=2), msp, non:all.filter(c=>!c.msp),
     na:all.filter(c=>c.ctry==="na"), noCtry:all.filter(c=>!c.ctry), abroad:all.filter(c=>c.ctry==="other"),
     person:msp.filter(c=>c.res==="person"), found:msp.filter(c=>c.res==="found"), none:msp.filter(c=>c.res==="none"), tvl:msp.filter(c=>c.tvlDone),
     personAll:all.filter(c=>c.res==="person"),
@@ -338,19 +339,21 @@ function render(){
     back(y.email) < y.email.length ? (y.email.length-back(y.email))+" with an email but dropped by Step 1" : ""].filter(Boolean).join(", ");
   const steps = [
     jf ? {div:"Website traffic · Google Analytics"} : {div:"Before our engine · identified by the product team"},
-    jf ? {k:"vis", l:"Website visitors (unique)", n:vis ? vis.u : null, sub:vis ? "All countries · "+vis.s.toLocaleString()+" sessions"+(vis.exact?"":" · sum of daily uniques") : "GA not loaded", noList:true, cls:"vis", w:100} : null,
+    jf ? {k:"vis", l:"Website visitors (unique)", n:vis ? vis.u : null, sub:vis ? "All countries · "+vis.s.toLocaleString("en-US")+" sessions"+(vis.exact?"":" · sum of daily uniques") : "GA not loaded", noList:true, cls:"vis", w:100} : null,
     jf && visNa ? {k:"visna", l:"From the US and Canada", n:visNa.u, noList:true, cls:"vis", w:VW(visNa.u),
-      sub:vis ? (vis.u-visNa.u).toLocaleString()+" from other countries left out" : ""} : null,
+      sub:vis ? (vis.u-visNa.u).toLocaleString("en-US")+" from other countries left out" : ""} : null,
     jf && visH ? {k:"vish", l:"US and Canada, bots removed", n:visH.u, noList:true, cls:"vis", w:VW(visH.u),
-      sub:(visNa ? (visNa.u-visH.u).toLocaleString()+" likely bots left out: " : "Left out: ")+"all visits from Meta's data-centre towns (ad review systems), direct and paid-social visits from Google, Amazon and Microsoft server towns (search and referral visits there are kept), Linux desktops and unknown browsers. These are the visitors we can sell to."} : null,
+      sub:(visNa ? (visNa.u-visH.u).toLocaleString("en-US")+" likely bots left out: " : "Left out: ")+"all visits from Meta's data-centre towns (ad review systems), direct and paid-social visits from Google, Amazon and Microsoft server towns (search and referral visits there are kept), Linux desktops and unknown browsers. These are the visitors we can sell to."} : null,
     jf ? {div:"Companies the product team identified · a separate count from visitors (one company can be many visitors)"} : null,
     {k:"id", l:"Companies identified", n:y.all.length, list:y.all, src:true, max:P1,
-      sub:[y.na.length ? y.na.length.toLocaleString()+" visited from the US or Canada" : "", y.noCtry.length ? y.noCtry.length.toLocaleString()+" with no country recorded" : "",
-           y.abroad.length ? y.abroad.length.toLocaleString()+" from elsewhere" : ""].filter(Boolean).join(", ")+(srcLine ? " · By source: "+srcLine : "")},
-    {k:"seen", l:"Visited on an earlier day", n:y.seen.length, of:y.all.length, list:y.seen, src:true, max:P1, cls:"sub info", sub:"Repeat visitors (any earlier hit in the product's history)"},
+      sub:[y.na.length ? y.na.length.toLocaleString("en-US")+" visited from the US or Canada" : "", y.noCtry.length ? y.noCtry.length.toLocaleString("en-US")+" with no country recorded" : "",
+           y.abroad.length ? y.abroad.length.toLocaleString("en-US")+" from elsewhere" : ""].filter(Boolean).join(", ")+(srcLine ? " · By source: "+srcLine : "")},
+    {k:"seen", l:"Visited on an earlier day", n:y.seen.length, of:y.all.length, list:y.seen, src:true, max:P1, cls:"sub info", sub:"Their first visit this "+(S.view==="week"?"week":"month")+" wasn't their first ever: an earlier day, any time in the product's history"},
+    {k:"back", l:"Came back on another day this "+(S.view==="week"?"week":"month"), n:y.back.length, of:y.all.length, list:y.back, src:true, max:P1, cls:"sub info",
+      sub:"Identified on 2 or more different days within this "+(S.view==="week"?"week":"month")+" (same-day visits count once)"},
     {k:"pmsp", l:"Scored MSP by the product", n:y.msp.length, of:y.all.length, list:y.msp, src:true, max:P1,
-      sub:y.non.length.toLocaleString()+" scored not MSP: the bridge doesn't send those"+(jf ? " (JF directory-page visitors still reach our engine, see below)" : "")+
-        " · across all "+y.all.length.toLocaleString()+" companies, the visitor was named for "+y.personAll.length.toLocaleString()},
+      sub:y.non.length.toLocaleString("en-US")+" scored not MSP: the bridge doesn't send those"+(jf ? " (JF directory-page visitors still reach our engine, see below)" : "")+
+        " · across all "+y.all.length.toLocaleString("en-US")+" companies, the visitor was named for "+y.personAll.length.toLocaleString("en-US")},
     jf ? {div:"How well we know each of the "+y.msp.length+" MSPs"} : null,
     jf && {k:"person", l:"Person identified", n:y.person.length, of:y.msp.length, list:y.person, src:true, max:P1, cls:"sub",
       sub:"The product named the visitor (person email)"},
@@ -388,7 +391,7 @@ function render(){
       '<button type="button" class="wf-stepbtn" data-step="'+s.k+'"'+(s.noList?" disabled":"")+' aria-expanded="'+(S.open===s.k)+'">'+
       '<span class="wf-l">'+h(s.l)+(s.sub?'<small class="'+(s.warn?"warn":"")+'">'+h(s.sub)+'</small>':'')+'</span>'+
       '<span class="wf-bar"><span style="width:'+w+'%"></span></span>'+
-      '<span class="wf-n">'+(s.n==null?"–":Number(s.n).toLocaleString())+(s.of!=null?'<small>'+pct(s.n, s.of)+'</small>':'')+'</span></button>'+
+      '<span class="wf-n">'+(s.n==null?"–":Number(s.n).toLocaleString("en-US"))+(s.of!=null?'<small>'+pct(s.n, s.of)+'</small>':'')+'</span></button>'+
       (S.open===s.k ? (s.src ? listSrcHtml(s.list) : listHtml(s.list, s.k)) : "")+'</li>';
   };
   // by source: where each feed falls off before our engine
@@ -449,7 +452,7 @@ function listSrcHtml(list){
     L.slice(0, CAP).map(c=>'<tr><td><b>'+h(c.dom)+'</b></td><td>'+lbl(c.first)+(c.days>1?' <small>+'+(c.days-1)+' days</small>':'')+'</td><td>'+h([...c.srcs].map(s=>s.replace(/^SRC-/,"")).join(", ")||"–")+'</td>'+
       '<td>'+(c.msp?"Yes":"–")+'</td><td>'+yes(c.seen)+'</td><td>'+yes(c.lead && c.msp, true)+'</td><td>'+yes(c.email)+'</td>'+
       '<td>'+(c.reached?"Yes":(c.msp?'<span class="warn">No</span>':"–"))+'</td></tr>').join("")+
-    '</tbody></table>'+(L.length > CAP ? '<p class="wf-none">Showing the latest '+CAP+' of '+L.length.toLocaleString()+'.</p>' : '')+'</div>';
+    '</tbody></table>'+(L.length > CAP ? '<p class="wf-none">Showing the latest '+CAP+' of '+L.length.toLocaleString("en-US")+'.</p>' : '')+'</div>';
 }
 function listHtml(list, k){
   if(!list || !list.length) return '<div class="wf-list"><p class="wf-none">None</p></div>';

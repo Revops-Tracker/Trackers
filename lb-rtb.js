@@ -72,7 +72,7 @@ function scRtb(view, p){
     seg:s=>jf.filter(c=>c.seg===s),
   };
 }
-const rtbVisSub = v => v ? v.s.toLocaleString()+" sessions"+(v.exact ? "" : " · sum of daily uniques") : "";
+const rtbVisSub = v => v ? v.s.toLocaleString("en-US")+" sessions"+(v.exact ? "" : " · sum of daily uniques") : "";
 const rtbOfN = (a, b, what) => b ? Math.round(100*a/b)+"% of "+b+" "+what : "";
 const SC_RTB_ROWS = [
   {grp:"RTB waterfall (website → MSP → TVL)"},

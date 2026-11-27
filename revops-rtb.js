@@ -40,7 +40,7 @@ const BK = Object.fromEntries(BUCKETS.map(b=>[b.k, b]));
 const NO_BOOK = new Set(["live_deal","client","dq_deal",""]);
 
 const S = { data:null, view:"week", site:"jf", idx:0, open:null, err:"" };
-const F = { MSP:1, EMAIL:2, SEEN:4, LEAD:8, JF:16, CS:32 };
+const F = { MSP:1, EMAIL:2, SEEN:4, LEAD:8, JF:16, CS:32, NA:64, OTH:128 };   // NA / OTH: visitor in US+Canada / elsewhere (11-27)
 const HF = { FOUND:1, NONMSP:2, EXCL:4, ACTIVE:8, JFLINE:16, TODO:32, INTENT:64 };
 /* where a TVL-bucket MSP with no TVL since the hit stands today (current HubSpot flags) */
 const TVL_STATE = {
@@ -167,9 +167,19 @@ function srcCohort(p){
     c.email = !!(c.f & F.EMAIL);
     c.reached = !!(c.f & (F.JF|F.CS));
     c.branch = c.lead ? "lead" : c.email ? "email" : "noemail";
+    c.ctry = (c.f & F.NA) ? "na" : (c.f & F.OTH) ? "other" : "";   // visitor country from the product hits (11-27)
+    // 11-27 resolution: how well we know this company. person = the product named the visitor (person email);
+    // found = no person from the product, but a contact was added later (Clay enrichment or TVL); none = still no contact.
+    // tvl = verified by TVL and the rep was told (BDR digest "TVL added").
+    const dn = S.data.down.get(c.dom) || {t:[], c:[]};
+    c.tvlDone = dn.t.some(d=>d>=c.first);
+    c.res = c.email ? "person" : (c.tvlDone || dn.c.some(d=>d>=c.first)) ? "found" : "none";
   });
   const msp = all.filter(c=>c.msp);
   return { all, seen:all.filter(c=>c.seen), msp, non:all.filter(c=>!c.msp),
+    na:all.filter(c=>c.ctry==="na"), noCtry:all.filter(c=>!c.ctry), abroad:all.filter(c=>c.ctry==="other"),
+    person:msp.filter(c=>c.res==="person"), found:msp.filter(c=>c.res==="found"), none:msp.filter(c=>c.res==="none"), tvl:msp.filter(c=>c.tvlDone),
+    personAll:all.filter(c=>c.res==="person"),
     lead:msp.filter(c=>c.branch==="lead"), noemail:msp.filter(c=>c.branch==="noemail"), email:msp.filter(c=>c.branch==="email"),
     reached:msp.filter(c=>c.reached) };
 }
@@ -261,11 +271,15 @@ function trendHover(e){
   let left = box.left - cb.left + cx*sx + 12; if(left + tip.offsetWidth > cb.width - 4) left = box.left - cb.left + cx*sx - tip.offsetWidth - 12;
   tip.style.left = Math.max(4, left)+"px"; tip.style.top = (box.top - cb.top + 8)+"px";
 }
-function visitors(p){
-  const G = S.data.ga, k = p.start+"|all", y = add(torNow(),-1), end = p.end > y ? y : p.end;
-  const st = s2d(p.start), whole = S.view==="week" ? (st.getUTCDay()===1 && p.end <= y) : (p.start.slice(8)==="01" && p.end <= y);
+// grp: "all" = every visitor, "na" = US + Canada, "nah" = US + Canada with likely bots removed (GA feed, 11-27)
+function visitors(p, grp){
+  grp = grp || "all";
+  const G = S.data.ga, k = p.start+"|"+grp, y = add(torNow(),-1), end = p.end > y ? y : p.end;
+  // GA's week / month rows cover the period up to yesterday, so they are the de-duplicated count even for the period in
+  // progress (11-27: summing daily uniques overcounted Nov by ~9%)
+  const st = s2d(p.start), whole = S.view==="week" ? st.getUTCDay()===1 : p.start.slice(8)==="01";
   if(whole && G.agg.has((S.view==="week"?"w":"m")+"|"+k)) return {...G.agg.get((S.view==="week"?"w":"m")+"|"+k), exact:true};
-  let s = 0, u = 0, n = 0; G.d.forEach(x=>{ if(x.grp==="all" && x.start>=p.start && x.start<=end){ s+=x.s; u+=x.u; n++; } });
+  let s = 0, u = 0, n = 0; G.d.forEach(x=>{ if(x.grp===grp && x.start>=p.start && x.start<=end){ s+=x.s; u+=x.u; n++; } });
   return n ? {s, u, exact:false} : null;
 }
 const median = a => { if(!a.length) return null; const s = a.slice().sort((x,y)=>x-y), m = s.length>>1; return s.length%2 ? s[m] : (s[m-1]+s[m])/2; };
@@ -314,20 +328,40 @@ function render(){
   const bySrc = {}; y.all.forEach(c=>c.srcs.forEach(s=>bySrc[s]=(bySrc[s]||0)+1));
   const srcLine = Object.keys(bySrc).sort().map(k=>k.replace(/^SRC-/,"")+" "+bySrc[k]).join(" · ");
   const P1 = y.all.length, P2 = Math.max(1, eng.length);
+  // 11-27: visitors are people and identified companies are companies, so no percentage links the two. We show the
+  // visitor counts we care about (US + Canada, bots removed), then the companies identified as a plain count.
+  const visNa = jf ? visitors(p, "na") : null, visH = jf ? visitors(p, "nah") : null;
+  const VW = n => vis && vis.u ? Math.max(2, Math.round(100*n/vis.u)) : 2;
+  const lost = y.msp.length - y.reached.length;
+  const lostWhy = [back(y.lead) < y.lead.length ? (y.lead.length-back(y.lead))+" already a lead in the product DB" : "",
+    back(y.noemail) < y.noemail.length ? (y.noemail.length-back(y.noemail))+" with no contact email (sent to Clay only)" : "",
+    back(y.email) < y.email.length ? (y.email.length-back(y.email))+" with an email but dropped by Step 1" : ""].filter(Boolean).join(", ");
   const steps = [
-    {div:"Before our engine · identified by the product team"},
-    jf ? {k:"vis", l:"Website visitors (unique)", n:vis ? vis.u : null, sub:vis ? vis.s.toLocaleString()+" sessions"+(vis.exact?"":" · sum of daily uniques") : "GA not loaded", noList:true, cls:"vis", w:100} : null,
-    {k:"id", l:"Companies identified", n:y.all.length, of:jf && vis ? vis.u : null, list:y.all, src:true, max:P1, sub:srcLine ? "By source: "+srcLine : "none"},
+    jf ? {div:"Website traffic · Google Analytics"} : {div:"Before our engine · identified by the product team"},
+    jf ? {k:"vis", l:"Website visitors (unique)", n:vis ? vis.u : null, sub:vis ? "All countries · "+vis.s.toLocaleString()+" sessions"+(vis.exact?"":" · sum of daily uniques") : "GA not loaded", noList:true, cls:"vis", w:100} : null,
+    jf && visNa ? {k:"visna", l:"From the US and Canada", n:visNa.u, noList:true, cls:"vis", w:VW(visNa.u),
+      sub:vis ? (vis.u-visNa.u).toLocaleString()+" from other countries left out" : ""} : null,
+    jf && visH ? {k:"vish", l:"US and Canada, bots removed", n:visH.u, noList:true, cls:"vis", w:VW(visH.u),
+      sub:(visNa ? (visNa.u-visH.u).toLocaleString()+" likely bots left out: " : "Left out: ")+"all visits from Meta's data-centre towns (ad review systems), direct and paid-social visits from Google, Amazon and Microsoft server towns (search and referral visits there are kept), Linux desktops and unknown browsers. These are the visitors we can sell to."} : null,
+    jf ? {div:"Companies the product team identified · a separate count from visitors (one company can be many visitors)"} : null,
+    {k:"id", l:"Companies identified", n:y.all.length, list:y.all, src:true, max:P1,
+      sub:[y.na.length ? y.na.length.toLocaleString()+" visited from the US or Canada" : "", y.noCtry.length ? y.noCtry.length.toLocaleString()+" with no country recorded" : "",
+           y.abroad.length ? y.abroad.length.toLocaleString()+" from elsewhere" : ""].filter(Boolean).join(", ")+(srcLine ? " · By source: "+srcLine : "")},
     {k:"seen", l:"Visited on an earlier day", n:y.seen.length, of:y.all.length, list:y.seen, src:true, max:P1, cls:"sub info", sub:"Repeat visitors (any earlier hit in the product's history)"},
-    {k:"pmsp", l:"Scored MSP by the product", n:y.msp.length, of:y.all.length, list:y.msp, src:true, max:P1, sub:y.non.length.toLocaleString()+" scored not MSP: the bridge doesn't send those"+(jf ? " (JF directory-page visitors still reach our engine, see below)" : "")},
-    {k:"lead", l:"Already a lead in the product DB", n:y.lead.length, of:y.msp.length, list:y.lead, src:true, max:P1, cls:"sub leak",
-      sub:"Until Nov 24 the bridge never forwarded a company twice · "+back(y.lead)+" reached us", warn:y.lead.length-back(y.lead)},
-    {k:"noemail", l:"No contact email", n:y.noemail.length, of:y.msp.length, list:y.noemail, src:true, max:P1, cls:"sub leak",
-      sub:"Until Nov 24 sent to Clay only · "+back(y.noemail)+" reached us", warn:y.noemail.length-back(y.noemail)},
-    {k:"email", l:"With a contact email", n:y.email.length, of:y.msp.length, list:y.email, src:true, max:P1, cls:"sub",
-      sub:(jf ? "Posted straight to our engine (dropped by a Step 1 bug until Nov 24) · " : "Posted to the cross-seed webhooks · ")+back(y.email)+" arrived"},
+    {k:"pmsp", l:"Scored MSP by the product", n:y.msp.length, of:y.all.length, list:y.msp, src:true, max:P1,
+      sub:y.non.length.toLocaleString()+" scored not MSP: the bridge doesn't send those"+(jf ? " (JF directory-page visitors still reach our engine, see below)" : "")+
+        " · across all "+y.all.length.toLocaleString()+" companies, the visitor was named for "+y.personAll.length.toLocaleString()},
+    jf ? {div:"How well we know each of the "+y.msp.length+" MSPs"} : null,
+    jf && {k:"person", l:"Person identified", n:y.person.length, of:y.msp.length, list:y.person, src:true, max:P1, cls:"sub",
+      sub:"The product named the visitor (person email)"},
+    jf && {k:"found", l:"Company only, contact found afterwards", n:y.found.length, of:y.msp.length, list:y.found, src:true, max:P1, cls:"sub",
+      sub:"No person from the product; we found a contact through Clay enrichment or TVL"},
+    jf && {k:"none", l:"Company only, still no contact", n:y.none.length, of:y.msp.length, list:y.none, src:true, max:P1, cls:"sub leak",
+      sub:"We know the company but have nobody to call yet", warn:y.none.length},
+    jf && {k:"tvl", l:"Contacts verified (TVL) and handed to a rep", n:y.tvl.length, of:y.msp.length, list:y.tvl, src:true, max:P1,
+      sub:"Triple-verified contacts, rep told by the BDR digest · MSPs with a live deal or a booked call go to their rep without TVL (see Handed to a rep below)"},
     {k:"reached", l:jf ? "Reached our engine" : "Reached us as cross-seeds", n:y.reached.length, of:y.msp.length, list:y.reached, src:true, max:P1,
-      sub:(y.msp.length-y.reached.length)+" MSPs lost before the engine", warn:y.msp.length-y.reached.length},
+      sub:lost ? lost+" MSPs lost before the engine"+(lostWhy ? ": "+lostWhy : "")+" (fixed Nov 24)" : "Every MSP reached us", warn:lost},
     {div:"Inside our engine"},
     {k:"recv", l:jf ? "Companies received by the engine" : "Cross-seeds received", n:eng.length, list:eng, max:P2,
       sub:recvSub},

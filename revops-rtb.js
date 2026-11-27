@@ -102,13 +102,15 @@ function cohort(p){
   D.hits.forEach(x=>{
     if(x.d < p.start || x.d > p.end) return;
     const c = by.get(x.dom);
-    if(!c){ by.set(x.dom, {...x, first:x.d}); return; }
-    c.seg = Math.max(c.seg, x.seg); c.cst = c.cst && x.cst;
+    if(!c){ by.set(x.dom, {...x, first:x.d, segs:new Set([x.seg])}); return; }
+    c.seg = Math.max(c.seg, x.seg); c.segs.add(x.seg); c.cst = c.cst && x.cst;
     if(x.cls==="msp" || (!c.cls && x.cls)) c.cls = x.cls;
     if(!c.stage && x.stage) c.stage = x.stage;
     if(!c.touch && x.touch){ c.touch = x.touch; c.ttype = x.ttype; c.tby = x.tby; }
   });
-  const all = [...by.values()], jf = all.filter(c=>c.seg!==2);
+  // 11-27: a company with any JF hit in the period counts for JF, even if it also hit the CST engine that period
+  // (before, the highest segment won, so a JF hit with no page + a CST hit was counted as CST only: 5 in October).
+  const all = [...by.values()], jf = all.filter(c=>[...c.segs].some(s=>s!==2));
   // 11-24: MSPs that HubSpot has since flagged not-MSP or permanently excluded are not MSPs (the fishing queue skips them too)
   const later = jf.filter(c=>c.cls==="msp" && D.flags.has(c.dom) && (D.flags.get(c.dom) & (HF.NONMSP|HF.EXCL)));
   later.forEach(c=>{ c.cls = "later"; });
@@ -280,9 +282,21 @@ function render(){
   const x = cohort(p), y = srcCohort(p), jf = S.site==="jf";
   const fastBase = x.due.length;
   const med = median(x.worked.map(c=>c.biz));
-  const eng = jf ? x.jf : x.all.filter(c=>c.seg===2);            // what our engine received for this site
+  const eng = jf ? x.jf : x.all.filter(c=>c.segs.has(2));            // what our engine received for this site
   const engMsp = eng.filter(c=>c.cls==="msp");
   const prodMsp = new Set(y.msp.map(c=>c.dom)), fromMsp = eng.filter(c=>prodMsp.has(c.dom)).length;
+  // 11-27: the engine count is a different group from "reached" above, so spell out how they connect:
+  // the reached MSPs that arrived here, the product non-MSPs (mostly JF directory-page visitors, which post to our
+  // engine directly whatever the product scored), and anything the product did not see this period.
+  const prodAll = new Set(y.all.map(c=>c.dom)), engOther = eng.filter(c=>!prodMsp.has(c.dom));
+  const engNon = engOther.filter(c=>prodAll.has(c.dom)), engDir = engNon.filter(c=>c.segs.has(3)).length, engUnseen = engOther.length - engNon.length;
+  const engDoms = new Set(eng.map(c=>c.dom)), inEng = y.reached.filter(c=>engDoms.has(c.dom)).length;
+  const viaOther = y.reached.length - inEng;   // reached us, but through the other site's engine (cross-seeds)
+  const mspOffDay = fromMsp - inEng;           // product MSPs we received on a different day from their product hit
+  const recvSub = [inEng+" of the "+y.reached.length+" MSPs above"+(viaOther > 0 ? " ("+viaOther+" reached us through the "+(jf ? "CST" : "JF")+" engine instead)" : ""),
+    mspOffDay > 0 ? "+ "+mspOffDay+" product MSP"+(mspOffDay===1 ? "" : "s")+" that reached us on a different day from the product's hit" : "",
+    engNon.length ? "+ "+engNon.length+" the product scored not MSP"+(jf && engDir ? " ("+(engDir===engNon.length ? "all" : engDir)+" from the JF directory pages, which post to our engine directly)" : "") : "",
+    engUnseen ? "+ "+engUnseen+" the product did not identify this period" : ""].filter(Boolean).join(" ");
   const back = L => L.filter(c=>c.reached).length;
   const reachTone = y.msp.length ? (y.reached.length/y.msp.length >= .9 ? "ahead" : "behind") : "";
   const tiles = [
@@ -305,7 +319,7 @@ function render(){
     jf ? {k:"vis", l:"Website visitors (unique)", n:vis ? vis.u : null, sub:vis ? vis.s.toLocaleString()+" sessions"+(vis.exact?"":" · sum of daily uniques") : "GA not loaded", noList:true, cls:"vis", w:100} : null,
     {k:"id", l:"Companies identified", n:y.all.length, of:jf && vis ? vis.u : null, list:y.all, src:true, max:P1, sub:srcLine ? "By source: "+srcLine : "none"},
     {k:"seen", l:"Visited on an earlier day", n:y.seen.length, of:y.all.length, list:y.seen, src:true, max:P1, cls:"sub info", sub:"Repeat visitors (any earlier hit in the product's history)"},
-    {k:"pmsp", l:"Scored MSP by the product", n:y.msp.length, of:y.all.length, list:y.msp, src:true, max:P1, sub:y.non.length.toLocaleString()+" scored not MSP: the bridge never sends those to us"},
+    {k:"pmsp", l:"Scored MSP by the product", n:y.msp.length, of:y.all.length, list:y.msp, src:true, max:P1, sub:y.non.length.toLocaleString()+" scored not MSP: the bridge doesn't send those"+(jf ? " (JF directory-page visitors still reach our engine, see below)" : "")},
     {k:"lead", l:"Already a lead in the product DB", n:y.lead.length, of:y.msp.length, list:y.lead, src:true, max:P1, cls:"sub leak",
       sub:"Until Nov 24 the bridge never forwarded a company twice · "+back(y.lead)+" reached us", warn:y.lead.length-back(y.lead)},
     {k:"noemail", l:"No contact email", n:y.noemail.length, of:y.msp.length, list:y.noemail, src:true, max:P1, cls:"sub leak",
@@ -316,7 +330,7 @@ function render(){
       sub:(y.msp.length-y.reached.length)+" MSPs lost before the engine", warn:y.msp.length-y.reached.length},
     {div:"Inside our engine"},
     {k:"recv", l:jf ? "Companies received by the engine" : "Cross-seeds received", n:eng.length, list:eng, max:P2,
-      sub:fromMsp+" were product MSPs this period, "+(eng.length-fromMsp)+" came in otherwise (product non-MSPs, earlier hits)"},
+      sub:recvSub},
     {k:"msp", l:"Confirmed MSP by our check", n:engMsp.length, of:eng.length, list:engMsp, max:P2,
       sub:jf ? x.non.length+" not MSPs, "+x.later.length+" flagged not MSP in HubSpot after the hit, "+(x.jf.length-x.msp.length-x.non.length-x.later.length)+" unclear or clients" : "CST cross-seeds are routed by the CST engine"},
   ].concat(jf ? [
